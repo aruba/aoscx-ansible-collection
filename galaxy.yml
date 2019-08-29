@@ -1,0 +1,34 @@
+
+namespace: "arubanetworks"
+
+name: "aoscx"
+
+version: "1.0.0"
+
+authors:
+  - "Madhusudan Pranav Venugopal"
+  - "Tiffany Chiapuzio-Wong"
+  - "Yang Liu "
+
+description:
+
+license: "Apache-2.0"
+
+tags: [
+  networking,
+  aruba,
+  arubaoscx,
+  aoscx,
+  switch,
+  switches,
+  '8320',
+  '8400',
+  'hpe',
+  'datacenter'
+]
+
+repository: https://github.com/aruba/aoscx-ansible-collection
+
+issues: https://github.com/aruba/aoscx-ansible-collection/issues
+
+readme: "README.md"
