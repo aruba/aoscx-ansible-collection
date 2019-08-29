@@ -56,7 +56,7 @@ Example Playbook
 ----------------
 
 If collection installed through [Github](https://github.com/aruba/aoscx-ansible-collection)
-set collection to `aoscx-ansible-collection`:
+set collection to `arubanetworks.aoscx`:
 
 ```yaml
     ---
