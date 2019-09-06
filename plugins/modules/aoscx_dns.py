@@ -1,4 +1,6 @@
 #!/usr/bin/python
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
 # -*- coding: utf-8 -*-
 #
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
@@ -165,7 +167,7 @@ def main():
 
                 aruba_ansible_module.module.fail_json(msg="The management interface must have static IP to configure management interface name servers")  # NOQA
 
-            for k, v in mgmt_nameservers.iteritems():
+            for k, v in mgmt_nameservers.items():
                 if k.lower() == 'primary':
                     aruba_ansible_module.running_config['System']['mgmt_intf']['dns_server_1'] = v  # NOQA
                 elif k.lower() == 'secondary':
@@ -193,7 +195,7 @@ def main():
 
         if mgmt_nameservers is not None:
 
-            for k, v in mgmt_nameservers.iteritems():
+            for k, v in mgmt_nameservers.items():
                 if k.lower() == 'primary':
                     aruba_ansible_module.running_config['System']['mgmt_intf'].pop('dns_server_1')  # NOQA
                 elif k.lower() == 'secondary':
