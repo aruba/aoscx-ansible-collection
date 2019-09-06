@@ -64,20 +64,20 @@ EXAMPLES = '''
   aoscx_acl_vlan:
     acl_name: ipv4_acl
     acl_type: ipv4
-    acl_interface_list: [2, 4]
+    acl_vlan_list: [2, 4]
 
 - name: Remove ipv4 ACL from VLANs
   aoscx_acl_vlan:
     acl_name: ipv4_acl
     acl_type: ipv4
-    acl_interface_list: [2, 4]
+    acl_vlan_list: [2, 4]
     state: delete
 
 - name: Apply ipv6 ACL to VLANs
   aoscx_acl_vlan:
     acl_name: ipv6_acl
     acl_type: ipv6
-    acl_interface_list: [2, 4]
+    acl_vlan_list: [2, 4]
 '''
 
 RETURN = r''' # '''
