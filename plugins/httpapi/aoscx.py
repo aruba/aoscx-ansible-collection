@@ -1,4 +1,6 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
 # -*- coding: utf-8 -*-
 #
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
@@ -45,12 +47,9 @@ from ansible.module_utils.parsing.convert_bool import boolean
 from ansible.module_utils.six.moves.urllib.error import HTTPError
 from ansible.plugins.httpapi import HttpApiBase
 
-
-try:
-    from __main__ import display
-except ImportError:
-    from ansible.utils.display import Display
-    display = Display()
+#Removed the exception handling as only required pre 2.8 and collection is supported in >= 2.9
+from ansible.utils.display import Display
+display = Display()
 
 
 class HttpApi(HttpApiBase):

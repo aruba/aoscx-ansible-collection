@@ -1,4 +1,6 @@
 #!/usr/bin/python
+from __future__ import (absolute_import, division, print_function)
+__metaclass__ = type
 # -*- coding: utf-8 -*-
 #
 # (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
