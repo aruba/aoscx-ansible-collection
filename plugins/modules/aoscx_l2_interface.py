@@ -28,8 +28,7 @@ DOCUMENTATION = '''
 ---
 module: aoscx_l2_interface
 version_added: "2.8"
-short_description: Create or Update or Delete Layer2 Interface configuration
-  on AOS-CX
+short_description: Create or Update or Delete Layer2 Interface configuration on AOS-CX
 description:
   - This modules provides configuration management of Layer2 Interfaces on
     AOS-CX devices.
@@ -92,7 +91,7 @@ options:
     choices: ['create', 'delete', 'update']
     default: 'create'
     required: false
-'''
+'''  # NOQA
 
 EXAMPLES = '''
 - name: Configure Interface 1/1/3 - vlan trunk allowed all

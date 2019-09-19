@@ -31,7 +31,7 @@ version_added: "2.8"
 short_description: Apply/Remove ACL configuration on interfaces for AOS-CX.
 description:
   - This modules provides application management of Access Classifier Lists
-  on Interfaces on AOS-CX devices.
+    on Interfaces on AOS-CX devices.
 author:
   - Aruba Networks
 options:

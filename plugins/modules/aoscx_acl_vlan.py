@@ -31,7 +31,7 @@ version_added: "2.8"
 short_description: Apply/Remove ACL configuration on VLANs for AOS-CX.
 description:
   - This modules provides application management of Access Classifier Lists
-  on VLANs on AOS-CX devices.
+    on VLANs on AOS-CX devices.
 author:
   - Aruba Networks
 options:

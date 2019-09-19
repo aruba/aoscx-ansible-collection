@@ -18,9 +18,9 @@ __metaclass__ = type
 # specific language governing permissions and limitations
 # under the License.
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF  # NOQA
 from random import randint
 
 
@@ -36,39 +36,37 @@ def number_unit(s):
 class Interface:
 
     def create_interface(self, aruba_ansible_module, interface_name):
-        if not aruba_ansible_module.running_config.has_key('Interface'):
+        if 'Interface' not in aruba_ansible_module.running_config.keys():
             aruba_ansible_module.running_config['Interface'] = {}
 
         encoded_interface_name = interface_name.replace('/', "%2F")
-        if not aruba_ansible_module.running_config['Interface'].has_key(encoded_interface_name):
+        if encoded_interface_name not in aruba_ansible_module.running_config['Interface'].keys():  # NOQA
 
-            aruba_ansible_module.running_config['Interface'][encoded_interface_name] = {
-                "name" : interface_name
-            }
+            aruba_ansible_module.running_config['Interface'][encoded_interface_name] = {"name": interface_name}  # NOQA
 
         return aruba_ansible_module
 
     def check_interface_exists(self, aruba_ansible_module, interface_name):
 
-        if not aruba_ansible_module.running_config.has_key('Interface'):
+        if 'Interface' not in aruba_ansible_module.running_config.keys():
             return False
 
         encoded_interface_name = interface_name.replace('/', "%2F")
-        if not aruba_ansible_module.running_config['Interface'].has_key(encoded_interface_name):
+        if encoded_interface_name not in aruba_ansible_module.running_config['Interface'].keys():  # NOQA
             return False
 
         return True
 
-
     def delete_interface(self, aruba_ansible_module, interface_name):
 
-        if  self.check_interface_exists(aruba_ansible_module, interface_name):
+        if self.check_interface_exists(aruba_ansible_module, interface_name):
             encoded_interface_name = interface_name.replace('/', "%2F")
-            aruba_ansible_module.running_config['Interface'].pop(encoded_interface_name)
+            aruba_ansible_module.running_config['Interface'].pop(encoded_interface_name)  # NOQA
 
         return aruba_ansible_module
 
-    def update_interface_fields(self, aruba_ansible_module, interface_name, interface_fields):
+    def update_interface_fields(self, aruba_ansible_module, interface_name,
+                                interface_fields):
 
         if self.check_interface_exists(aruba_ansible_module, interface_name):
 
@@ -76,11 +74,13 @@ class Interface:
 
             for key in interface_fields.keys():
 
-                aruba_ansible_module.running_config['Interface'][encoded_interface_name][key] = interface_fields[key]
+                aruba_ansible_module.running_config['Interface'][encoded_interface_name][key] = interface_fields[key]  # NOQA
 
         return aruba_ansible_module
 
-    def update_interface_acl_details(self, aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction, update_type="insert"):
+    def update_interface_acl_details(self, aruba_ansible_module,
+                                     interface_name, acl_name, acl_type,
+                                     acl_direction, update_type="insert"):
         port = Port()
 
         acl_type_prefix = ""
@@ -103,34 +103,49 @@ class Interface:
         }
 
         if (update_type == "insert") or (update_type == "update"):
-            exisitng_values = port.get_port_field_values(aruba_ansible_module, interface_name, [field1])
+            exisitng_values = port.get_port_field_values(aruba_ansible_module,
+                                                         interface_name,
+                                                         [field1])
 
-            if exisitng_values.has_key(field1):
-                if (exisitng_values[field1] != port_fields[field1]):
-                    aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+            if field1 in exisitng_values.keys():
+                if exisitng_values[field1] != port_fields[field1]:
+                    aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
             else:
-                aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+                aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
 
-        elif (update_type == 'delete'):
-            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, [field1, field2])
+        elif update_type == 'delete':
+            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, [field1, field2])  # NOQA
 
         return aruba_ansible_module
 
-    def update_interface_qos_profile(self, aruba_ansible_module, interface_name, qos_profile_details, update_type='insert'):
+    def update_interface_qos_profile(self, aruba_ansible_module,
+                                     interface_name, qos_profile_details,
+                                     update_type='insert'):
         port = Port()
         if (update_type == 'insert') or (update_type == 'update'):
-            if not aruba_ansible_module.running_config.has_key('QoS'):
-                aruba_ansible_module.module.fail_json("Qos schedule profile being attached to interface {} is not configured".format(interface_name))
-            elif not aruba_ansible_module.running_config['QoS'].has_key(qos_profile_details):
-                aruba_ansible_module.module.fail_json("Qos schedule profile being attached to interface {} is not configured".format(interface_name))
+            if 'QoS' not in aruba_ansible_module.running_config.keys():
+                aruba_ansible_module.module.fail_json("Qos schedule profile "
+                                                      "being attached to "
+                                                      "interface {} is not "
+                                                      "configured"
+                                                      "".format(interface_name)
+                                                      )
+            elif qos_profile_details not in aruba_ansible_module.running_config['QoS'].keys():  # NOQA
+                aruba_ansible_module.module.fail_json("Qos schedule profile "
+                                                      "being attached to "
+                                                      "interface {} is not "
+                                                      "configured"
+                                                      "".format(interface_name)
+                                                      )
             else:
                 port_fields = {
-                    'qos' : qos_profile_details
+                    'qos': qos_profile_details
                 }
-                aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+                aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
                 return aruba_ansible_module
 
-    def update_interface_qos_rate(self, aruba_ansible_module, interface_name, qos_rate):
+    def update_interface_qos_rate(self, aruba_ansible_module, interface_name,
+                                  qos_rate):
         port = Port()
         rate_limits = {}
         if qos_rate is not None:
@@ -140,18 +155,20 @@ class Interface:
                 rate_limits[k + '_units'] = unit
 
             port_fields = {
-                "rate_limits" : rate_limits
+                "rate_limits": rate_limits
             }
-        aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+        aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
+                                                       interface_name,
+                                                       port_fields)
         return aruba_ansible_module
 
-
-    def update_interface_admin_state(self, aruba_ansible_module, interface_name, admin_state):
+    def update_interface_admin_state(self, aruba_ansible_module,
+                                     interface_name, admin_state):
 
         port = Port()
         interface = Interface()
         user_config = {
-            "admin" : admin_state,
+            "admin": admin_state,
         }
         interface_fields = {
             "user_config": user_config
@@ -161,51 +178,67 @@ class Interface:
             "admin": admin_state
         }
 
-        aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name,port_fields)
-        aruba_ansible_module = interface.update_interface_fields(aruba_ansible_module, interface_name, interface_fields)
+        aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
+                                                       interface_name,
+                                                       port_fields)
+        aruba_ansible_module = interface.update_interface_fields(aruba_ansible_module, interface_name, interface_fields)  # NOQA
 
         return aruba_ansible_module
 
-    def update_interface_description(self, aruba_ansible_module, interface_name, description):
+    def update_interface_description(self, aruba_ansible_module,
+                                     interface_name, description):
         interface = Interface()
         interface_fields = {
-            "description" : description
+            "description": description
         }
-        aruba_ansible_module = interface.update_interface_fields(aruba_ansible_module, interface_name, interface_fields)
+        aruba_ansible_module = interface.update_interface_fields(aruba_ansible_module, interface_name, interface_fields)  # NOQA
         return aruba_ansible_module
 
 
 class L2_Interface:
 
     def create_l2_interface(self, aruba_ansible_module, interface_name):
-        if self.check_if_l2_interface_possible(aruba_ansible_module, interface_name):
+        if self.check_if_l2_interface_possible(aruba_ansible_module,
+                                               interface_name):
             interface = Interface()
             port = Port()
-            aruba_ansible_module = interface.create_interface(aruba_ansible_module, interface_name)
-            aruba_ansible_module = port.create_port(aruba_ansible_module, interface_name)
+            aruba_ansible_module = interface.create_interface(aruba_ansible_module, interface_name)  # NOQA
+            aruba_ansible_module = port.create_port(aruba_ansible_module,
+                                                    interface_name)
             encoded_interface_name = interface_name.replace("/", "%2F")
             interfaces = [encoded_interface_name]
             port_fields = {
                 "interfaces": interfaces,
                 "routing": False
             }
-            aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+            aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
         else:
-            aruba_ansible_module.module.fail_json(msg="Interface {} is currently an L3 interface. Delete interface then configure as L2.".format(interface_name))
+            aruba_ansible_module.module.fail_json(msg="Interface {} is "
+                                                      "currently an L3 "
+                                                      "interface. Delete "
+                                                      "interface then "
+                                                      "configure"
+                                                      " as L2."
+                                                      "".format(interface_name)
+                                                  )
 
         return aruba_ansible_module
 
     def delete_l2_interface(self, aruba_ansible_module, interface_name):
         interface = Interface()
         port = Port()
-        aruba_ansible_module = interface.delete_interface(aruba_ansible_module, interface_name)
-        aruba_ansible_module = port.delete_port(aruba_ansible_module, interface_name)
+        aruba_ansible_module = interface.delete_interface(aruba_ansible_module,
+                                                          interface_name)
+        aruba_ansible_module = port.delete_port(aruba_ansible_module,
+                                                interface_name)
         return aruba_ansible_module
 
-    def check_if_l2_interface_possible(self, aruba_ansible_module, interface_name):
+    def check_if_l2_interface_possible(self, aruba_ansible_module,
+                                       interface_name):
         port = Port()
         if port.check_port_exists(aruba_ansible_module, interface_name):
-            result = port.get_port_field_values(aruba_ansible_module, interface_name, ['vrf'])
+            result = port.get_port_field_values(aruba_ansible_module,
+                                                interface_name, ['vrf'])
             if 'vrf' in result.keys():
                 if result['vrf'] != "":
                     return False
@@ -216,70 +249,96 @@ class L2_Interface:
         else:
             return True
 
-    def update_interface_vlan_details(self, aruba_ansible_module, interface_name, vlan_details, update_type='insert'):
+    def update_interface_vlan_details(self, aruba_ansible_module,
+                                      interface_name, vlan_details,
+                                      update_type='insert'):
         port = Port()
         interface = L2_Interface()
 
-        if not interface.check_if_l2_interface_possible(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is configured as an L3 interface. Delete interface then configure as L2.".format(interface_name))
+        if not interface.check_if_l2_interface_possible(aruba_ansible_module,
+                                                        interface_name):
+            aruba_ansible_module.module.fail_json(msg="Interface {} is "
+                                                      "configured as an L3 "
+                                                      "interface. Delete "
+                                                      "interface then "
+                                                      "configure as L2."
+                                                      "".format(interface_name)
+                                                  )
         if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is not configured".format(interface_name))
+            aruba_ansible_module.module.fail_json(msg="Interface {} is not configured".format(interface_name))  # NOQA
 
         if (update_type == 'insert') or (update_type == 'insert'):
-            aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, vlan_details)
+            aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, vlan_details)  # NOQA
         elif update_type == 'delete':
             vlan_fields = []
             for key in vlan_fields:
                 vlan_fields.append(key)
-            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, vlan_fields)
+            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, vlan_fields)  # NOQA
 
         return aruba_ansible_module
 
-    def update_interface_acl_details(self, aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction):
+    def update_interface_acl_details(self, aruba_ansible_module,
+                                     interface_name, acl_name, acl_type,
+                                     acl_direction):
         interface = Interface()
-        aruba_ansible_module = interface.update_interface_acl_details(aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction, update_type="insert")
+        aruba_ansible_module = interface.update_interface_acl_details(aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction, update_type="insert")  # NOQA
         return aruba_ansible_module
 
-    def update_interface_qos_profile(self, aruba_ansible_module, interface_name, qos_profile_details, update_type='insert'):
+    def update_interface_qos_profile(self, aruba_ansible_module,
+                                     interface_name, qos_profile_details,
+                                     update_type='insert'):
         interface = Interface()
-        aruba_ansible_module = interface.update_interface_qos_profile(aruba_ansible_module, interface_name, qos_profile_details, update_type)
+        aruba_ansible_module = interface.update_interface_qos_profile(aruba_ansible_module, interface_name, qos_profile_details, update_type)  # NOQA
         return aruba_ansible_module
 
-    def update_interface_qos_rate(self, aruba_ansible_module, interface_name, qos_rate):
+    def update_interface_qos_rate(self, aruba_ansible_module, interface_name,
+                                  qos_rate):
         interface = Interface()
-        aruba_ansible_module = interface.update_interface_qos_rate(aruba_ansible_module, interface_name, qos_rate)
+        aruba_ansible_module = interface.update_interface_qos_rate(aruba_ansible_module, interface_name, qos_rate)  # NOQA
         return aruba_ansible_module
+
 
 class L3_Interface:
 
     def create_l3_interface(self, aruba_ansible_module, interface_name):
-        if self.check_if_l3_interface_possible(aruba_ansible_module, interface_name):
+        if self.check_if_l3_interface_possible(aruba_ansible_module,
+                                               interface_name):
             interface = Interface()
             port = Port()
-            aruba_ansible_module = interface.create_interface(aruba_ansible_module, interface_name)
-            aruba_ansible_module = port.create_port(aruba_ansible_module, interface_name)
+            aruba_ansible_module = interface.create_interface(aruba_ansible_module, interface_name)  # NOQA
+            aruba_ansible_module = port.create_port(aruba_ansible_module,
+                                                    interface_name)
             encoded_interface_name = interface_name.replace("/", "%2F")
             interfaces = [encoded_interface_name]
             port_fields = {
                 "interfaces": interfaces
             }
-            aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+            aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
         else:
-            aruba_ansible_module.module.fail_json("Interface {} is currently an L2 interface. Delete interface then configure as L3.".format(interface_name))
+            aruba_ansible_module.module.fail_json("Interface {} is currently "
+                                                  "an L2 interface. Delete "
+                                                  "interface then configure as"
+                                                  " L3."
+                                                  "".format(interface_name))
 
         return aruba_ansible_module
 
     def delete_l3_interface(self, aruba_ansible_module, interface_name):
         interface = Interface()
         port = Port()
-        aruba_ansible_module = interface.delete_interface(aruba_ansible_module, interface_name)
-        aruba_ansible_module = port.delete_port(aruba_ansible_module, interface_name)
+        aruba_ansible_module = interface.delete_interface(aruba_ansible_module,
+                                                          interface_name)
+        aruba_ansible_module = port.delete_port(aruba_ansible_module,
+                                                interface_name)
         return aruba_ansible_module
 
-    def check_if_l3_interface_possible(self, aruba_ansible_module, interface_name):
+    def check_if_l3_interface_possible(self, aruba_ansible_module,
+                                       interface_name):
         port = Port()
         if port.check_port_exists(aruba_ansible_module, interface_name):
-            result = port.get_port_field_values(aruba_ansible_module, interface_name, ['vrf', 'routing'])
+            result = port.get_port_field_values(aruba_ansible_module,
+                                                interface_name, ['vrf',
+                                                                 'routing'])
             if 'vrf' in result.keys():
                 return True
             if 'routing' in result.keys():
@@ -290,11 +349,16 @@ class L3_Interface:
         else:
             return True
 
-    def update_interface_vrf_details_from_l3(self, aruba_ansible_module, vrf_name, interface_name, update_type="insert"):
+    def update_interface_vrf_details_from_l3(self, aruba_ansible_module,
+                                             vrf_name, interface_name,
+                                             update_type="insert"):
         port = Port()
         vrf = VRF()
         if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is not configured".format(interface_name))
+            aruba_ansible_module.module.fail_json(msg="Interface {} is not "
+                                                      "configured"
+                                                      "".format(interface_name)
+                                                  )
 
         result = port.get_port_field_values(aruba_ansible_module,
                                             interface_name,
@@ -302,27 +366,39 @@ class L3_Interface:
         if 'vrf' in result.keys():
             if result['vrf'] != "" and result['vrf'] != vrf_name:
                 aruba_ansible_module.module.fail_json(
-                    msg=("Interface {} is attached to VRF {}. Delete interface and recreate with VRF {}".format(
-                        interface_name, result['vrf'], vrf_name)))
+                    msg=("Interface {} is attached to VRF {}. Delete interface"
+                         " and recreate with VRF {}".format(interface_name,
+                                                            result['vrf'],
+                                                            vrf_name)))
 
         if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
             if vrf_name != "default":
-                aruba_ansible_module.module.fail_json(msg="VRF {} does not exist".format(vrf_name))
-            aruba_ansible_module = vrf.create_vrf(aruba_ansible_module, vrf_name)
+                aruba_ansible_module.module.fail_json(msg="VRF {} does not "
+                                                          "exist"
+                                                          "".format(vrf_name))
+            aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
+                                                  vrf_name)
 
         port_field = {
             "vrf": vrf_name
         }
 
-        aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_field)
+        aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
+                                                       interface_name,
+                                                       port_field)
 
         return aruba_ansible_module
 
-    def update_interface_vrf_details_from_vrf(self, aruba_ansible_module, vrf_name, interface_name, update_type="insert"):
+    def update_interface_vrf_details_from_vrf(self, aruba_ansible_module,
+                                              vrf_name, interface_name,
+                                              update_type="insert"):
         port = Port()
         vrf = VRF()
         if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is not configured".format(interface_name))
+            aruba_ansible_module.module.fail_json(msg="Interface {} is not "
+                                                      "configured"
+                                                      "".format(interface_name)
+                                                  )
 
         result = port.get_port_field_values(aruba_ansible_module,
                                             interface_name,
@@ -330,48 +406,60 @@ class L3_Interface:
         if 'vrf' in result.keys():
             if result['vrf'] != "" and result['vrf'] != vrf_name:
                 aruba_ansible_module.module.fail_json(
-                    msg=("Interface {} is attached to VRF {}. Delete interface and recreate with VRF {}".format(
-                        interface_name, result['vrf'], vrf_name)))
+                    msg=("Interface {} is attached to VRF {}. Delete interface"
+                         " and recreate with VRF {}".format(interface_name,
+                                                            result['vrf'],
+                                                            vrf_name)))
 
         if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
             if vrf_name != "default":
-                aruba_ansible_module.module.fail_json(msg="VRF {} does not exist".format(vrf_name))
-            aruba_ansible_module = vrf.create_vrf(aruba_ansible_module, vrf_name)
+                aruba_ansible_module.module.fail_json(msg="VRF {} does not "
+                                                          "exist"
+                                                          "".format(vrf_name))
+            aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
+                                                  vrf_name)
 
         port_field = {
             "vrf": vrf_name
         }
 
-        aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_field)
+        aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
+                                                       interface_name,
+                                                       port_field)
         try:
-            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip4_address'])
-            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip6_address'])
-        except:
+            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip4_address'])  # NOQA
+            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip6_address'])  # NOQA
+        except Exception:
             pass
 
         return aruba_ansible_module
 
-
-    def update_interface_acl_details(self, aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction):
+    def update_interface_acl_details(self, aruba_ansible_module,
+                                     interface_name, acl_name, acl_type,
+                                     acl_direction):
         interface = Interface()
-        aruba_ansible_module = interface.update_interface_acl_details(aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction, update_type="insert")
+        aruba_ansible_module = interface.update_interface_acl_details(aruba_ansible_module, interface_name, acl_name, acl_type, acl_direction, update_type="insert")  # NOQA
         return aruba_ansible_module
 
-    def update_interface_qos_profile(self, aruba_ansible_module, interface_name, qos_profile_details, update_type='insert'):
+    def update_interface_qos_profile(self, aruba_ansible_module,
+                                     interface_name, qos_profile_details,
+                                     update_type='insert'):
         interface = Interface()
-        aruba_ansible_module = interface.update_interface_qos_profile(aruba_ansible_module, interface_name, qos_profile_details, update_type)
+        aruba_ansible_module = interface.update_interface_qos_profile(aruba_ansible_module, interface_name, qos_profile_details, update_type)  # NOQA
         return aruba_ansible_module
 
-    def update_interface_qos_rate(self, aruba_ansible_module, interface_name, qos_rate):
+    def update_interface_qos_rate(self, aruba_ansible_module, interface_name,
+                                  qos_rate):
         interface = Interface()
-        aruba_ansible_module = interface.update_interface_qos_rate(aruba_ansible_module, interface_name, qos_rate)
+        aruba_ansible_module = interface.update_interface_qos_rate(aruba_ansible_module, interface_name, qos_rate)  # NOQA
         return aruba_ansible_module
 
-    def update_interface_ipv4_address(self, aruba_ansible_module, interface_name, ipv4):
+    def update_interface_ipv4_address(self, aruba_ansible_module,
+                                      interface_name, ipv4):
         port = Port()
         port_fields = {}
         if ipv4 == ['']:
-            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip4_address'])
+            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip4_address'])  # NOQA
             return aruba_ansible_module
 
         port_fields["ip4_address"] = ipv4[0]
@@ -381,18 +469,20 @@ class L3_Interface:
                     port_fields["ip4_address_secondary"].append(item)
         elif len(ipv4) == 2:
                 port_fields["ip4_address_secondary"] = ipv4[1]
-        aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+        aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
+                                                       interface_name,
+                                                       port_fields)
 
         return aruba_ansible_module
 
-
-    def update_interface_ipv6_address(self, aruba_ansible_module, interface_name, ipv6):
+    def update_interface_ipv6_address(self, aruba_ansible_module,
+                                      interface_name, ipv6):
         port = Port()
         port_fields = {}
         ip6_addresses = {}
 
         if ipv6 == ['']:
-            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip6_addresses'])
+            aruba_ansible_module = port.delete_port_fields(aruba_ansible_module, interface_name, ['ip6_addresses'])  # NOQA
             return aruba_ansible_module
 
         for item in ipv6:
@@ -406,11 +496,15 @@ class L3_Interface:
 
         port_fields["ip6_addresses"] = ip6_addresses
 
-        aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)
+        aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
+                                                       interface_name,
+                                                       port_fields)
 
         return aruba_ansible_module
 
-    def update_interface_ip_helper_address(self, aruba_ansible_module, vrf_name, interface_name, ip_helper_address):
+    def update_interface_ip_helper_address(self, aruba_ansible_module,
+                                           vrf_name, interface_name,
+                                           ip_helper_address):
 
         vrf = VRF()
         if vrf_name is not None:
@@ -419,11 +513,14 @@ class L3_Interface:
         if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
 
             if vrf_name == 'default':
-                aruba_ansible_module = vrf.create_vrf(aruba_ansible_module, vrf_name)
+                aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
+                                                      vrf_name)
             else:
-                aruba_ansible_module.module.fail_json(msg="VRF {} is not comfigured".format(vrf_name))
+                aruba_ansible_module.module.fail_json(msg="VRF {} is not "
+                                                          "configured"
+                                                          "".format(vrf_name))
 
-        if not aruba_ansible_module.running_config.has_key('DHCP_Relay'):
+        if 'DHCP_Relay' not in aruba_ansible_module.running_config.keys():
 
             aruba_ansible_module.running_config['DHCP_Relay'] = {}
 
@@ -431,21 +528,18 @@ class L3_Interface:
 
         index = '{}/{}'.format(vrf_name, encoded_interface_name)
 
-        if not aruba_ansible_module.running_config["DHCP_Relay"].has_key(index):
+        if index not in aruba_ansible_module.running_config["DHCP_Relay"].keys():  # NOQA
             aruba_ansible_module.running_config["DHCP_Relay"][index] = {}
 
-        if not aruba_ansible_module.running_config["DHCP_Relay"][index].has_key("ipv4_ucast_server"):
-            aruba_ansible_module.running_config["DHCP_Relay"][index]["ipv4_ucast_server"] = []
+        if "ipv4_ucast_server" not in aruba_ansible_module.running_config["DHCP_Relay"][index].keys():  # NOQA
+            aruba_ansible_module.running_config["DHCP_Relay"][index]["ipv4_ucast_server"] = []  # NOQA
 
-        aruba_ansible_module.running_config["DHCP_Relay"][index]["port"] = encoded_interface_name
+        aruba_ansible_module.running_config["DHCP_Relay"][index]["port"] = encoded_interface_name  # NOQA
 
-        aruba_ansible_module.running_config["DHCP_Relay"][index]["vrf"] = vrf_name
+        aruba_ansible_module.running_config["DHCP_Relay"][index]["vrf"] = vrf_name  # NOQA
 
         for item in ip_helper_address:
-            aruba_ansible_module.running_config["DHCP_Relay"][index]["ipv4_ucast_server"].append(item)
-            aruba_ansible_module.running_config["DHCP_Relay"][index]["ipv4_ucast_server"].sort()
+            aruba_ansible_module.running_config["DHCP_Relay"][index]["ipv4_ucast_server"].append(item)  # NOQA
+            aruba_ansible_module.running_config["DHCP_Relay"][index]["ipv4_ucast_server"].sort()  # NOQA
 
         return aruba_ansible_module
-
-
-

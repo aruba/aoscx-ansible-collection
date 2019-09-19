@@ -47,7 +47,8 @@ from ansible.module_utils.parsing.convert_bool import boolean
 from ansible.module_utils.six.moves.urllib.error import HTTPError
 from ansible.plugins.httpapi import HttpApiBase
 
-#Removed the exception handling as only required pre 2.8 and collection is supported in >= 2.9
+# Removed the exception handling as only required pre 2.8 and collection is
+# supported in >= 2.9
 from ansible.utils.display import Display
 display = Display()
 
@@ -65,7 +66,8 @@ class HttpApi(HttpApiBase):
 
     def login(self, username, password):
         self.set_no_proxy()
-        path = '/rest/v1/login?username='+username+'&password='+password
+        path = '/rest/v1/login?username={}&password={}'.format(username,
+                                                               password)
         method = 'POST'
         headers = {}
 

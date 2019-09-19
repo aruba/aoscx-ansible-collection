@@ -209,7 +209,6 @@ def main():
         if not aruba_ansible_module.running_config['System']['vrfs'][vrf_name].has_key('Static_Route'):  # NOQA
             aruba_ansible_module.warnings.append("Static route for destination {} and does not exist in VRF{}".format(prefix, vrf_name))  # NOQA
 
-
         elif not aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'].has_key(index):  # NOQA
             aruba_ansible_module.warnings.append("Static route for destination {} and does not exist in VRF{}".format(prefix, vrf_name))  # NOQA
 

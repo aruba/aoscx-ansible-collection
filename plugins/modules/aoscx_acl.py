@@ -30,8 +30,7 @@ module: aoscx_acl
 version_added: "2.8"
 short_description: Manage ACL configuration for AOS-CX.
 description:
-  - This modules provides configuration management and creation of Access
-  Classifier Lists on AOS-CX devices.
+  - This modules provides configuration management and creation of Access Classifier Lists on AOS-CX devices.
 author:
   - Aruba Networks
 options:

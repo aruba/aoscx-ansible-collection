@@ -25,6 +25,7 @@ from ansible.module_utils.connection import Connection, ConnectionError
 
 _DEVICE_CONNECTION = None
 
+
 class HttpApi:
     def __init__(self, module):
         self._module = module
@@ -39,9 +40,10 @@ class HttpApi:
     def get_running_config(self):
         return self._connection.get_running_config()
 
-    def put_running_config(self,updated_config):
+    def put_running_config(self, updated_config):
         # updated_config = {}
         self._connection.put_running_config(updated_config)
+
 
 def get_connection(module):
     global _DEVICE_CONNECTION
@@ -50,11 +52,13 @@ def get_connection(module):
         _DEVICE_CONNECTION = conn
     return _DEVICE_CONNECTION
 
+
 def get_running_config(module):
     conn = get_connection(module)
     run = conn.get_running_config()
     module.log(json.dumps(run))
     return run
+
 
 def put_running_config(module, updated_config):
     conn = get_connection(module)
@@ -64,9 +68,6 @@ def put_running_config(module, updated_config):
 class ArubaAnsibleModule:
 
     def __init__(self, module_args):
-
-
-
         self.module = module = AnsibleModule(
             argument_spec=module_args,
             supports_check_mode=True
@@ -82,9 +83,6 @@ class ArubaAnsibleModule:
         self.running_config = copy.deepcopy(running_config)
         self.original_config = copy.deepcopy(running_config)
 
-
-
-
     def update_switch_config(self):
 
         self.result = dict(changed=self.changed, warnings=self.warnings)
@@ -95,7 +93,8 @@ class ArubaAnsibleModule:
 
         else:
             self.result["changed"] = False
-            self.module.log("============================ No Change ==================================")
+            self.module.log("============================ No Change ======="
+                            "===========================")
             self.module.exit_json(**self.result)
 
         '''
