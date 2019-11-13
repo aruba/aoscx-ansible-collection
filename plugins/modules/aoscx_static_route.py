@@ -1,22 +1,13 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -32,8 +23,7 @@ short_description: Create or Delete static route configuration on AOS-CX
 description:
   - This modules provides configuration management of static routes on
     AOS-CX devices.
-author:
-  - Aruba Networks
+author: Aruba Networks (@ArubaNetworks)
 options:
   vrf_name:
     description: Name of the VRF on which the static route is to be configured.
@@ -42,11 +32,13 @@ options:
       static route will be on the Default VRF.
     required: false
     default: "default"
+    type: str
 
   destination_address_prefix:
     description: The IPv4 or IPv6 destination prefix and mask in the
-      address/mask format.
+      address/mask format i.e 1.1.1.0/24.
     required: true
+    type: str
 
   type:
     description: Specifies whether the static route is a forward, blackhole or
@@ -60,27 +52,33 @@ options:
           be silently discarded without sending any ICMP message to the sender
           of the packet.
     required: false
+    choices: ['forward', 'blackhole', 'reject']
     default: forward
+    type: str
 
   distance:
     description: Administrative distance to be used for the next hop in the
       static route instaed of default value.
     required: false
     default: 1
+    type: int
 
   next_hop_interface:
     description: The interface through which the next hop can be reached.
     required: false
+    type: str
 
   next_hop_ip_address:
     description: The IPv4 address or the IPv6 address of next hop.
     required: false
+    type: str
 
   state:
     description: Create or delete the static route.
     required: false
     choices: ['create', 'delete']
     default: create
+    type: str
 '''  # NOQA
 
 EXAMPLES = '''
@@ -129,8 +127,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF  # NOQA
 
 
 def main():
@@ -167,9 +165,9 @@ def main():
             aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
                                                   vrf_name)
         else:
-            aruba_ansible_module.module.fail_json(msg="VRF {} is not "
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
                                                       "configured"
-                                                      "".format(vrf_name))
+                                                      "".format(vrf=vrf_name))
 
     encoded_prefix = prefix.replace("/", "%2F")
     index = vrf_name + '/' + encoded_prefix
@@ -207,10 +205,10 @@ def main():
     if state == 'delete':
 
         if not aruba_ansible_module.running_config['System']['vrfs'][vrf_name].has_key('Static_Route'):  # NOQA
-            aruba_ansible_module.warnings.append("Static route for destination {} and does not exist in VRF{}".format(prefix, vrf_name))  # NOQA
+            aruba_ansible_module.warnings.append("Static route for destination {dest} and does not exist in VRF{vrf}".format(dest=prefix, vrf=vrf_name))  # NOQA
 
         elif not aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'].has_key(index):  # NOQA
-            aruba_ansible_module.warnings.append("Static route for destination {} and does not exist in VRF{}".format(prefix, vrf_name))  # NOQA
+            aruba_ansible_module.warnings.append("Static route for destination {dest} and does not exist in VRF{vrf}".format(dest=prefix, vrf=vrf_name))  # NOQA
 
         else:
             aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'].pop(index)  # NOQA

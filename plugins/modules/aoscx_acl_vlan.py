@@ -1,22 +1,12 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -32,33 +22,37 @@ short_description: Apply/Remove ACL configuration on VLANs for AOS-CX.
 description:
   - This modules provides application management of Access Classifier Lists
     on VLANs on AOS-CX devices.
-author:
-  - Aruba Networks
+author: Aruba Networks (@ArubaNetworks)
 options:
   acl_name:
     description: Name of the ACL being applied or removed from the VLAN.
     required: true
+    type: str
 
   acl_type:
     description: Type of ACL being applied or removed from the VLAN.
     choices: ['ipv4', 'ipv6', 'mac']
     required: true
+    type: str
 
   acl_vlan_list:
     description: List of VLANs for which the ACL is to be applied or removed.
     required: true
+    type: list
 
   acl_direction:
     description: Direction for which the ACL is to be applied or removed.
     required: true
     choices: ['in', 'out']
     default: 'in'
+    type: str
 
   state:
     description: Create or delete the ACL configuration from the VLANs.
     required: false
     choices: ['create', 'delete']
     default: create
+    type: str
 '''
 
 EXAMPLES = '''
@@ -80,13 +74,13 @@ EXAMPLES = '''
     acl_name: ipv6_acl
     acl_type: ipv6
     acl_vlan_list: [2, 4]
-'''
+'''  # NOQA
 
 RETURN = r''' # '''
 
-from random import randint
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
+from random import randint  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN  # NOQA
 
 
 def main():
@@ -118,9 +112,12 @@ def main():
     vlan = VLAN()
 
     for vlan_id in acl_vlan_list:
-        field1 = '{}_{}_cfg'.format(acl_type_prefix, acl_direction)
-        value1 = '{}/{}'.format(acl_name, acl_type)
-        field2 = '{}_{}_cfg_version'.format(acl_type_prefix, acl_direction)
+        field1 = '{type}_{dir}_cfg'.format(type=acl_type_prefix,
+                                           dir=acl_direction)
+        value1 = '{name}/{type}'.format(name=acl_name,
+                                        type=acl_type)
+        field2 = '{type}_{dir}_cfg_version'.format(type=acl_type_prefix,
+                                                   dir=acl_direction)
         value2 = randint(-900719925474099, 900719925474099)
 
         vlan_fields = {field1: value1, field2: value2}
@@ -138,13 +135,25 @@ def main():
                 aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='insert')  # NOQA
 
             if state == 'create':
-                aruba_ansible_module.module.log(msg=" Inserted ACL {} of type {} to VLAN {}".format(acl_name, acl_type, vlan_id))  # NOQA
+                aruba_ansible_module.module.log(msg=" Inserted ACL {name} of "
+                                                    "type {type} to VLAN {id}"
+                                                    "".format(name=acl_name,
+                                                              type=acl_type,
+                                                              id=vlan_id))  # NOQA
 
             if state == 'update':
-                aruba_ansible_module.module.log(msg=" Updated  ACL {} of type {} to VLAN {}".format(acl_name, acl_type, vlan_id))  # NOQA
+                aruba_ansible_module.module.log(msg=" Updated  ACL {name} of "
+                                                    "type {type} to VLAN {id}"
+                                                    "".format(name=acl_name,
+                                                              type=acl_type,
+                                                              id=vlan_id))  # NOQA
         elif state == 'delete':
             aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='delete')  # NOQA
-            aruba_ansible_module.module.log(msg="Deleted ACL {} of type {} from VLAN {}".format(acl_name, acl_type, vlan_id))  # NOQA
+            aruba_ansible_module.module.log(msg="Deleted ACL {name} of type "
+                                                "{type} from VLAN {id}"
+                                                "".format(name=acl_name,
+                                                          type=acl_type,
+                                                          id=vlan_id))  # NOQA
 
     aruba_ansible_module.update_switch_config()
 

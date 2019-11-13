@@ -1,27 +1,17 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port  # NOQA
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import Interface  # NOQA
-import json
 
 
 class VLAN:
@@ -46,6 +36,9 @@ class VLAN:
 
         vlan_id_str = str(vlan_id)
 
+        if vlan_id_str == '1':
+            return True
+
         if vlan_id_str not in aruba_ansible_module.running_config["VLAN"].keys():  # NOQA
             return False
 
@@ -56,18 +49,20 @@ class VLAN:
         port = Port()
         interface = Interface()
 
-        interface_vlan_id = "vlan{}".format(vlan_id)
+        interface_vlan_id = "vlan{id}".format(id=vlan_id)
 
         if not self.check_vlan_exist(aruba_ansible_module, vlan_id):
-            aruba_ansible_module.warnings.append("VLAN ID {} is not configured"
-                                                 "".format(vlan_id))
+            aruba_ansible_module.warnings.append("VLAN ID {id} is not "
+                                                 "configured"
+                                                 "".format(id=vlan_id))
             return aruba_ansible_module
 
         if interface.check_interface_exists(aruba_ansible_module,
                                             interface_vlan_id):
-            aruba_ansible_module.module.fail_json(msg="VLAN ID {} is "
+            aruba_ansible_module.module.fail_json(msg="VLAN ID {id} is "
                                                       "configured as interface"
-                                                      " VLAN".format(vlan_id))
+                                                      " VLAN"
+                                                      "".format(id=vlan_id))
             return aruba_ansible_module
 
         port_list = port.get_configured_port_list(aruba_ansible_module)
@@ -96,8 +91,9 @@ class VLAN:
                            vlan_fields_details, update_type='update'):
 
         if not self.check_vlan_exist(aruba_ansible_module, vlan_id):
-            aruba_ansible_module.warnings.append("VLAN ID {} is not "
-                                                 "configured".format(vlan_id))
+            aruba_ansible_module.warnings.append("VLAN ID {id} is not "
+                                                 "configured"
+                                                 "".format(id=vlan_id))
             return aruba_ansible_module
 
         vlan_id_str = str(vlan_id)
@@ -114,7 +110,7 @@ class VLAN:
 
         if not self.check_vlan_exist(aruba_ansible_module, vlan_id):
             aruba_ansible_module.warnings.append(
-                "VLAN ID {} is not configured".format(vlan_id))
+                "VLAN ID {id} is not configured".format(id=vlan_id))
             return aruba_ansible_module
 
         vlan_id_str = str(vlan_id)

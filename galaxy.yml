@@ -3,7 +3,7 @@ namespace: "arubanetworks"
 
 name: "aoscx"
 
-version: "1.0.0"
+version: "1.0.1"
 
 authors:
   - "Madhusudan Pranav Venugopal"
@@ -21,10 +21,8 @@ tags: [
   aoscx,
   switch,
   switches,
-  '8320',
-  '8400',
-  'hpe',
-  'datacenter'
+  hpe,
+  datacenter
 ]
 
 repository: https://github.com/aruba/aoscx-ansible-collection

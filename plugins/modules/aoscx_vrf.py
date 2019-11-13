@@ -1,22 +1,13 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -31,17 +22,18 @@ version_added: "2.8"
 short_description: Create or Delete VRF configuration on AOS-CX
 description:
   - This modules provides configuration management of VRFs on AOS-CX devices.
-author:
-  - Aruba Networks
+author: Aruba Networks (@ArubaNetworks)
 options:
   name:
     description: The name of the VRF
     required: true
+    type: str
   state:
     description: Create or delete the VRF.
     required: false
     choices: ['create', 'delete']
     default: create
+    type: str
 '''
 
 EXAMPLES = '''
@@ -58,8 +50,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF  # NOQA
 
 
 def main():

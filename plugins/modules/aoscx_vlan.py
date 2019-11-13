@@ -1,22 +1,13 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -31,29 +22,32 @@ version_added: "2.8"
 short_description: Create or Delete VLAN configuration on AOS-CX
 description:
   - This modules provides configuration management of VLANs on AOS-CX devices.
-author:
-  - Aruba Networks
+author: Aruba Networks (@ArubaNetworks)
 options:
   vlan_id:
     description: The ID of this VLAN. Non-internal VLANs must have an 'id'
                  between 1 and 4094 to be effectively instantiated.
     required: true
+    type: int
   name:
     description: VLAN name
     required: false
+    type: str
   description:
     description: VLAN description
     required: false
+    type: str
   admin_state:
     description: The Admin State of the VLAN, options are 'up' and 'down'.
     required: false
     choices: ['up', 'down']
-    default: None
+    type: str
   state:
     description: Create or update or delete the VLAN.
     required: false
     choices: ['create', 'update', 'delete']
     default: create
+    type: str
 '''
 
 EXAMPLES = '''
@@ -76,8 +70,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN  # NOQA
 
 
 def main():
@@ -85,8 +79,7 @@ def main():
         vlan_id=dict(type='int', required=True),
         name=dict(type='str', default=None),
         description=dict(type='str', default=None),
-        admin_state=dict(type='str', default=None, choices=[None,
-                                                            'up', 'down']),
+        admin_state=dict(type='str', default=None, choices=['up', 'down']),
         state=dict(type='str', default='create', choices=['create', 'delete',
                                                           'update'])
     )

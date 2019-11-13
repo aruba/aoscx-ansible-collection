@@ -1,22 +1,13 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port  # NOQA
@@ -91,10 +82,13 @@ class Interface:
         elif acl_type == "mac":
             acl_type_prefix = "aclmac"
 
-        field1 = '{}_{}_cfg'.format(acl_type_prefix, acl_direction)
-        value1 = '{}/{}'.format(acl_name, acl_type)
+        field1 = '{type}_{dir}_cfg'.format(type=acl_type_prefix,
+                                           dir=acl_direction)
+        value1 = '{name}/{type}'.format(name=acl_name,
+                                        type=acl_type)
 
-        field2 = '{}_{}_cfg_version'.format(acl_type_prefix, acl_direction)
+        field2 = '{type}_{dir}_cfg_version'.format(type=acl_type_prefix,
+                                                   dir=acl_direction)
         value2 = randint(-900719925474099, 900719925474099)
 
         port_fields = {
@@ -126,17 +120,17 @@ class Interface:
             if 'QoS' not in aruba_ansible_module.running_config.keys():
                 aruba_ansible_module.module.fail_json("Qos schedule profile "
                                                       "being attached to "
-                                                      "interface {} is not "
+                                                      "interface {int} is not "
                                                       "configured"
-                                                      "".format(interface_name)
-                                                      )
+                                                      "".format(int=interface_name)
+                                                      )  # NOQA
             elif qos_profile_details not in aruba_ansible_module.running_config['QoS'].keys():  # NOQA
                 aruba_ansible_module.module.fail_json("Qos schedule profile "
                                                       "being attached to "
-                                                      "interface {} is not "
+                                                      "interface {int} is not "
                                                       "configured"
-                                                      "".format(interface_name)
-                                                      )
+                                                      "".format(int=interface_name)
+                                                      )  # NOQA
             else:
                 port_fields = {
                     'qos': qos_profile_details
@@ -213,14 +207,14 @@ class L2_Interface:
             }
             aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
         else:
-            aruba_ansible_module.module.fail_json(msg="Interface {} is "
+            aruba_ansible_module.module.fail_json(msg="Interface {int} is "
                                                       "currently an L3 "
                                                       "interface. Delete "
                                                       "interface then "
                                                       "configure"
                                                       " as L2."
-                                                      "".format(interface_name)
-                                                  )
+                                                      "".format(int=interface_name)
+                                                  )  # NOQA
 
         return aruba_ansible_module
 
@@ -257,15 +251,15 @@ class L2_Interface:
 
         if not interface.check_if_l2_interface_possible(aruba_ansible_module,
                                                         interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is "
+            aruba_ansible_module.module.fail_json(msg="Interface {int} is "
                                                       "configured as an L3 "
                                                       "interface. Delete "
                                                       "interface then "
                                                       "configure as L2."
-                                                      "".format(interface_name)
-                                                  )
+                                                      "".format(int=interface_name)
+                                                  )  # NOQA
         if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is not configured".format(interface_name))  # NOQA
+            aruba_ansible_module.module.fail_json(msg="Interface {int} is not configured".format(int=interface_name))  # NOQA
 
         if (update_type == 'insert') or (update_type == 'insert'):
             aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, vlan_details)  # NOQA
@@ -315,11 +309,13 @@ class L3_Interface:
             }
             aruba_ansible_module = port.update_port_fields(aruba_ansible_module, interface_name, port_fields)  # NOQA
         else:
-            aruba_ansible_module.module.fail_json("Interface {} is currently "
+            aruba_ansible_module.module.fail_json("Interface {int} is "
+                                                  "currently "
                                                   "an L2 interface. Delete "
                                                   "interface then configure as"
                                                   " L3."
-                                                  "".format(interface_name))
+                                                  "".format(int=interface_name)
+                                                  )
 
         return aruba_ansible_module
 
@@ -355,10 +351,10 @@ class L3_Interface:
         port = Port()
         vrf = VRF()
         if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is not "
+            aruba_ansible_module.module.fail_json(msg="Interface {int} is not "
                                                       "configured"
-                                                      "".format(interface_name)
-                                                  )
+                                                      "".format(int=interface_name)
+                                                  )  # NOQA
 
         result = port.get_port_field_values(aruba_ansible_module,
                                             interface_name,
@@ -366,16 +362,18 @@ class L3_Interface:
         if 'vrf' in result.keys():
             if result['vrf'] != "" and result['vrf'] != vrf_name:
                 aruba_ansible_module.module.fail_json(
-                    msg=("Interface {} is attached to VRF {}. Delete interface"
-                         " and recreate with VRF {}".format(interface_name,
-                                                            result['vrf'],
-                                                            vrf_name)))
+                    msg=("Interface {int} is attached to VRF {vrf}. "
+                         "Delete interface"
+                         " and recreate with VRF "
+                         "{vrf_name}".format(int=interface_name,
+                                             vrf=result['vrf'],
+                                             vrf_name=vrf_name)))
 
         if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
             if vrf_name != "default":
-                aruba_ansible_module.module.fail_json(msg="VRF {} does not "
+                aruba_ansible_module.module.fail_json(msg="VRF {vrf} does not "
                                                           "exist"
-                                                          "".format(vrf_name))
+                                                          "".format(vrf=vrf_name))  # NOQA
             aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
                                                   vrf_name)
 
@@ -395,10 +393,10 @@ class L3_Interface:
         port = Port()
         vrf = VRF()
         if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {} is not "
+            aruba_ansible_module.module.fail_json(msg="Interface {int} is not "
                                                       "configured"
-                                                      "".format(interface_name)
-                                                  )
+                                                      "".format(int=interface_name)
+                                                  )  # NOQA
 
         result = port.get_port_field_values(aruba_ansible_module,
                                             interface_name,
@@ -406,16 +404,17 @@ class L3_Interface:
         if 'vrf' in result.keys():
             if result['vrf'] != "" and result['vrf'] != vrf_name:
                 aruba_ansible_module.module.fail_json(
-                    msg=("Interface {} is attached to VRF {}. Delete interface"
-                         " and recreate with VRF {}".format(interface_name,
-                                                            result['vrf'],
-                                                            vrf_name)))
+                    msg=("Interface {int} is attached to VRF {vrf}. Delete interface"
+                         " and recreate with VRF "
+                         "{vrf_name}".format(int=interface_name,
+                                             vrf=result['vrf'],
+                                             vrf_name=vrf_name)))
 
         if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
             if vrf_name != "default":
-                aruba_ansible_module.module.fail_json(msg="VRF {} does not "
+                aruba_ansible_module.module.fail_json(msg="VRF {vrf} does not "
                                                           "exist"
-                                                          "".format(vrf_name))
+                                                          "".format(vrf=vrf_name))  # NOQA
             aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
                                                   vrf_name)
 
@@ -466,9 +465,9 @@ class L3_Interface:
         if len(ipv4) > 2:
             port_fields["ip4_address_secondary"] = []
             for item in ipv4[1:]:
-                    port_fields["ip4_address_secondary"].append(item)
+                port_fields["ip4_address_secondary"].append(item)
         elif len(ipv4) == 2:
-                port_fields["ip4_address_secondary"] = ipv4[1]
+            port_fields["ip4_address_secondary"] = ipv4[1]
         aruba_ansible_module = port.update_port_fields(aruba_ansible_module,
                                                        interface_name,
                                                        port_fields)
@@ -486,13 +485,13 @@ class L3_Interface:
             return aruba_ansible_module
 
         for item in ipv6:
-                ip6_addresses[item] = {
-                    "node_address": True,
-                    "preferred_lifetime": 604800,
-                    "ra_prefix": True,
-                    "type": "global-unicast",
-                    "valid_lifetime": 2592000
-                }
+            ip6_addresses[item] = {
+                "node_address": True,
+                "preferred_lifetime": 604800,
+                "ra_prefix": True,
+                "type": "global-unicast",
+                "valid_lifetime": 2592000
+            }
 
         port_fields["ip6_addresses"] = ip6_addresses
 
@@ -516,9 +515,9 @@ class L3_Interface:
                 aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
                                                       vrf_name)
             else:
-                aruba_ansible_module.module.fail_json(msg="VRF {} is not "
+                aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
                                                           "configured"
-                                                          "".format(vrf_name))
+                                                          "".format(vrf=vrf_name))  # NOQA
 
         if 'DHCP_Relay' not in aruba_ansible_module.running_config.keys():
 
@@ -526,7 +525,8 @@ class L3_Interface:
 
         encoded_interface_name = interface_name.replace("/", "%2F")
 
-        index = '{}/{}'.format(vrf_name, encoded_interface_name)
+        index = '{vrf}/{int}'.format(vrf=vrf_name,
+                                     int=encoded_interface_name)
 
         if index not in aruba_ansible_module.running_config["DHCP_Relay"].keys():  # NOQA
             aruba_ansible_module.running_config["DHCP_Relay"][index] = {}

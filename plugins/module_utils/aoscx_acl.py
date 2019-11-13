@@ -1,22 +1,13 @@
-#!/usr/bin/python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
 from random import randint
@@ -55,9 +46,9 @@ class ACL:
     def delete_acl(self, aruba_ansible_module, acl_name, acl_type):
 
         if not self.check_acl_exist(aruba_ansible_module, acl_name, acl_type):
-            aruba_ansible_module.warnings.append("ACL {} of type {} not does "
-                                                 "not exist ".format(acl_name,
-                                                                     acl_type))
+            aruba_ansible_module.warnings.append("ACL " + acl_name + " of "
+                                                 "type " + acl_type + " not "
+                                                 "does not exist ")
             return aruba_ansible_module
 
         acl_index = acl_name + "/" + acl_type
@@ -70,9 +61,9 @@ class ACL:
                           acl_fields):
 
         if not self.check_acl_exist(aruba_ansible_module, acl_name, acl_type):
-            aruba_ansible_module.warnings.append("ACL {} of type {} not does "
-                                                 "not exist ".format(acl_name,
-                                                                     acl_type))
+            aruba_ansible_module.warnings.append("ACL " + acl_name + " of "
+                                                 "type " + acl_type + " not "
+                                                 "does not exist ")
             return aruba_ansible_module
 
         acl_index = acl_name + "/" + acl_type
@@ -91,9 +82,11 @@ class ACL:
 
     def update_acl_entry(self, aruba_ansible_module, acl_name, acl_type, acl_entry_sequence_number, acl_entry_details, update_type="insert"):  # NOQA
         if not self.check_acl_exist(aruba_ansible_module, acl_name, acl_type):
-            aruba_ansible_module.warnings.append("ACL {} of type {} not does "
-                                                 "not exist ".format(acl_name,
-                                                                     acl_type))
+            aruba_ansible_module.warnings.append("ACL {acl_name} of type "
+                                                 "{acl_type} not does "
+                                                 "not exist "
+                                                 "".format(acl_name=acl_name,
+                                                           acl_type=acl_type))
             return aruba_ansible_module
 
         acl_index = acl_name + "/" + acl_type

@@ -1,22 +1,13 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
-# -*- coding: utf-8 -*-
-#
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-# KIND, either express or implied. See the License for the
-# specific language governing permissions and limitations
-# under the License.
+
 
 ANSIBLE_METADATA = {
     'metadata_version': '1.1',
@@ -32,18 +23,18 @@ short_description: Create or Delete VLAN Interface configuration on AOS-CX
 description:
   - This modules provides configuration management of VLAN Interfacess on
     AOS-CX devices.
-author:
-  - Aruba Networks
+author: Aruba Networks (@ArubaNetworks)
 options:
   vlan_id:
     description: The ID of this VLAN interface. Non-internal VLANs must have
                  an 'id' between 1 and 4094 to be effectively instantiated.
     required: true
+    type: str
   admin_state:
     description: Admin State status of vlan interface.
-    default: 'up'
     choices: ['up', 'down']
     required: false
+    type: str
   ipv4:
     description: "The IPv4 address and subnet mask in the address/mask format.
       The first entry in the list is the primary IPv4, the remainings are
@@ -75,47 +66,53 @@ options:
   description:
     description: VLAN description
     required: false
+    type: str    
   active_gateway_ip:
     description: Configure IPv4 active-gateway for vlan interface.
-    type: string
+    type: str
     required: False
   active_gateway_mac_v4:
     description: "Configure virtual MAC address for IPv4 active-gateway for
       vlan interface. Must be used in conjunction of active_gateway_ip"
-    type: string
+    type: str
     required: False
   state:
     description: Create or update or delete the VLAN.
     required: false
     choices: ['create', 'update', 'delete']
     default: create
-
+    type: str
 '''  # NOQA
 
 EXAMPLES = '''
-     - name: Adding VLAN interface
-       aoscx_vlan_interface:
-         interface: "{{ item.interface }}"
-         description: "{{ item.description }}"
-       with_items:
-         - { interface: 1/1/2, vlan_details: {"vlan_tag" 2, "vlan_mode":"access" }}
-         - { interface: 1/1/3, vlan_details: {"vlan_tag" 2, "vlan_mode":"access" }}
+  - name: Create VLAN Interface 100
+    aoscx_vlan_interface:
+      vlan_id: 100
+      description: UPLINK_VLAN
+      ipv4: ['10.10.20.1/24']
+      ipv6: ['2000:db8::1234/64']
 
-     - name: Deleting interface
-       aoscx_vlan_interface:
-         interface: "{{ item.interface }}"
-         state: "{{ item.state }}"
-       with_items:
-           - { interface: vlan2, state: absent }
-           - { interface: vlan3, state: absent }
+  - name: Create VLAN Interface 200
+    aoscx_vlan_interface:
+      vlan_id: 200
+      description: UPLINK_VLAN
+      ipv4: ['10.20.20.1/24']
+      ipv6: ['3000:db8::1234/64']
+      vrf: red
+      ip_helper_address: ['10.40.20.1']
+
+  - name: Delete VLAN Interface 100
+    aoscx_vlan_interface:
+      vlan_id: 100
+      state: delete
 '''  # NOQA
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import Interface, L3_Interface
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import Interface, L3_Interface  # NOQA
 
 
 def main():
@@ -150,10 +147,11 @@ def main():
     interface = Interface()
     vlan_interface_id = "vlan" + vlan_id
     if not vlan.check_vlan_exist(aruba_ansible_module, vlan_id):
-        aruba_ansible_module.module.fail_json(msg="VLAN {} does not exist. "
+        aruba_ansible_module.module.fail_json(msg="VLAN {id} does not exist. "
                                                   "VLAN needs to be created "
                                                   "before adding or deleting "
-                                                  "interfaces".format(vlan_id))
+                                                  "interfaces"
+                                                  "".format(id=vlan_id))
 
     if state == 'create':
         aruba_ansible_module = port.create_port(aruba_ansible_module,
