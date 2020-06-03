@@ -1,8 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 from __future__ import (absolute_import, division, print_function)
@@ -82,6 +83,7 @@ RETURN = r''' # '''
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import Interface  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import Port  # NOQA
 
 
 def main():
@@ -103,14 +105,13 @@ def main():
     state = aruba_ansible_module.module.params['state']
 
     interface = Interface()
+    port = Port()
 
     for interface_name in acl_interface_list:
-        if not interface.check_interface_exists(aruba_ansible_module,
-                                                interface_name):
-            aruba_ansible_module.module.fail_json(msg="Interface {int} is not "
-                                                      "configured"
-                                                      "".format(int=interface_name)
-                                                  )
+        if not port.check_port_exists(aruba_ansible_module, interface_name):
+            aruba_ansible_module.module.fail_json(
+                msg="Interface {int} is not configured".format(
+                    int=interface_name))
 
         if (state == 'create') or (state == 'update'):
             update_type = 'insert'

@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 class VRF:
@@ -89,9 +90,9 @@ class VRF:
                                    dns_domain_list, update_type="insert"):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'insert'):  # NOQA
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         elif not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'delete'):  # NOQA
@@ -111,9 +112,9 @@ class VRF:
                                     dns_name_servers, update_type="insert"):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'insert'):  # NOQA
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
         elif not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'delete'):  # NOQA
             aruba_ansible_module.warnings.append("VRF {vrf} is not "
@@ -134,15 +135,15 @@ class VRF:
                                                update_type="insert"):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'insert'):  # NOQA
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         elif not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'delete'):  # NOQA
-            aruba_ansible_module.warnings.append("VRF {vrf} is not "
-                                                 "configured"
-                                                 "".format(vrf=vrf_name))
+            aruba_ansible_module.warnings.append(msg="VRF {vrf} is not "
+                                                     "configured"
+                                                     "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         if (update_type == 'insert') or (update_type == 'update'):
@@ -158,9 +159,9 @@ class VRF:
                                                update_type="insert"):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'insert'):  # NOQA
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         elif not self.check_vrf_exists(aruba_ansible_module, vrf_name) and (update_type == 'delete'):  # NOQA
@@ -180,9 +181,9 @@ class VRF:
                                       enable_ssh_server=False):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name):
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['ssh_enable'] = enable_ssh_server  # NOQA
@@ -192,9 +193,9 @@ class VRF:
     def check_vrf_snmp_enable(self, aruba_ansible_module, vrf_name):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name):
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         if aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['enable_snmp']:  # NOQA
@@ -206,18 +207,18 @@ class VRF:
                                 enable_snmp=False):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name):
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         for vrf in aruba_ansible_module.running_config['System']['vrfs'].keys():  # NOQA
             if self.check_vrf_snmp_enable(aruba_ansible_module, vrf):
-                aruba_ansible_module.module.fail_json("SNMP is enabled in VRF "
-                                                      "{vrf}. Only one VRF can"
-                                                      " "
-                                                      "have SNMP enabled."
-                                                      "".format(vrf=vrf))
+                aruba_ansible_module.module.fail_json(msg="SNMP is enabled in"
+                                                          " VRF {vrf}. Only "
+                                                          "one VRF can have "
+                                                          "SNMP enabled."
+                                                          "".format(vrf=vrf))
 
         aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['enable_snmp'] = enable_snmp  # NOQA
 
@@ -227,9 +228,9 @@ class VRF:
                                         enable_https_server=False):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name):
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['https_server'] = {"enable": enable_https_server}  # NOQA
@@ -241,9 +242,9 @@ class VRF:
                                   route_target, update_type='insert'):
 
         if not self.check_vrf_exists(aruba_ansible_module, vrf_name):
-            aruba_ansible_module.module.fail_json("VRF {vrf} is not "
-                                                  "configured"
-                                                  "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
+                                                      "configured"
+                                                      "".format(vrf=vrf_name))
             return aruba_ansible_module
 
         # if (update_type == "insert") or (update_type == "update"):

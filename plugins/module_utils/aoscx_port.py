@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 class Port:
@@ -39,7 +40,15 @@ class Port:
 
         return True
 
-    def delete_port(self, aruba_ansible_module, port_name):
+    def delete_port(self, aruba_ansible_module, port_name, type=None):
+
+        if aruba_ansible_module.switch_platform.startswith("6") and (type is None):  # NOQA
+            encoded_port_name = port_name.replace('/', "%2F")
+            aruba_ansible_module.running_config['Port'][encoded_port_name] = {
+                "name": port_name,
+                "admin": "down"
+            }
+            return aruba_ansible_module
 
         if not self.check_port_exists(aruba_ansible_module, port_name):
             aruba_ansible_module.warnings.append("{port} is not configured"
@@ -54,8 +63,10 @@ class Port:
     def update_port_fields(self, aruba_ansible_module, port_name, port_fields):
 
         if not self.check_port_exists(aruba_ansible_module, port_name):
-            aruba_ansible_module.module.fail_json("{port} is not configured"
-                                                  "".format(port=port_name))
+            aruba_ansible_module.module.fail_json(msg="{port} is not "
+                                                      "configured"
+                                                      "".format(port=port_name)
+                                                  )
             return aruba_ansible_module
 
         encoded_port_name = port_name.replace('/', "%2F")
@@ -69,8 +80,10 @@ class Port:
     def delete_port_fields(self, aruba_ansible_module, port_name, field_names):
 
         if not self.check_port_exists(aruba_ansible_module, port_name):
-            aruba_ansible_module.module.fail_json("{port} is not configured"
-                                                  "".format(port=port_name))
+            aruba_ansible_module.module.fail_json(msg="{port} is not "
+                                                      "configured"
+                                                      "".format(port=port_name)
+                                                  )
             return aruba_ansible_module
 
         encoded_port_name = port_name.replace('/', "%2F")
@@ -85,8 +98,10 @@ class Port:
 
         result = {}
         if not self.check_port_exists(aruba_ansible_module, port_name):
-            aruba_ansible_module.module.fail_json("{port} is not configured"
-                                                  "".format(port=port_name))
+            aruba_ansible_module.module.fail_json(msg="{port} is not "
+                                                      "configured"
+                                                      "".format(port=port_name)
+                                                  )
             return aruba_ansible_module
 
         encoded_port_name = port_name.replace('/', "%2F")

@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 from __future__ import (absolute_import, division, print_function)
@@ -41,6 +42,7 @@ from ansible.plugins.httpapi import HttpApiBase
 # Removed the exception handling as only required pre 2.8 and collection is
 # supported in >= 2.9
 from ansible.utils.display import Display
+
 display = Display()
 
 
@@ -48,10 +50,10 @@ class HttpApi(HttpApiBase):
 
     def set_no_proxy(self):
         try:
-            no_proxy = boolean(self.get_option("acx_no_proxy"))
+            self.no_proxy = boolean(self.get_option("acx_no_proxy"))
         except NameError:
-            no_proxy = False
-        if no_proxy:
+            self.no_proxy = False
+        if self.no_proxy:
             os.environ['no_proxy'] = "*"
             display.vvvv("no_proxy set to True")
 
@@ -74,6 +76,9 @@ class HttpApi(HttpApiBase):
 
     def send_request(self, data, **message_kwargs):
         headers = {}
+        if 'headers' in message_kwargs.keys():
+            headers = message_kwargs['headers']
+
         if self.connection._auth:
             headers.update(self.connection._auth)
         response, response_data = self.connection.send(
@@ -81,18 +86,28 @@ class HttpApi(HttpApiBase):
             method=message_kwargs['method'])
         return self.handle_response(response, response_data)
 
+    def get_connection_details(self):
+        connection_details = {}
+        if self.connection._auth:
+            connection_details['auth'] = self.connection._auth
+        connection_details['url'] = self.connection._url
+        connection_details['no_proxy'] = self.no_proxy
+        return connection_details
+
     def handle_response(self, response, response_data):
         response_data_json = ''
         try:
-            response_data_json = json.loads(to_text(response_data.getvalue()))
+            response_data_json = \
+                json.loads(to_text(response_data.getvalue().decode()))
         except ValueError:
+            response_data = response_data.read().decode()
 
-            response_data = response_data.read()
         if isinstance(response, HTTPError):
             if response_data:
                 if 'errors' in response_data:
                     errors = response_data['errors']['error']
-                    error_text = '\n'.join((error['error-message'] for error in errors))  # NOQA
+                    error_text = '\n'.join(
+                        (error['error-message'] for error in errors))  # NOQA
                 else:
                     error_text = response_data
 
@@ -103,3 +118,52 @@ class HttpApi(HttpApiBase):
         if auth:
             self.connection._auth = auth
         return response_data_json
+
+    def get_capabilities(self):
+        result = {}
+
+        return json.dumps(result)
+
+    def handle_httperror(self, exc):
+        """Method for dealing with HTTP error codes.
+        """
+        if exc.code == 401:
+            if self.connection._auth:
+                # Stored auth appears to be invalid, clear and retry
+                self.connection._auth = None
+                self.login(self.connection.get_option('remote_user'),
+                           self.connection.get_option('password'))
+                return True
+
+            # Unauthorized and there's no token
+
+            # If the out-of-the-box values were already tried, return.
+            if getattr(self, "zeroize_auth", False):
+                return exc
+
+            setattr(self, "zeroize_auth", True)
+
+            # Try to login with the out-of-the-box values of a zeroized
+            # device, a zeroized device uses a blank password and won't
+            # accept any operation on REST until a new password is set.
+            login_path = '/rest/v1/login?username={username}'.format(
+                username=self.connection.get_option('remote_user'))
+
+            login_resp = self.connection.send(
+                data=None, path=login_path, method='POST')
+
+            if login_resp[0].code == 268:
+                # Login was succesfull, but the session is restricted, the
+                # administrator password must be set.
+                admin_path = '/rest/v1/system/users/admin'
+                data = {
+                    "password": self.connection.get_option('password')
+                }
+
+                admin_response = self.connection.send(
+                    data=json.dumps(data), path=admin_path, method='PUT')
+
+                if admin_response[0].code == 200:
+                    return login_resp[0]
+
+        return exc

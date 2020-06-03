@@ -1,8 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 from __future__ import (absolute_import, division, print_function)
@@ -66,8 +67,8 @@ EXAMPLES = '''
 - name: DNS configuration creation
   aoscx_dns:
     mgmt_nameservers:
-     "Primary": "10.10.2.10"
-     "Secondary": "10.10.2.10"
+      "Primary": "10.10.2.10"
+      "Secondary": "10.10.2.10"
     dns_domain_name: "hpe.com"
     dns_domain_list:
       0: "hp.com"
@@ -123,11 +124,14 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import VRF
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 def main():
+    '''
+    Ansible module to configure DNS on AOS-CX switch
+    '''
     module_args = dict(
         mgmt_nameservers=dict(type='dict', required=False),
         dns_domain_list=dict(type='dict', required=False),
@@ -146,64 +150,98 @@ def main():
     dns_domain_list = aruba_ansible_module.module.params['dns_domain_list']
     vrf_name = aruba_ansible_module.module.params['vrf']
     dns_name_servers = aruba_ansible_module.module.params['dns_name_servers']
-    dns_host_v4_address_mapping = aruba_ansible_module.module.params['dns_host_v4_address_mapping']  # NOQA
+    dns_host_v4_address_mapping = aruba_ansible_module.module.params[
+        'dns_host_v4_address_mapping']
     state = aruba_ansible_module.module.params['state']
 
     vrf = VRF()
 
     if state == 'create' or state == 'update':
         if mgmt_nameservers is not None:
-            mgmt_if_mode = aruba_ansible_module.running_config['System']['mgmt_intf']['mode']  # NOQA
+            if 'mode' in aruba_ansible_module.running_config['System']['mgmt_intf']:
+                mgmt_if_mode = aruba_ansible_module.running_config['System']['mgmt_intf']['mode']
+            else:
+                mgmt_if_mode = 'dhcp'
 
             if mgmt_if_mode != 'static':
+                message_part1 = "The management interface must have static"
+                message_part2 = "IP to configure management interface name servers"
+                aruba_ansible_module.module.fail_json(
+                    msg=message_part1 + message_part2)
 
-                aruba_ansible_module.module.fail_json(msg="The management interface must have static IP to configure management interface name servers")  # NOQA
-
-            for k, v in mgmt_nameservers.items():
-                if k.lower() == 'primary':
-                    aruba_ansible_module.running_config['System']['mgmt_intf']['dns_server_1'] = v  # NOQA
-                elif k.lower() == 'secondary':
-                    aruba_ansible_module.running_config['System']['mgmt_intf']['dns_server_2'] = v  # NOQA
+            for key, value in mgmt_nameservers.items():
+                if key.lower() == 'primary':
+                    aruba_ansible_module.running_config[
+                        'System']['mgmt_intf']['dns_server_1'] = value
+                elif key.lower() == 'secondary':
+                    aruba_ansible_module.running_config[
+                        'System']['mgmt_intf']['dns_server_2'] = value
 
         if vrf_name is None:
             vrf_name = 'default'
 
+        if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
+            aruba_ansible_module.module.fail_json(
+                msg="VRF {vrf} is not configured".format(vrf=vrf_name))
+            return aruba_ansible_module
+
         if dns_domain_name is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_domain_name(aruba_ansible_module, vrf_name, dns_domain_name, update_type="insert")  # NOQA
+            aruba_ansible_module = vrf.update_vrf_fields(
+                aruba_ansible_module, vrf_name, "dns_domain_name", dns_domain_name)
 
         if dns_domain_list is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_domain_list(aruba_ansible_module, vrf_name, dns_domain_list, update_type="insert")  # NOQA
+            aruba_ansible_module = vrf.update_vrf_fields(
+                aruba_ansible_module, vrf_name, "dns_domain_list", dns_domain_list)
 
         if dns_name_servers is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_name_servers(aruba_ansible_module, vrf_name, dns_name_servers, update_type="insert")  # NOQA
+            aruba_ansible_module = vrf.update_vrf_fields(
+                aruba_ansible_module, vrf_name, "dns_name_servers", dns_name_servers)
 
         if dns_host_v4_address_mapping is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_host_v4_address_mapping(aruba_ansible_module, vrf_name, dns_host_v4_address_mapping, update_type="insert")  # NOQA
+            aruba_ansible_module = vrf.update_vrf_fields(
+                aruba_ansible_module,
+                vrf_name,
+                "dns_host_v4_address_mapping",
+                dns_host_v4_address_mapping)
 
     if state == 'delete':
 
         if vrf_name is None:
             vrf_name = 'default'
 
+        if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
+            aruba_ansible_module.warnings.append(
+                "VRF {vrf} is not configured" "".format(vrf=vrf_name))
+            return aruba_ansible_module
+
         if mgmt_nameservers is not None:
 
-            for k, v in mgmt_nameservers.items():
+            for k in mgmt_nameservers.keys():
                 if k.lower() == 'primary':
-                    aruba_ansible_module.running_config['System']['mgmt_intf'].pop('dns_server_1')  # NOQA
+                    aruba_ansible_module.running_config['System']['mgmt_intf'].pop(
+                        'dns_server_1')
                 elif k.lower() == 'secondary':
-                    aruba_ansible_module.running_config['System']['mgmt_intf'].pop('dns_server_2')  # NOQA
+                    aruba_ansible_module.running_config['System']['mgmt_intf'].pop(
+                        'dns_server_2')
 
         if dns_domain_name is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_domain_name(aruba_ansible_module, vrf_name, dns_domain_name, update_type="delete")  # NOQA
+            aruba_ansible_module = vrf.delete_vrf_field(
+                aruba_ansible_module, vrf_name, "dns_domain_name", dns_domain_name)
 
         if dns_domain_list is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_domain_list(aruba_ansible_module, vrf_name, dns_domain_list, update_type="delete")  # NOQA
+            aruba_ansible_module = vrf.delete_vrf_field(
+                aruba_ansible_module, vrf_name, "dns_domain_list", dns_domain_list)
 
         if dns_name_servers is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_name_servers(aruba_ansible_module, vrf_name, dns_name_servers, update_type="delete")  # NOQA
+            aruba_ansible_module = vrf.delete_vrf_field(
+                aruba_ansible_module, vrf_name, "dns_name_servers", dns_name_servers)
 
         if dns_host_v4_address_mapping is not None:
-            aruba_ansible_module = vrf.update_vrf_dns_host_v4_address_mapping(aruba_ansible_module, vrf_name, dns_host_v4_address_mapping, update_type="delete")  # NOQA
+            aruba_ansible_module = vrf.delete_vrf_field(
+                aruba_ansible_module,
+                vrf_name,
+                "dns_host_v4_address_mapping",
+                dns_host_v4_address_mapping)
 
     aruba_ansible_module.update_switch_config()
 

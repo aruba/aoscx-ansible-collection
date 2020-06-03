@@ -1,8 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019 Hewlett Packard Enterprise Development LP.
-# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 
 from __future__ import (absolute_import, division, print_function)
@@ -127,8 +128,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vrf import VRF  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import VRF
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 def main():
@@ -150,8 +151,8 @@ def main():
     prefix = aruba_ansible_module.module.params['destination_address_prefix']
     route_type = aruba_ansible_module.module.params['type']
     distance = aruba_ansible_module.module.params['distance']
-    next_hop_interface = aruba_ansible_module.module.params['next_hop_interface']  # NOQA
-    next_hop_ip_address = aruba_ansible_module.module.params['next_hop_ip_address']  # NOQA
+    next_hop_interface = aruba_ansible_module.module.params['next_hop_interface']
+    next_hop_ip_address = aruba_ansible_module.module.params['next_hop_ip_address']
     state = aruba_ansible_module.module.params['state']
 
     vrf = VRF()
@@ -165,53 +166,58 @@ def main():
             aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
                                                   vrf_name)
         else:
-            aruba_ansible_module.module.fail_json(msg="VRF {vrf} is not "
-                                                      "configured"
-                                                      "".format(vrf=vrf_name))
+            aruba_ansible_module.module.fail_json(
+                msg="VRF {vrf} is not " "configured" "".format(vrf=vrf_name))
 
     encoded_prefix = prefix.replace("/", "%2F")
+    encoded_prefix = encoded_prefix.replace(":", "%3A")
     index = vrf_name + '/' + encoded_prefix
-
     if (state == 'create') or (state == 'update'):
-
         address_family = 'ipv6' if ':' in prefix else 'ipv4'
-
-        if not aruba_ansible_module.running_config['System']['vrfs'][vrf_name].has_key('Static_Route'):  # NOQA
-            aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'] = {}  # NOQA
-
-        if not aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'].has_key(index):  # NOQA
-            aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index] = {}  # NOQA
-
+        static_route = {}
+        static_route[index] = {}
         if address_family is not None:
-            aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index]["address_family"] = address_family  # NOQA
-
+            static_route[index]["address_family"] = address_family
         if prefix is not None:
-            aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index]["prefix"] = prefix  # NOQA
-
+            static_route[index]["prefix"] = prefix
         if route_type is not None:
-            aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index]["type"] = route_type  # NOQA
-
+            static_route[index]["type"] = route_type
             if route_type == 'forward':
-                if not aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index].has_key('static_nexthops'):  # NOQA
-                    aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index]['static_nexthops'] = {"0": {"bfd_enable": False, "distance": distance}}  # NOQA
+                static_route[index]['static_nexthops'] = {
+                    "0": {
+                        "bfd_enable": False,
+                        "distance": distance
+                    }
+                }
+            if next_hop_interface is not None:
+                encoded_interface = next_hop_interface.replace(
+                    '/', '%2F')
+                static_route[index]['static_nexthops']["0"]["port"] = encoded_interface
+            if next_hop_ip_address is not None:
+                static_route[index]['static_nexthops']["0"]["ip_address"] = next_hop_ip_address
 
-                if next_hop_interface is not None:
-                    encoded_interface = next_hop_interface.replace('/', '%2F')
-                    aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index]['static_nexthops']["0"]["port"] = encoded_interface  # NOQA
+            aruba_ansible_module = vrf.update_vrf_fields(
+                aruba_ansible_module, vrf_name, 'Static_Route', static_route)
 
-                if next_hop_ip_address is not None:
-                    aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'][index]['static_nexthops']["0"]["ip_address"] = next_hop_ip_address  # NOQA
-
-    if state == 'delete':
-
-        if not aruba_ansible_module.running_config['System']['vrfs'][vrf_name].has_key('Static_Route'):  # NOQA
-            aruba_ansible_module.warnings.append("Static route for destination {dest} and does not exist in VRF{vrf}".format(dest=prefix, vrf=vrf_name))  # NOQA
-
-        elif not aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'].has_key(index):  # NOQA
-            aruba_ansible_module.warnings.append("Static route for destination {dest} and does not exist in VRF{vrf}".format(dest=prefix, vrf=vrf_name))  # NOQA
-
+    if (state == 'delete'):
+        if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
+            aruba_ansible_module.module.fail_json(
+                msg="VRF {vrf_name} does not exist".format(
+                    vrf_name=vrf_name))
+        static_route = vrf.get_vrf_field_value(
+            aruba_ansible_module, vrf_name, 'Static_Route')
+        if not static_route:
+            aruba_ansible_module.warnings.append(
+                "Static route for destination {dest} does not exist in VRF {vrf}".format(
+                    dest=prefix, vrf=vrf_name))
+        elif index not in static_route.keys():
+            aruba_ansible_module.warnings.append(
+                "Static route for destination {dest} does not exist in VRF {vrf}".format(
+                    dest=prefix, vrf=vrf_name))
         else:
-            aruba_ansible_module.running_config['System']['vrfs'][vrf_name]['Static_Route'].pop(index)  # NOQA
+            static_route.pop(index)
+            aruba_ansible_module = vrf.update_vrf_fields(
+                aruba_ansible_module, vrf_name, 'Static_Route', static_route)
 
     aruba_ansible_module.update_switch_config()
 
