@@ -191,7 +191,9 @@ sets the `ansible_connection` value accordingly):
 Contribution
 -------
 At Aruba Networks we're dedicated to ensuring the quality of our products, so if you find any
-issues at all please open an issue on our [Github](https://github.com/aruba/aoscx-ansible-collection) and we'll be sure to respond promptly!
+issues at all please open an issue on our [Github](https://github.com/aruba/aoscx-ansible-collection) and we'll be sure to respond promptly!  
+
+For more contribution opportunities follow our guidelines outlined in our [CONTRIBUTING.md](https://github.com/aruba/aoscx-ansible-collection/blob/master/CONTRIBUTING.md)
 
 License
 -------
