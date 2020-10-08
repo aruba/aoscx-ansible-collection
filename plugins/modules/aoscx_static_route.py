@@ -181,7 +181,7 @@ def main():
         if prefix is not None:
             static_route[index]["prefix"] = prefix
         if route_type is not None:
-            static_route[index]["type"] = route_type
+            static_route[index]['static_nexthops']["0"]["type"] = route_type
             if route_type == 'forward':
                 static_route[index]['static_nexthops'] = {
                     "0": {

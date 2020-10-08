@@ -3,12 +3,13 @@ namespace: "arubanetworks"
 
 name: "aoscx"
 
-version: "2.0.1"
+version: "2.0.2"
 
 authors:
   - "Madhusudan Pranav Venugopal"
   - "Tiffany Chiapuzio-Wong"
-  - "Yang Liu "
+  - "Yang Liu"
+  - "Derek Wang"
 
 description:
 
