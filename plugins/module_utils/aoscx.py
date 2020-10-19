@@ -18,7 +18,10 @@ from ansible.module_utils._text import to_text
 from ansible.module_utils.basic import env_fallback
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils.basic import missing_required_lib
-from ansible.module_utils.network.common.utils import to_list, ComplexList
+try:
+    from ansible.module_utils.network.common.utils import to_list, ComplexList
+except ImportError:
+    from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import to_list, ComplexList
 from ansible.module_utils.connection import exec_command, Connection, ConnectionError
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_ztp import connect_ztp_device
 
