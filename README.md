@@ -16,6 +16,14 @@ Requirements
     switch(config)# https-server rest access-mode read-write
     switch(config)# https-server vrf mgmt
     ```
+* Install all Ansible requirements, with the following command:
+    ```
+    ansible-galaxy install -r requirements.yml
+    ```
+* Install all Python requirements with the following command:
+    ```
+    pip install -r requirements.txt
+    ```
 
 SSH/CLI Modules
 ---------------
@@ -208,3 +216,4 @@ Author Information
  - Derek Wang (@derekwangHPEAruba)
  - Melvin Gutierrez (@melvin-gutierrez)
  - Rodrigo Jose Hernandez (@rodrigo-j-hernandez)
+ - Daniel Alvarado Bonilla (@daniel-alvarado)

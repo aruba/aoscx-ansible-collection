@@ -1,0 +1,5 @@
+---
+collections:
+  # Install Ansible.netcommon from Ansible Galaxy
+  - name: ansible.netcommon
+    source: https://galaxy.ansible.com

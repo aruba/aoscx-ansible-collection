@@ -17,7 +17,10 @@ from itertools import chain
 from ansible.errors import AnsibleConnectionFailure
 from ansible.module_utils._text import to_text
 from ansible.module_utils.common._collections_compat import Mapping
-from ansible.module_utils.network.common.utils import to_list
+try:
+    from ansible.module_utils.network.common.utils import to_list, ComplexList
+except ImportError:
+    from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import to_list, ComplexList
 from ansible.plugins.cliconf import CliconfBase, enable_mode
 
 
