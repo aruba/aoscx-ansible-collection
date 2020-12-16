@@ -92,6 +92,8 @@ class HttpApi(HttpApiBase):
             connection_details['auth'] = self.connection._auth
         connection_details['url'] = self.connection._url
         connection_details['no_proxy'] = self.no_proxy
+        connection_details['remote_user'] = self.connection.get_option('remote_user')  # NOQA
+        connection_details['password'] = self.connection.get_option('password')  # NOQA
         return connection_details
 
     def handle_response(self, response, response_data):

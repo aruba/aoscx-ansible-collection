@@ -206,26 +206,63 @@ class HttpApi:
         if headers is None:
             headers = {}
         connection_details = self._connection.get_connection_details()
-        if 'auth'in connection_details.keys():
-            headers.update(connection_details['auth'])
-
+ 
         full_url = connection_details['url'] + url
         with open(files, 'rb') as file:
             file_param = {'fileupload': file}
+
+            # Get Credentials
+            user = connection_details['remote_user']
+            password = connection_details['password']
+
             # Workaround for setting no_proxy based off acx_no_proxy flag
             if connection_details['no_proxy']:
                 proxies = {'http': None, 'https': None}
+                # Using proxies
+                # Perform Login
+                response_login = requests.post(
+                    connection_details['url'] + \
+                    "/rest/v1/login?username={}&password={}".format(
+                        user, password
+                    ),
+                    verify=False, timeout=5, proxies=proxies)
+                # Perform File Upload
                 res = requests.post(
                     url=full_url, files=file_param, verify=False,
-                    proxies=proxies, headers=headers)
+                    proxies=proxies,
+                    cookies=response_login.cookies
+                )
+                # Perform Logout 
+                response_logout = requests.post(
+                    connection_details['url'] + "/rest/v1/logout",
+                    verify=False,proxies=proxies,
+                    cookies=response_login.cookies)
+
             else:
+                # No proxies
+                # Perform Login
+                response_login = requests.post(
+                    connection_details['url'] + \
+                    "/rest/v1/login?username={}&password={}".format(
+                        user, password
+                    ),
+                    verify=False, timeout=5)
+                # Perform File Upload
                 res = requests.post(
                     url=full_url, files=file_param, verify=False,
-                    headers=headers)
+                    cookies=response_login.cookies
+                )
+                # Perform Logout 
+                response_logout = requests.post(
+                    connection_details['url'] + "/rest/v1/logout",
+                    verify=False,
+                    cookies=response_login.cookies)
+    
         if res.status_code != 200:
             error_text = "Error while uploading firmware"
             raise ConnectionError(error_text, code=res.status_code)
         return res
+
 
 
 def create_ssh_connection(module):
