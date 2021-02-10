@@ -31,6 +31,11 @@ description: This module downloads an existing configuration from AOS-CX devices
     description: VRF to be used to contact TFTP server, required if remote_output_file_tftp_path is provided
     type: str
     required: false
+  sort_json:
+    description: flag whether or not to sort JSON config
+    type: bool
+    default: True
+    required: false    
 ```
 
 ##### EXAMPLES
