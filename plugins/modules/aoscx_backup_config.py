@@ -52,6 +52,11 @@ options:
     description: VRF to be used to contact TFTP server, required if remote_output_file_tftp_path is provided
     type: str
     required: false
+  sort_json:
+    description: flag whether or not to sort JSON config
+    type: bool
+    default: True
+    required: false
 '''  # NOQA
 
 EXAMPLES = '''
@@ -94,7 +99,7 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule  # NOQA
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule, comp_sort  # NOQA
 import json
 
 
@@ -104,7 +109,8 @@ def main():
         output_file=dict(type='str', default=None),
         remote_output_file_tftp_path=dict(type='str', default=None),
         config_type=dict(type='str', default='json', choices=['json', 'cli']),
-        vrf=dict(type='str')
+        vrf=dict(type='str'),
+        sort_json=dict(type='bool', default=True)
     )
 
     aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
@@ -115,6 +121,7 @@ def main():
     config_name = aruba_ansible_module.module.params['config_name']
     config_type = aruba_ansible_module.module.params['config_type']
     config_file = aruba_ansible_module.module.params['output_file']
+    sort_json = aruba_ansible_module.module.params['sort_json']
 
     if tftp_path is not None:
         if vrf is None:
@@ -133,6 +140,8 @@ def main():
 
         config_json = aruba_ansible_module.get_switch_config(
             store_config=False)
+        if sort_json:
+            config_json = comp_sort(config_json)
         with open(config_file, 'w') as to_file:
             formatted_file = json.dumps(config_json, indent=4)
             to_file.write(formatted_file)

@@ -14,6 +14,7 @@ import copy
 import json
 import re
 import traceback
+from collections import OrderedDict
 from ansible.module_utils._text import to_text
 from ansible.module_utils.basic import env_fallback
 from ansible.module_utils.basic import AnsibleModule
@@ -146,6 +147,42 @@ def sanitize(resp):
     return '\n'.join(cleaned).strip()
 
 
+def natural_sort_key(s):
+    '''
+    Sort function for natural sort of alphanumeric values instead of ASCII
+    :param s: str to be sorted
+    :return: value to be compared
+    '''
+    _nsre = re.compile(r'\.*(\d+)$')
+    if '%2F' in s:
+        s.replace('%2F', '')
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(_nsre, s)]
+
+
+def comp_sort(obj):
+    '''
+    Sorts list and dict objects within a nested JSON and returns the result
+    :param obj: dict or list to be sorted
+    :return: dict or list sorted
+    '''
+    data = OrderedDict()
+    if isinstance(obj, dict):
+        for key, value in sorted(obj.items(), key=lambda x: natural_sort_key(x[0])):
+            if isinstance(value, dict) or isinstance(value, list):
+                data[key] = comp_sort(value)
+            else:
+                data[key] = value
+    elif isinstance(obj, list):
+        try:
+            return sorted(obj, key=natural_sort_key)
+        except ExpectedError:
+            is_dict_or_list = isinstance(value, dict) or isinstance(value,
+                                                                    list)
+            return [comp_sort(value) if is_dict_or_list else value for value in obj]
+    return data
+
+
 class HttpApi:
     '''
     Module utils class for AOS-CX HTTP API connection
@@ -206,7 +243,7 @@ class HttpApi:
         if headers is None:
             headers = {}
         connection_details = self._connection.get_connection_details()
- 
+
         full_url = connection_details['url'] + url
         with open(files, 'rb') as file:
             file_param = {'fileupload': file}
@@ -232,7 +269,7 @@ class HttpApi:
                     proxies=proxies,
                     cookies=response_login.cookies
                 )
-                # Perform Logout 
+                # Perform Logout
                 response_logout = requests.post(
                     connection_details['url'] + "/rest/v1/logout",
                     verify=False,proxies=proxies,
@@ -252,12 +289,12 @@ class HttpApi:
                     url=full_url, files=file_param, verify=False,
                     cookies=response_login.cookies
                 )
-                # Perform Logout 
+                # Perform Logout
                 response_logout = requests.post(
                     connection_details['url'] + "/rest/v1/logout",
                     verify=False,
                     cookies=response_login.cookies)
-    
+
         if res.status_code != 200:
             error_text = "Error while uploading firmware"
             raise ConnectionError(error_text, code=res.status_code)
