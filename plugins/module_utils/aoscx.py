@@ -155,7 +155,7 @@ def natural_sort_key(s):
     '''
     _nsre = re.compile(r'\.*(\d+)$')
     if '%2F' in s:
-        s.replace('%2F', '')
+        s = s.replace('%2F', '')
     return [int(text) if text.isdigit() else text.lower()
             for text in re.split(_nsre, s)]
 
