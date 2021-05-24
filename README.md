@@ -124,16 +124,17 @@ Example Playbooks
 If collection installed through Galaxy add `arubanetworks.aoscx` to your list of collections:
 
 ```yaml
--  hosts: all
- collections:
-  - arubanetworks.aoscx
- tasks:
-  - name: Create L3 Interface 1/1/3
-    aoscx_l3_interface:
-      interface: 1/1/3
-      description: Uplink_Interface
-      ipv4: ['10.20.1.3/24']
-      ipv6: ['2001:db8::1234/64']
+- hosts: all
+  collections:
+    - arubanetworks.aoscx
+  gather_facts: False
+  tasks:
+    - name: Create L3 Interface 1/1/3
+      aoscx_l3_interface:
+        interface: 1/1/3
+        description: Uplink_Interface
+        ipv4: ['10.20.1.3/24']
+        ipv6: ['2001:db8::1234/64']
 ```
 
 
@@ -179,6 +180,7 @@ sets the `ansible_connection` value accordingly):
 - hosts: all
   collections:
     - arubanetworks.aoscx
+  gather_facts: False    
   tasks:
     - name: Adding or Updating Banner
       aoscx_banner:
@@ -188,6 +190,7 @@ sets the `ansible_connection` value accordingly):
 - hosts: all
   collections:
     - arubanetworks.aoscx
+  gather_facts: False    
   vars:
     ansible_connection: network_cli
   tasks:
