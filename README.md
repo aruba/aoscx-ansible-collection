@@ -178,6 +178,8 @@ If collection installed through Galaxy add `arubanetworks.aoscx` to your list of
 - hosts: all
   collections:
     - arubanetworks.aoscx
+  vars:
+    ansible_python_interpreter: /usr/bin/python3    
   gather_facts: False
   tasks:
   - name: Create L3 Interface 1/1/3
@@ -231,6 +233,8 @@ sets the `ansible_connection` value accordingly):
 - hosts: all
   collections:
     - arubanetworks.aoscx
+  vars:
+    ansible_python_interpreter: /usr/bin/python3    
   gather_facts: False
   tasks:
     - name: Adding or Updating Banner
