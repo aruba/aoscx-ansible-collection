@@ -10,7 +10,7 @@ Requirements
 
 * Python 3 or later
 * Ansible 2.9.0 or later
-* Minimum supported AOS-CX firmware version 10.03
+* Minimum supported AOS-CX firmware version 10.04
 * Enable REST on your AOS-CX device with the following commands:
     ```
     switch(config)# https-server rest access-mode read-write
@@ -22,7 +22,21 @@ Requirements
     ```
 * Install all Python requirements with the following command:
     ```
-    pip install -r requirements.txt
+    python3 -m pip install -r <collection_path>/requirements.txt
+    ```
+    
+  * After installing the collection using the `ansible-galaxy` command you'll find the path to the collection in the following output:
+    ```bash
+    ubuntu-vm: $ ansible-galaxy collection install ~/arubanetworks-aoscx-3.0.0.tar.gz -f
+    Process install dependency map
+    Starting collection install process
+    Skipping 'ansible.netcommon' as it is already installed
+    Installing 'arubanetworks.aoscx:3.0.0' to '/home/administrator/.ansible/collections/ansible_collections/arubanetworks/aoscx'
+    ```
+    The requirements.txt file is located in the collection path. Based on the previous example, the command to install all Python3 requirements
+    is as follows:
+    ```
+    python3 -m pip  install -r /home/administrator/.ansible/collections/ansible_collections/arubanetworks/aoscx/requirements.txt
     ```
 
 SSH/CLI Modules
