@@ -145,9 +145,9 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import L2_Interface, Interface
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import L2_Interface, Interface
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 def main():
@@ -167,121 +167,228 @@ def main():
                    choices=['create', 'delete', 'update'])
     )
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args)
+    # Version management
+    try:
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    params = {}
-    for param in aruba_ansible_module.module.params.keys():
-        params[param] = aruba_ansible_module.module.params[param]
+        USE_PYAOSCX_SDK = True
 
-    state = aruba_ansible_module.module.params['state']
-    admin_state = aruba_ansible_module.module.params['admin_state']
-    interface_name = aruba_ansible_module.module.params['interface']
-    description = aruba_ansible_module.module.params['description']
-    interface_qos_rate = aruba_ansible_module.module.params[
-        'interface_qos_rate']
-    interface_qos_schedule_profile = aruba_ansible_module.module.params[
-        'interface_qos_schedule_profile']
+    except ImportError:
 
-    l2_interface = L2_Interface()
-    interface = Interface()
-    vlan = VLAN()
+        USE_PYAOSCX_SDK = False
 
-    interface_vlan_dict = {}
+    if USE_PYAOSCX_SDK:
 
-    if params['state'] == 'create':
-        aruba_ansible_module = l2_interface.create_l2_interface(
-            aruba_ansible_module, interface_name)
+        from ansible.module_utils.basic import AnsibleModule
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
 
-        if params['vlan_mode'] == 'access':
-            interface_vlan_dict['vlan_mode'] = 'access'
+        interface_name = ansible_module.params['interface']
+        admin_state = ansible_module.params['admin_state']
+        # Set all variables
+        description = ansible_module.params['description']
+        vlan_mode = ansible_module.params['vlan_mode']
+        vlan_access = ansible_module.params['vlan_access']
+        vlan_trunks = ansible_module.params['vlan_trunks']
+        trunk_allowed_all = ansible_module.params['trunk_allowed_all']
+        native_vlan_id = ansible_module.params['native_vlan_id']
+        native_vlan_tag = ansible_module.params['native_vlan_tag']
+        qos_profile_details = ansible_module.params['interface_qos_schedule_profile']
+        qos_rate = ansible_module.params['interface_qos_rate']
+        state = ansible_module.params['state']
 
-            if params['vlan_access'] is None:
-                interface_vlan_dict['vlan_tag'] = 1
+        # Session
+        session = Session(ansible_module)
 
-            elif vlan.check_vlan_exist(aruba_ansible_module,
-                                       params['vlan_access']):
-                interface_vlan_dict['vlan_tag'] = params['vlan_access']
+        # Set result var
+        result = dict(
+            changed=False
+        )
 
-            else:
-                aruba_ansible_module.module.fail_json(msg="VLAN {id} is not "
-                                                          "configured"
-                                                          "".format(id=params['vlan_access']))  # NOQA
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
 
-        elif params['vlan_mode'] == 'trunk':
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
 
-            if params['native_vlan_id']:
-                if params['native_vlan_id'] == '1':
-                    interface_vlan_dict['vlan_tag'] = '1'
-                    if params['native_vlan_tag']:
-                        interface_vlan_dict['vlan_mode'] = 'native-tagged'
-                    else:
-                        interface_vlan_dict['vlan_mode'] = 'native-untagged'
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+        if state == 'delete':
+            # Create Interface Object
+            interface = pyaoscx_factory.interface(interface_name)
+            # Delete it
+            interface.delete()
+
+            # Changed
+            result['changed'] = True
+
+        if state == 'create' or state == 'update':
+            # Set VLAN tag
+            vlan_tag = None
+            if vlan_access is not None:
+                vlan_tag = vlan_access
+            elif native_vlan_id is not None:
+                vlan_tag = native_vlan_id
+
+            if isinstance(vlan_tag, str):
+                vlan_tag = int(vlan_tag)
+
+            # Create Interface Object
+            interface = pyaoscx_factory.interface(interface_name)
+            # Verify if interface was create
+            if interface.was_modified():
+                # Changed
+                result['changed'] = True
+            # Configure L2
+            # Verify if object was changed
+            modified_op = interface.configure_l2(
+                description=description,
+                admin=admin_state,
+                vlan_mode=vlan_mode,
+                vlan_tag=vlan_tag,
+                vlan_ids_list=vlan_trunks,
+                trunk_allowed_all=trunk_allowed_all,
+                native_vlan_tag=native_vlan_tag)
+
+            if qos_profile_details is not None:
+                modified_op2 = interface.update_interface_qos_profile(
+                    qos_profile_details)
+                modified_op = modified_op2 or modified_op
+
+            if qos_rate is not None:
+                modified_op3 = interface.update_interface_qos_rate(qos_rate)
+                modified_op = modified_op3 or modified_op
+
+            if modified_op:
+                # Changed
+                result['changed'] = True
+
+        # Exit
+        ansible_module.exit_json(**result)
+    else:
+        aruba_ansible_module = ArubaAnsibleModule(module_args)
+
+        params = {}
+        for param in aruba_ansible_module.module.params.keys():
+            params[param] = aruba_ansible_module.module.params[param]
+
+        state = aruba_ansible_module.module.params['state']
+        admin_state = aruba_ansible_module.module.params['admin_state']
+        interface_name = aruba_ansible_module.module.params['interface']
+        description = aruba_ansible_module.module.params['description']
+        interface_qos_rate = aruba_ansible_module.module.params[
+            'interface_qos_rate']
+        interface_qos_schedule_profile = aruba_ansible_module.module.params[
+            'interface_qos_schedule_profile']
+
+        l2_interface = L2_Interface()
+        interface = Interface()
+        vlan = VLAN()
+
+        interface_vlan_dict = {}
+
+        if params['state'] == 'create':
+            aruba_ansible_module = l2_interface.create_l2_interface(
+                aruba_ansible_module, interface_name)
+
+            if params['vlan_mode'] == 'access':
+                interface_vlan_dict['vlan_mode'] = 'access'
+
+                if params['vlan_access'] is None:
+                    interface_vlan_dict['vlan_tag'] = 1
+
                 elif vlan.check_vlan_exist(aruba_ansible_module,
-                                           params['native_vlan_id']):
-                    if params['native_vlan_tag']:
-                        interface_vlan_dict['vlan_mode'] = 'native-tagged'
-                    else:
-                        interface_vlan_dict['vlan_mode'] = 'native-untagged'
-                    interface_vlan_dict['vlan_tag'] = params['native_vlan_id']
+                                           params['vlan_access']):
+                    interface_vlan_dict['vlan_tag'] = params['vlan_access']
+
                 else:
                     aruba_ansible_module.module.fail_json(
-                        msg="VLAN {id} is not configured".format(
-                            id=params['native_vlan_id']))
+    msg="VLAN {id} is not "
+    "configured"
+    "".format(
+        id=params['vlan_access']))  # NOQA
 
-            elif params['native_vlan_tag']:
-                interface_vlan_dict['vlan_mode'] = 'native-tagged'
-                interface_vlan_dict['vlan_tag'] = '1'
+            elif params['vlan_mode'] == 'trunk':
 
-            else:
-                interface_vlan_dict['vlan_mode'] = 'native-untagged'
-                interface_vlan_dict['vlan_tag'] = '1'
-
-            if not params['trunk_allowed_all'] and params['vlan_trunks']:
-                if 'vlan_mode' not in interface_vlan_dict.keys():
-                    interface_vlan_dict['vlan_mode'] = 'native-untagged'
-                interface_vlan_dict['vlan_trunks'] = []
-                for id in params['vlan_trunks']:
-                    if vlan.check_vlan_exist(aruba_ansible_module, id):
-                        interface_vlan_dict['vlan_trunks'].append(str(id))
+                if params['native_vlan_id']:
+                    if params['native_vlan_id'] == '1':
+                        interface_vlan_dict['vlan_tag'] = '1'
+                        if params['native_vlan_tag']:
+                            interface_vlan_dict['vlan_mode'] = 'native-tagged'
+                        else:
+                            interface_vlan_dict['vlan_mode'] = 'native-untagged'
+                    elif vlan.check_vlan_exist(aruba_ansible_module,
+                                               params['native_vlan_id']):
+                        if params['native_vlan_tag']:
+                            interface_vlan_dict['vlan_mode'] = 'native-tagged'
+                        else:
+                            interface_vlan_dict['vlan_mode'] = 'native-untagged'
+                        interface_vlan_dict['vlan_tag'] = params['native_vlan_id']
                     else:
                         aruba_ansible_module.module.fail_json(
-                            msg="VLAN {id} is not configured".format(id=id))
+                            msg="VLAN {id} is not configured".format(
+                                id=params['native_vlan_id']))
 
-            elif params['trunk_allowed_all']:
-                if 'vlan_mode' not in interface_vlan_dict.keys():
+                elif params['native_vlan_tag']:
+                    interface_vlan_dict['vlan_mode'] = 'native-tagged'
+                    interface_vlan_dict['vlan_tag'] = '1'
+
+                else:
                     interface_vlan_dict['vlan_mode'] = 'native-untagged'
+                    interface_vlan_dict['vlan_tag'] = '1'
 
-        else:
-            interface_vlan_dict['vlan_mode'] = 'access'
-            interface_vlan_dict['vlan_tag'] = 1
+                if not params['trunk_allowed_all'] and params['vlan_trunks']:
+                    if 'vlan_mode' not in interface_vlan_dict.keys():
+                        interface_vlan_dict['vlan_mode'] = 'native-untagged'
+                    interface_vlan_dict['vlan_trunks'] = []
+                    for id in params['vlan_trunks']:
+                        if vlan.check_vlan_exist(aruba_ansible_module, id):
+                            interface_vlan_dict['vlan_trunks'].append(str(id))
+                        else:
+                            aruba_ansible_module.module.fail_json(
+                                msg="VLAN {id} is not configured".format(id=id))
 
-        aruba_ansible_module = l2_interface.update_interface_vlan_details(
-            aruba_ansible_module, interface_name, interface_vlan_dict)
+                elif params['trunk_allowed_all']:
+                    if 'vlan_mode' not in interface_vlan_dict.keys():
+                        interface_vlan_dict['vlan_mode'] = 'native-untagged'
 
-    if state == 'delete':
-        aruba_ansible_module = l2_interface.delete_l2_interface(
-            aruba_ansible_module, interface_name)
+            else:
+                interface_vlan_dict['vlan_mode'] = 'access'
+                interface_vlan_dict['vlan_tag'] = 1
 
-    if (state == 'update') or (state == 'create'):
+            aruba_ansible_module = l2_interface.update_interface_vlan_details(
+                aruba_ansible_module, interface_name, interface_vlan_dict)
 
-        if admin_state is not None:
-            aruba_ansible_module = interface.update_interface_admin_state(
-                aruba_ansible_module, interface_name, admin_state)
+        if state == 'delete':
+            aruba_ansible_module = l2_interface.delete_l2_interface(
+                aruba_ansible_module, interface_name)
 
-        if description is not None:
-            aruba_ansible_module = interface.update_interface_description(
-                aruba_ansible_module, interface_name, description)
+        if (state == 'update') or (state == 'create'):
 
-        if interface_qos_rate is not None:
-            aruba_ansible_module = l2_interface.update_interface_qos_rate(
-                aruba_ansible_module, interface_name, interface_qos_rate)
+            if admin_state is not None:
+                aruba_ansible_module = interface.update_interface_admin_state(
+                    aruba_ansible_module, interface_name, admin_state)
 
-        if interface_qos_schedule_profile is not None:
-            aruba_ansible_module = l2_interface.update_interface_qos_profile(
-                aruba_ansible_module, interface_name,
-                interface_qos_schedule_profile)
+            if description is not None:
+                aruba_ansible_module = interface.update_interface_description(
+                    aruba_ansible_module, interface_name, description)
 
-    aruba_ansible_module.update_switch_config()
+            if interface_qos_rate is not None:
+                aruba_ansible_module = l2_interface.update_interface_qos_rate(
+                    aruba_ansible_module, interface_name, interface_qos_rate)
+
+            if interface_qos_schedule_profile is not None:
+                aruba_ansible_module = l2_interface.update_interface_qos_profile(
+                    aruba_ansible_module, interface_name, interface_qos_schedule_profile)
+
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

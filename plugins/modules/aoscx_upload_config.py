@@ -82,9 +82,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 import json
-
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 def main():
     module_args = dict(
@@ -95,44 +94,113 @@ def main():
         vrf=dict(type='str')
     )
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args=module_args,
-                                              store_config=False)
+    # Version Management
+    try:
 
-    tftp_path =\
-        aruba_ansible_module.module.params['remote_config_file_tftp_path']
-    vrf = aruba_ansible_module.module.params['vrf']
-    config_name = aruba_ansible_module.module.params['config_name']
-    config_json = aruba_ansible_module.module.params['config_json']
-    config_file = aruba_ansible_module.module.params['config_file']
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    if tftp_path is not None:
-        if vrf is None:
-            aruba_ansible_module.module.fail_json(
-                msg="VRF needs to be provided in order to TFTP"
-                    " the configuration onto the switch")
-        tftp_path_replace = tftp_path.replace("/", "%2F")
-        tftp_path_encoded = tftp_path_replace.replace(":", "%3A")
-        if config_name != 'running-config' and config_name != 'startup-config':
-            aruba_ansible_module.module.fail_json(
-                msg="Only running-config or startup-config "
-                    "can be uploaded using TFTP")
-        aruba_ansible_module.tftp_switch_config_from_remote_location(
-            tftp_path_encoded, config_name, vrf)
+        USE_PYAOSCX_SDK = True
+
+    except ImportError:
+        USE_PYAOSCX_SDK = False
+
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
+
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
+
+        # Session
+        session = Session(ansible_module)
+
+        # Set Variables
+        tftp_path =\
+            ansible_module.params['remote_config_file_tftp_path']
+        vrf = ansible_module.params['vrf']
+        config_name = ansible_module.params['config_name']
+        config_json = ansible_module.params['config_json']
+        config_file = ansible_module.params['config_file']
+
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session's serialized information
+        session_info = session.get_session()
+        # Create pyaoscx session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+
+        # Create an instance of the Configuration class from PyaoscxFactory
+        config = pyaoscx_factory.configuration()  # Contains action methods
+
+        # Upload configuration file/json to switch
+        success = config.upload_switch_config(
+            config_name=config_name,
+            config_file=config_file,
+            config_json=config_json,
+            vrf=vrf,
+            remote_file_tftp_path=tftp_path
+        )
+
+        # Changed
+        result['changed'] = success
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older Version
     else:
-        if config_json:
-            with open(config_json) as json_file:
-                config_json = json.load(json_file)
 
-        if config_file:
-            with open(config_file) as json_file:
-                config_json = json.load(json_file)
+        aruba_ansible_module = ArubaAnsibleModule(module_args=module_args,
+                                                  store_config=False)
 
-        aruba_ansible_module.upload_switch_config(config_json, config_name)
+        tftp_path =\
+            aruba_ansible_module.module.params['remote_config_file_tftp_path']
+        vrf = aruba_ansible_module.module.params['vrf']
+        config_name = aruba_ansible_module.module.params['config_name']
+        config_json = aruba_ansible_module.module.params['config_json']
+        config_file = aruba_ansible_module.module.params['config_file']
 
-    result = dict(changed=aruba_ansible_module.changed,
-                  warnings=aruba_ansible_module.warnings)
-    result["changed"] = True
-    aruba_ansible_module.module.exit_json(**result)
+        if tftp_path is not None:
+            if vrf is None:
+                aruba_ansible_module.module.fail_json(
+                    msg="VRF needs to be provided in order to TFTP"
+                        " the configuration onto the switch")
+            tftp_path_replace = tftp_path.replace("/", "%2F")
+            tftp_path_encoded = tftp_path_replace.replace(":", "%3A")
+            if config_name != 'running-config' and config_name != 'startup-config':
+                aruba_ansible_module.module.fail_json(
+                    msg="Only running-config or startup-config "
+                        "can be uploaded using TFTP")
+            aruba_ansible_module.tftp_switch_config_from_remote_location(
+                tftp_path_encoded, config_name, vrf)
+        else:
+            if config_json:
+                with open(config_json) as json_file:
+                    config_json = json.load(json_file)
+
+            if config_file:
+                with open(config_file) as json_file:
+                    config_json = json.load(json_file)
+
+            aruba_ansible_module.upload_switch_config(config_json, config_name)
+
+        result = dict(changed=aruba_ansible_module.changed,
+                      warnings=aruba_ansible_module.warnings)
+        result["changed"] = True
+        aruba_ansible_module.module.exit_json(**result)
 
 
 if __name__ == '__main__':

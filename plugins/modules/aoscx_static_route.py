@@ -128,8 +128,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import VRF
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import VRF
 
 
 def main():
@@ -145,81 +145,162 @@ def main():
                        state=dict(default='create',
                                   choices=['create', 'delete']))
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args)
+    # Version management
+    try:
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    vrf_name = aruba_ansible_module.module.params['vrf_name']
-    prefix = aruba_ansible_module.module.params['destination_address_prefix']
-    route_type = aruba_ansible_module.module.params['type']
-    distance = aruba_ansible_module.module.params['distance']
-    next_hop_interface = aruba_ansible_module.module.params['next_hop_interface']
-    next_hop_ip_address = aruba_ansible_module.module.params['next_hop_ip_address']
-    state = aruba_ansible_module.module.params['state']
+        USE_PYAOSCX_SDK = True
 
-    vrf = VRF()
+    except ImportError:
 
-    if vrf_name is None:
-        vrf_name = 'default'
+        USE_PYAOSCX_SDK = False
 
-    if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
+    if USE_PYAOSCX_SDK:
 
-        if vrf_name == 'default' and state == 'create':
-            aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
-                                                  vrf_name)
-        else:
-            aruba_ansible_module.module.fail_json(
-                msg="VRF {vrf} is not " "configured" "".format(vrf=vrf_name))
+        from ansible.module_utils.basic import AnsibleModule
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
 
-    encoded_prefix = prefix.replace("/", "%2F")
-    encoded_prefix = encoded_prefix.replace(":", "%3A")
-    index = vrf_name + '/' + encoded_prefix
-    if (state == 'create') or (state == 'update'):
-        address_family = 'ipv6' if ':' in prefix else 'ipv4'
-        static_route = {}
-        static_route[index] = {}
-        if address_family is not None:
-            static_route[index]["address_family"] = address_family
-        if prefix is not None:
-            static_route[index]["prefix"] = prefix
-        if route_type is not None:
-            static_route[index]['static_nexthops']["0"]["type"] = route_type
-            if route_type == 'forward':
-                static_route[index]['static_nexthops'] = {
-                    "0": {
-                        "bfd_enable": False,
-                        "distance": distance
-                    }
-                }
-            if next_hop_interface is not None:
-                encoded_interface = next_hop_interface.replace(
-                    '/', '%2F')
-                static_route[index]['static_nexthops']["0"]["port"] = encoded_interface
-            if next_hop_ip_address is not None:
-                static_route[index]['static_nexthops']["0"]["ip_address"] = next_hop_ip_address
+        vrf_name = ansible_module.params['vrf_name']
+        prefix = ansible_module.params['destination_address_prefix']
+        route_type = ansible_module.params['type']
+        distance = ansible_module.params['distance']
+        next_hop_interface = ansible_module.params['next_hop_interface']
+        next_hop_ip_address = ansible_module.params['next_hop_ip_address']
+        state = ansible_module.params['state']
 
-            aruba_ansible_module = vrf.update_vrf_fields(
-                aruba_ansible_module, vrf_name, 'Static_Route', static_route)
+        # Session
+        session = Session(ansible_module)
 
-    if (state == 'delete'):
+        # Set result var
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+
+        if state == 'delete':
+            # Create Static Route Object
+            static_route = pyaoscx_factory.static_route(
+                vrf_name, prefix)
+            # Delete it
+            static_route.delete()
+            # Changed
+            result['changed'] = True
+
+        if state == 'create' or state == 'update':
+            # Create Static Route object
+            static_route = pyaoscx_factory.static_route(
+                vrf_name,
+                prefix
+            )
+
+            # Add Static Nexthop
+            static_route.add_static_nexthop(
+                next_hop_ip_address=next_hop_ip_address,
+                nexthop_type=route_type,
+                distance=distance,
+                next_hop_interface=next_hop_interface
+            )
+
+            # Verify if Static Route was created
+            if static_route.was_modified():
+                # Changed
+                result['changed'] = True
+
+        # Exit
+        ansible_module.exit_json(**result)
+    else:
+
+        aruba_ansible_module = ArubaAnsibleModule(module_args)
+
+        vrf_name = aruba_ansible_module.module.params['vrf_name']
+        prefix = aruba_ansible_module.module.params['destination_address_prefix']
+        route_type = aruba_ansible_module.module.params['type']
+        distance = aruba_ansible_module.module.params['distance']
+        next_hop_interface = aruba_ansible_module.module.params['next_hop_interface']
+        next_hop_ip_address = aruba_ansible_module.module.params['next_hop_ip_address']
+        state = aruba_ansible_module.module.params['state']
+
+        vrf = VRF()
+
+        if vrf_name is None:
+            vrf_name = 'default'
+
         if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
-            aruba_ansible_module.module.fail_json(
-                msg="VRF {vrf_name} does not exist".format(
-                    vrf_name=vrf_name))
-        static_route = vrf.get_vrf_field_value(
-            aruba_ansible_module, vrf_name, 'Static_Route')
-        if not static_route:
-            aruba_ansible_module.warnings.append(
-                "Static route for destination {dest} does not exist in VRF {vrf}".format(
-                    dest=prefix, vrf=vrf_name))
-        elif index not in static_route.keys():
-            aruba_ansible_module.warnings.append(
-                "Static route for destination {dest} does not exist in VRF {vrf}".format(
-                    dest=prefix, vrf=vrf_name))
-        else:
-            static_route.pop(index)
-            aruba_ansible_module = vrf.update_vrf_fields(
-                aruba_ansible_module, vrf_name, 'Static_Route', static_route)
 
-    aruba_ansible_module.update_switch_config()
+            if vrf_name == 'default' and state == 'create':
+                aruba_ansible_module = vrf.create_vrf(aruba_ansible_module,
+                                                      vrf_name)
+            else:
+                aruba_ansible_module.module.fail_json(
+                    msg="VRF {vrf} is not " "configured" "".format(vrf=vrf_name))
+
+        encoded_prefix = prefix.replace("/", "%2F")
+        encoded_prefix = encoded_prefix.replace(":", "%3A")
+        index = vrf_name + '/' + encoded_prefix
+        if (state == 'create') or (state == 'update'):
+            address_family = 'ipv6' if ':' in prefix else 'ipv4'
+            static_route = {}
+            static_route[index] = {}
+            if address_family is not None:
+                static_route[index]["address_family"] = address_family
+            if prefix is not None:
+                static_route[index]["prefix"] = prefix
+            if route_type is not None:
+                static_route[index]['static_nexthops']["0"]["type"] = route_type
+                if route_type == 'forward':
+                    static_route[index]['static_nexthops'] = {
+                        "0": {
+                            "bfd_enable": False,
+                            "distance": distance
+                        }
+                    }
+                if next_hop_interface is not None:
+                    encoded_interface = next_hop_interface.replace(
+                        '/', '%2F')
+                    static_route[index]['static_nexthops']["0"]["port"] = encoded_interface
+                if next_hop_ip_address is not None:
+                    static_route[index]['static_nexthops']["0"]["ip_address"] = next_hop_ip_address
+
+                aruba_ansible_module = vrf.update_vrf_fields(
+                    aruba_ansible_module, vrf_name, 'Static_Route', static_route)
+
+        if (state == 'delete'):
+            if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
+                aruba_ansible_module.module.fail_json(
+                    msg="VRF {vrf_name} does not exist".format(
+                        vrf_name=vrf_name))
+            static_route = vrf.get_vrf_field_value(
+                aruba_ansible_module, vrf_name, 'Static_Route')
+            if not static_route:
+                aruba_ansible_module.warnings.append(
+                    "Static route for destination {dest} does not exist in VRF {vrf}".format(
+                        dest=prefix, vrf=vrf_name))
+            elif index not in static_route.keys():
+                aruba_ansible_module.warnings.append(
+                    "Static route for destination {dest} does not exist in VRF {vrf}".format(
+                        dest=prefix, vrf=vrf_name))
+            else:
+                static_route.pop(index)
+                aruba_ansible_module = vrf.update_vrf_fields(
+                    aruba_ansible_module, vrf_name, 'Static_Route', static_route)
+
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

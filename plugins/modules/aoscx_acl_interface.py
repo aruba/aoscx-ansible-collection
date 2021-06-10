@@ -96,55 +96,145 @@ def main():
         state=dict(type='str', default='create', choices=['create', 'delete'])
     )
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args)
+    # Version management
+    try:
 
-    acl_name = aruba_ansible_module.module.params['acl_name']
-    acl_interface_list = aruba_ansible_module.module.params['acl_interface_list']  # NOQA
-    acl_type = aruba_ansible_module.module.params['acl_type']
-    acl_direction = aruba_ansible_module.module.params['acl_direction']
-    state = aruba_ansible_module.module.params['state']
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    interface = Interface()
-    port = Port()
+        USE_PYAOSCX_SDK = True
 
-    for interface_name in acl_interface_list:
-        if not port.check_port_exists(aruba_ansible_module, interface_name):
-            aruba_ansible_module.module.fail_json(
-                msg="Interface {int} is not configured".format(
-                    int=interface_name))
+    except ImportError:
+        USE_PYAOSCX_SDK = False
 
-        if (state == 'create') or (state == 'update'):
-            update_type = 'insert'
-        elif (state == 'delete'):
-            update_type = 'delete'
-        aruba_ansible_module = interface.update_interface_acl_details(
-            aruba_ansible_module, interface_name, acl_name, acl_type,
-            acl_direction, update_type)
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
 
-        if update_type == 'insert':
-            aruba_ansible_module.module.log(msg="Attached ACL {acl} of type "
-                                                "{type} to interface {int}"
-                                                "".format(acl=acl_name,
-                                                          type=acl_type,
-                                                          int=interface_name))
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
 
-        if update_type == 'update':
-            aruba_ansible_module.module.log(msg="Updated ACL {acl} of type "
-                                                "{type} attached to interface"
-                                                " {int}"
-                                                "".format(acl=acl_name,
-                                                          type=acl_type,
-                                                          int=interface_name))  # NOQA
+        # Session
+        session = Session(ansible_module)
 
-        if (update_type == 'absent') or (update_type == 'delete'):
-            aruba_ansible_module.module.log(msg="Removed ACL {acl} of type"
-                                                " {type} from interface"
-                                                " {int}"
-                                                "".format(acl=acl_name,
-                                                          type=acl_type,
-                                                          int=interface_name))
+        # Set Variables
+        acl_name = ansible_module.params['acl_name']
+        acl_interface_list = ansible_module.params['acl_interface_list']  # NOQA
+        acl_type = ansible_module.params['acl_type']
+        acl_direction = ansible_module.params['acl_direction']
+        state = ansible_module.params['state']
 
-    aruba_ansible_module.update_switch_config()
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+        for interface_name in acl_interface_list:
+            if state == 'delete':
+                # Create ACL Object
+                interface = pyaoscx_factory.interface(interface_name)
+                # Delete it
+                interface.clear_acl(acl_type)
+                # Changed
+                result['changed'] = True
+
+            if state == 'create' or state == 'update':
+                # Create ACL Object
+                interface = pyaoscx_factory.interface(interface_name)
+                # Verify if interface was create
+                if interface.was_modified():
+                    # Changed
+                    result['changed'] = True
+
+                # Modified variables
+                modified_op1 = False
+                modified_op2 = False
+                # Update ACL inside Interface
+                if acl_direction == 'in':
+                    modified_op1 = interface.update_acl_in(
+                        acl_name, acl_type)
+                if acl_direction == 'out':
+                    modified_op2 = interface.update_acl_out(
+                        acl_name, acl_type)
+                if modified_op1 or modified_op2:
+                    # Changed
+                    result['changed'] = True
+
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
+    else:
+        aruba_ansible_module = ArubaAnsibleModule(module_args)
+
+        acl_name = aruba_ansible_module.module.params['acl_name']
+        acl_interface_list = aruba_ansible_module.module.params['acl_interface_list']  # NOQA
+        acl_type = aruba_ansible_module.module.params['acl_type']
+        acl_direction = aruba_ansible_module.module.params['acl_direction']
+        state = aruba_ansible_module.module.params['state']
+
+        interface = Interface()
+        port = Port()
+
+        for interface_name in acl_interface_list:
+            if not port.check_port_exists(
+                    aruba_ansible_module, interface_name):
+                aruba_ansible_module.module.fail_json(
+                    msg="Interface {int} is not configured".format(
+                        int=interface_name))
+
+            if (state == 'create') or (state == 'update'):
+                update_type = 'insert'
+            elif (state == 'delete'):
+                update_type = 'delete'
+            aruba_ansible_module = interface.update_interface_acl_details(
+                aruba_ansible_module, interface_name, acl_name, acl_type,
+                acl_direction, update_type)
+
+            if update_type == 'insert':
+                aruba_ansible_module.module.log(
+                    msg="Attached ACL {acl} of type "
+                    "{type} to interface {int}"
+                    "".format(
+                        acl=acl_name,
+                        type=acl_type,
+                        int=interface_name))
+
+            if update_type == 'update':
+                aruba_ansible_module.module.log(
+    msg="Updated ACL {acl} of type "
+    "{type} attached to interface"
+    " {int}"
+    "".format(
+        acl=acl_name,
+        type=acl_type,
+         int=interface_name))  # NOQA
+
+            if (update_type == 'absent') or (update_type == 'delete'):
+                aruba_ansible_module.module.log(
+                    msg="Removed ACL {acl} of type"
+                    " {type} from interface"
+                    " {int}"
+                    "".format(
+                        acl=acl_name,
+                        type=acl_type,
+                        int=interface_name))
+
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

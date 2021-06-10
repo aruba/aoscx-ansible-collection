@@ -159,9 +159,9 @@ ansible_net_mgmt_intf_status:
   type: dict
 '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.facts.facts import Facts
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import aoscx_http_argument_spec, get_connection
 from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import aoscx_http_argument_spec, get_connection
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.facts.facts import Facts
 
 
 def main():
@@ -190,25 +190,161 @@ def main():
                                                   'vrfs'])
     }
 
-    argument_spec.update(aoscx_http_argument_spec)
+    # Version Management
+    try:
 
-    module = AnsibleModule(argument_spec=argument_spec,
-                           supports_check_mode=True)
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.interface import Interface
+        from pyaoscx.vlan import Vlan
+        from pyaoscx.device import Device
+        from pyaoscx.vrf import Vrf
 
-    module._connection = get_connection(module)  # noqa
+        USE_PYAOSCX_SDK = True
 
-    warnings = []
-    if module.params["gather_subset"] == "!config":
-        warnings.append(
-            'default value for `gather_subset` will be changed '
-            'to `min` from `!config` v2.11 onwards')
+    except ImportError:
+        USE_PYAOSCX_SDK = False
 
-    result = Facts(module).get_facts()
+    # Use the PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
 
-    ansible_facts, additional_warnings = result
-    warnings.extend(additional_warnings)
+        argument_spec.update(aoscx_http_argument_spec)
 
-    module.exit_json(ansible_facts=ansible_facts, warnings=warnings)
+        ansible_module = AnsibleModule(argument_spec=argument_spec,
+                                       supports_check_mode=True)
+
+        # Get session
+        session = Session(ansible_module)
+
+        # Session info
+        session_info = session.get_session()
+
+        # Create pyaoscx session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        warnings = []
+        if ansible_module.params["gather_subset"] == "!config":
+            warnings.append(
+                'default value for `gather_subset` will be changed '
+                'to `min` from `!config` v2.11 onwards')
+
+        # Declare the Ansible facts
+        ansible_facts = {}
+
+        # Retrieve variables from module parameters
+        network_resource_list = ansible_module.params['gather_network_resources']
+        subset_list = ansible_module.params['gather_subset']
+
+        # Retrieve ansible_network_resources
+        ansible_network_resources = {}
+        if network_resource_list is not None:
+            for resource in network_resource_list:
+                if resource == 'interfaces':
+                    ansible_network_resources.update(
+                        {'interfaces': Interface.get_facts(s)})
+                elif resource == 'vlans':
+                    ansible_network_resources.update(
+                        {'vlans': Vlan.get_facts(s)})
+                elif resource == 'vrfs':
+                    ansible_network_resources.update(
+                        {'vrfs': Vrf.get_facts(s)})
+
+        ansible_facts.update(
+            {'ansible_network_resources': ansible_network_resources})
+
+        # Retrieve ansible_net_gather_network_resources
+        ansible_facts.update(
+            {'ansible_net_gather_network_resources': network_resource_list})
+
+        # Retrieve ansible_net_gather_subset
+        ansible_facts.update({'ansible_net_gather_subset': subset_list})
+
+        # Retrieve device facts
+        switch = Device(s)
+        switch.get()
+        switch.get_subsystems()  # subsystem
+
+        # Set the subsystem attributes allowed to retrieve as facts
+        allowed_subsystem_attributes = [
+            'product_info',
+            'power_supplies',
+            'interfaces',
+            'fans',
+            'resource_utilization'
+        ]
+
+        # Set the default subsets that are always retreived as facts
+        default_subset_list = [
+            'management_interface',
+            'software_version'
+        ]
+
+        # Extend subset_list with default subsets
+        subset_list.extend(default_subset_list)
+
+        # Delete duplicates
+        subset_list = list(dict.fromkeys(subset_list))
+
+        # Iterate through given subset arguments in the gather_subset parameter
+        # in argument_spec
+        for subset in subset_list:
+
+            # Argument translation for management_interface and
+            # physical_interfaces
+            if subset == 'management_interface':
+                subset = 'mgmt_intf_status'
+            elif subset == 'physical_interfaces':
+                subset = 'interfaces'
+            elif subset == 'host_name':
+                subset = 'hostname'
+
+            str_subset = 'ansible_net_' + subset
+
+            # Check if current subset is inside the Device object
+            if hasattr(switch, subset):
+
+                # Get attribute value and add it to Ansible facts dictionary
+                ansible_facts[str_subset] = getattr(switch, subset)
+
+            # Check if current subset is inside the allowed subsystem
+            # attributes
+            elif subset in allowed_subsystem_attributes:
+                ansible_facts.update({str_subset: {}})
+
+                # Iterate through Device subsystems
+                for subsystem, value in switch.subsystems.items():
+
+                    # Get attribute value and update the Ansible facts
+                    # dictionary
+                    ansible_facts[str_subset].update(
+                        {subsystem: switch.subsystems[subsystem][subset]})
+
+        ansible_module.exit_json(
+            ansible_facts=ansible_facts,
+            warnings=warnings)
+
+    # USE OLD VERSION
+    else:
+        argument_spec.update(aoscx_http_argument_spec)
+
+        module = AnsibleModule(argument_spec=argument_spec,
+                               supports_check_mode=True)
+
+        module._connection = get_connection(module)  # noqa
+
+        warnings = []
+        if module.params["gather_subset"] == "!config":
+            warnings.append(
+                'default value for `gather_subset` will be changed '
+                'to `min` from `!config` v2.11 onwards')
+
+        result = Facts(module).get_facts()
+
+        ansible_facts, additional_warnings = result
+        warnings.extend(additional_warnings)
+
+        module.exit_json(ansible_facts=ansible_facts, warnings=warnings)
 
 
 if __name__ == '__main__':

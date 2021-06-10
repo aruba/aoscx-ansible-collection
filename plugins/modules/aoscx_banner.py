@@ -65,7 +65,6 @@ RETURN = r''' # '''
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
-
 def main():
     module_args = dict(banner_type=dict(type='str', required=True,
                                         choices=['banner', 'banner_exec']),
@@ -73,43 +72,107 @@ def main():
                        state=dict(default='create', choices=['create',
                                                              'delete']))
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args)
-    state = aruba_ansible_module.module.params['state']
-    banner_type = aruba_ansible_module.module.params['banner_type']
-    banner = aruba_ansible_module.module.params['banner']
+    # Version management
+    try:
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    if state == 'delete':
-        if 'other_config' in aruba_ansible_module.running_config['System'].keys():  # NOQA
-            if banner_type in aruba_ansible_module.running_config['System']["other_config"].keys():  # NOQA
-                aruba_ansible_module.running_config['System']["other_config"].pop(banner_type)  # NOQA
+        USE_PYAOSCX_SDK = True
+
+    except ImportError:
+        USE_PYAOSCX_SDK = False
+
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
+
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
+
+        # Session
+        session = Session(ansible_module)
+
+        # Set Variables
+        state = ansible_module.params['state']
+        banner_type = ansible_module.params['banner_type']
+        banner = ansible_module.params['banner']
+
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+        # Create Device Object
+        device = pyaoscx_factory.device()
+
+        if state == 'delete':
+            # Delete it
+            modified_op = device.delete_banner(banner_type)
+
+        if state == 'create' or state == 'update':
+            # Set Banner
+            modified_op = device.update_banner(banner, banner_type)
+
+        # Changed
+        result['changed'] = modified_op
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
+    else:
+        aruba_ansible_module = ArubaAnsibleModule(module_args)
+        state = aruba_ansible_module.module.params['state']
+        banner_type = aruba_ansible_module.module.params['banner_type']
+        banner = aruba_ansible_module.module.params['banner']
+
+        if state == 'delete':
+            if 'other_config' in aruba_ansible_module.running_config['System'].keys():  # NOQA
+                if banner_type in aruba_ansible_module.running_config['System']["other_config"].keys():  # NOQA
+                    aruba_ansible_module.running_config['System']["other_config"].pop(banner_type)  # NOQA
+                else:
+                    aruba_ansible_module.warnings.append("{x} has already been "
+                                                         "removed"
+                                                         "".format(x=banner_type))
             else:
                 aruba_ansible_module.warnings.append("{x} has already been "
                                                      "removed"
                                                      "".format(x=banner_type))
-        else:
-            aruba_ansible_module.warnings.append("{x} has already been "
-                                                 "removed"
-                                                 "".format(x=banner_type))
 
-        aruba_ansible_module.module.log('Banner is removed from the switch.')
+            aruba_ansible_module.module.log(
+                'Banner is removed from the switch.')
 
-    if state == 'create':
+        if state == 'create':
 
-        if banner is None:
-            banner = ""
+            if banner is None:
+                banner = ""
 
-        if 'other_config' not in aruba_ansible_module.running_config['System'].keys():  # NOQA
-            aruba_ansible_module.running_config['System']["other_config"] = {}
+            if 'other_config' not in aruba_ansible_module.running_config['System'].keys():  # NOQA
+                aruba_ansible_module.running_config['System']["other_config"] = {
+                }
 
-        if banner_type not in aruba_ansible_module.running_config['System']["other_config"].keys():  # NOQA
-            aruba_ansible_module.running_config['System']["other_config"][banner_type] = banner  # NOQA
+            if banner_type not in aruba_ansible_module.running_config['System']["other_config"].keys():  # NOQA
+                aruba_ansible_module.running_config['System']["other_config"][banner_type] = banner  # NOQA
 
-        elif aruba_ansible_module.running_config['System']["other_config"][banner_type] != banner:  # NOQA
-            aruba_ansible_module.running_config['System']["other_config"][banner_type] = banner  # NOQA
+            elif aruba_ansible_module.running_config['System']["other_config"][banner_type] != banner:  # NOQA
+                aruba_ansible_module.running_config['System']["other_config"][banner_type] = banner  # NOQA
 
-        aruba_ansible_module.module.log('Banner is added to the switch.')
+            aruba_ansible_module.module.log('Banner is added to the switch.')
 
-    aruba_ansible_module.update_switch_config()
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

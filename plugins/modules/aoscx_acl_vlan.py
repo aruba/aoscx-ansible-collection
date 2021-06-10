@@ -95,69 +95,157 @@ def main():
         state=dict(type='str', default='create', choices=['create', 'delete'])
     )
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args)
+    # Version management
+    try:
 
-    acl_name = aruba_ansible_module.module.params['acl_name']
-    acl_vlan_list = aruba_ansible_module.module.params['acl_vlan_list']
-    acl_type = aruba_ansible_module.module.params['acl_type']
-    acl_direction = aruba_ansible_module.module.params['acl_direction']
-    state = aruba_ansible_module.module.params['state']
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    acl_type_prefix = ""
-    if acl_type == "ipv4":
-        acl_type_prefix = "aclv4"
-    elif acl_type == "ipv6":
-        acl_type_prefix = "aclv6"
-    elif acl_type == "mac":
-        acl_type_prefix = "aclmac"
+        USE_PYAOSCX_SDK = True
 
-    vlan = VLAN()
+    except ImportError:
+        USE_PYAOSCX_SDK = False
 
-    for vlan_id in acl_vlan_list:
-        field1 = '{type}_{dir}_cfg'.format(type=acl_type_prefix,
-                                           dir=acl_direction)
-        value1 = '{name}/{type}'.format(name=acl_name,
-                                        type=acl_type)
-        field2 = '{type}_{dir}_cfg_version'.format(type=acl_type_prefix,
-                                                   dir=acl_direction)
-        value2 = randint(-900719925474099, 900719925474099)
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
 
-        vlan_fields = {field1: value1, field2: value2}
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
 
-        if (state == 'create') or (state == 'update'):
+        # Session
+        session = Session(ansible_module)
 
-            existing_values = vlan.get_vlan_fields_values(aruba_ansible_module,
-                                                          vlan_id,
-                                                          [field1])
+        # Set Variables
+        acl_name = ansible_module.params['acl_name']
+        acl_vlan_list = ansible_module.params['acl_vlan_list']  # NOQA
+        acl_type = ansible_module.params['acl_type']
+        acl_direction = ansible_module.params['acl_direction']
+        state = ansible_module.params['state']
 
-            if field1 in existing_values.keys():
-                if existing_values[field1] != vlan_fields[field1]:
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+
+        for vlan_name in acl_vlan_list:
+            if state == 'delete':
+                # Create VLAN Object
+                vlan = pyaoscx_factory.vlan(vlan_name)
+                # Delete acl
+                if acl_direction == 'in':
+                    vlan.detach_acl_in(acl_name, acl_type)
+                if acl_direction == 'out':
+                    vlan.detach_acl_out(acl_name, acl_type)
+                # Changed
+                result['changed'] = True
+
+            if state == 'create' or state == 'update':
+                # Create VLAN Object
+                vlan = pyaoscx_factory.vlan(vlan_name)
+                # Verify if interface was create
+                if vlan.was_modified():
+                    # Changed
+                    result['changed'] = True
+                # Set variables
+                modified_op1 = False
+                modified_op2 = False
+                # Update ACL inside VLAN
+                if acl_direction == 'in':
+                    modified_op1 = vlan.attach_acl_in(acl_name, acl_type)
+                if acl_direction == 'out':
+                    modified_op2 = vlan.attach_acl_out(acl_name, acl_type)
+                if modified_op1 or modified_op2:
+                    # Changed
+                    result['changed'] = True
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
+    else:
+        aruba_ansible_module = ArubaAnsibleModule(module_args)
+
+        acl_name = aruba_ansible_module.module.params['acl_name']
+        acl_vlan_list = aruba_ansible_module.module.params['acl_vlan_list']
+        acl_type = aruba_ansible_module.module.params['acl_type']
+        acl_direction = aruba_ansible_module.module.params['acl_direction']
+        state = aruba_ansible_module.module.params['state']
+
+        acl_type_prefix = ""
+        if acl_type == "ipv4":
+            acl_type_prefix = "aclv4"
+        elif acl_type == "ipv6":
+            acl_type_prefix = "aclv6"
+        elif acl_type == "mac":
+            acl_type_prefix = "aclmac"
+
+        vlan = VLAN()
+
+        for vlan_id in acl_vlan_list:
+            field1 = '{type}_{dir}_cfg'.format(type=acl_type_prefix,
+                                               dir=acl_direction)
+            value1 = '{name}/{type}'.format(name=acl_name,
+                                            type=acl_type)
+            field2 = '{type}_{dir}_cfg_version'.format(type=acl_type_prefix,
+                                                       dir=acl_direction)
+            value2 = randint(-900719925474099, 900719925474099)
+
+            vlan_fields = {field1: value1, field2: value2}
+
+            if (state == 'create') or (state == 'update'):
+
+                existing_values = vlan.get_vlan_fields_values(
+                    aruba_ansible_module, vlan_id, [field1])
+
+                if field1 in existing_values.keys():
+                    if existing_values[field1] != vlan_fields[field1]:
+                        aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='insert')  # NOQA
+                else:
                     aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='insert')  # NOQA
-            else:
-                aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='insert')  # NOQA
 
-            if state == 'create':
-                aruba_ansible_module.module.log(msg=" Inserted ACL {name} of "
-                                                    "type {type} to VLAN {id}"
-                                                    "".format(name=acl_name,
-                                                              type=acl_type,
-                                                              id=vlan_id))  # NOQA
+                if state == 'create':
+                    aruba_ansible_module.module.log(
+    msg=" Inserted ACL {name} of "
+    "type {type} to VLAN {id}"
+    "".format(
+        name=acl_name,
+        type=acl_type,
+         id=vlan_id))  # NOQA
 
-            if state == 'update':
-                aruba_ansible_module.module.log(msg=" Updated  ACL {name} of "
-                                                    "type {type} to VLAN {id}"
-                                                    "".format(name=acl_name,
-                                                              type=acl_type,
-                                                              id=vlan_id))  # NOQA
-        elif state == 'delete':
-            aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='delete')  # NOQA
-            aruba_ansible_module.module.log(msg="Deleted ACL {name} of type "
-                                                "{type} from VLAN {id}"
-                                                "".format(name=acl_name,
-                                                          type=acl_type,
-                                                          id=vlan_id))  # NOQA
+                if state == 'update':
+                    aruba_ansible_module.module.log(
+    msg=" Updated  ACL {name} of "
+    "type {type} to VLAN {id}"
+    "".format(
+        name=acl_name,
+        type=acl_type,
+         id=vlan_id))  # NOQA
+            elif state == 'delete':
+                aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module, vlan_id, vlan_fields, update_type='delete')  # NOQA
+                aruba_ansible_module.module.log(
+    msg="Deleted ACL {name} of type "
+    "{type} from VLAN {id}"
+    "".format(
+        name=acl_name,
+        type=acl_type,
+         id=vlan_id))  # NOQA
 
-    aruba_ansible_module.update_switch_config()
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

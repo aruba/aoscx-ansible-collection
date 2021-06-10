@@ -71,8 +71,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 def main():
@@ -85,57 +85,132 @@ def main():
                                                           'update'])
     )
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
+    # Version management
+    try:
 
-    vlan_id = aruba_ansible_module.module.params['vlan_id']
-    vlan_name = aruba_ansible_module.module.params['name']
-    description = aruba_ansible_module.module.params['description']
-    admin_state = aruba_ansible_module.module.params['admin_state']
-    state = aruba_ansible_module.module.params['state']
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    vlan = VLAN()
+        USE_PYAOSCX_SDK = True
 
-    if state == 'delete':
-        aruba_ansible_module = vlan.delete_vlan(aruba_ansible_module, vlan_id)
+    except ImportError:
+        USE_PYAOSCX_SDK = False
 
-    if state == 'create':
-        aruba_ansible_module = vlan.create_vlan(aruba_ansible_module, vlan_id)
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
 
-        if vlan_name is not None:
-            name = vlan_name
-        else:
-            name = "VLAN " + str(vlan_id)
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
 
-        if admin_state is None:
-            admin_state = 'up'
+        # Session
+        session = Session(ansible_module)
 
-        vlan_fields = {
-            "name": name,
-            "admin": admin_state,
-            "type": "static"
-        }
-        if description is not None:
-            vlan_fields["description"] = description
-        aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module,
-                                                       vlan_id, vlan_fields,
-                                                       update_type='insert')
+        # Set Variables
+        vlan_id = ansible_module.params['vlan_id']
+        vlan_name = ansible_module.params['name']
+        if vlan_name is None:
+            vlan_name = "VLAN{vlan_id}".format(vlan_id=vlan_id)
+        description = ansible_module.params['description']
+        if description is None:
+            vlan_name = "vlan{vlan_id}".format(vlan_id=vlan_id)
+        admin_state = ansible_module.params['admin_state']
+        state = ansible_module.params['state']
 
-    if state == 'update':
-        vlan_fields = {}
-        if admin_state is not None:
-            vlan_fields['admin'] = admin_state
+        result = dict(
+            changed=False
+        )
 
-        if description is not None:
-            vlan_fields['description'] = description
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
 
-        if state is not None:
-            vlan_fields['state'] = state
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
 
-        aruba_ansible_module = vlan.update_vlan_fields(aruba_ansible_module,
-                                                       vlan_id, vlan_fields,
-                                                       update_type='update')
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+        
+        if state == 'delete':
+            # Create Vlan Object
+            vlan = pyaoscx_factory.vlan(vlan_id)
+            # Delete it
+            vlan.delete()
+            # Changed
+            result['changed'] = True
 
-    aruba_ansible_module.update_switch_config()
+        elif state == 'update' or state == 'create':
+            # Create Vlan with incoming attributes, in case VLAN does not exist
+            # inside device
+            vlan = pyaoscx_factory.vlan(
+                vlan_id, vlan_name, description, "static", admin_state)
+
+            if vlan.was_modified():
+                # Changed
+                result['changed'] = True
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
+    else:
+
+        aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
+
+        vlan_id = aruba_ansible_module.module.params['vlan_id']
+        vlan_name = aruba_ansible_module.module.params['name']
+        description = aruba_ansible_module.module.params['description']
+        admin_state = aruba_ansible_module.module.params['admin_state']
+        state = aruba_ansible_module.module.params['state']
+
+        vlan = VLAN()
+
+        if state == 'delete':
+            aruba_ansible_module = vlan.delete_vlan(
+                aruba_ansible_module, vlan_id)
+
+        if state == 'create':
+            aruba_ansible_module = vlan.create_vlan(
+                aruba_ansible_module, vlan_id)
+
+            if vlan_name is not None:
+                name = vlan_name
+            else:
+                name = "VLAN " + str(vlan_id)
+
+            if admin_state is None:
+                admin_state = 'up'
+
+            vlan_fields = {
+                "name": name,
+                "admin": admin_state,
+                "type": "static"
+            }
+            if description is not None:
+                vlan_fields["description"] = description
+            aruba_ansible_module = vlan.update_vlan_fields(
+                aruba_ansible_module, vlan_id, vlan_fields, update_type='insert')
+
+        if state == 'update':
+            vlan_fields = {}
+            if admin_state is not None:
+                vlan_fields['admin'] = admin_state
+
+            if description is not None:
+                vlan_fields['description'] = description
+
+            if state is not None:
+                vlan_fields['state'] = state
+
+            aruba_ansible_module = vlan.update_vlan_fields(
+                aruba_ansible_module, vlan_id, vlan_fields, update_type='update')
+
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

@@ -140,44 +140,132 @@ def main():
                                                           'update'])
     )
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
-    acl = ACL()
-    state = aruba_ansible_module.module.params['state']
-    name = aruba_ansible_module.module.params['name']
-    list_type = aruba_ansible_module.module.params['type']
-    acl_entries = aruba_ansible_module.module.params['acl_entries']
+    # Version management
+    try:
 
-    if (state == 'create') or (state == 'update'):
-        aruba_ansible_module = acl.create_acl(
-            aruba_ansible_module, name, list_type)
-        if acl_entries is not None:
-            for sequence_number in acl_entries.keys():
-                acl_entry = acl_entries[sequence_number]
-                if 'protocol' in acl_entry.keys():
-                    translated_protocol_name = translate_acl_entries_protocol(
-                        acl_entry['protocol'])
-                    if (translated_protocol_name is not None) and (
-                            translated_protocol_name != ""):
-                        acl_entry['protocol'] = translated_protocol_name
-                    elif (translated_protocol_name is not None) and (
-                            translated_protocol_name == ""):
-                        acl_entry.pop('protocol')
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-                if 'count' in acl_entry.keys():
-                    if acl_entry['count'] is False:
-                        acl_entry.pop('count')
+        USE_PYAOSCX_SDK = True
 
-                acl_entries[sequence_number] = acl_entry
-            for sequence_number in acl_entries.keys():
-                aruba_ansible_module = acl.update_acl_entry(
-                    aruba_ansible_module, name, list_type, sequence_number,
-                    acl_entries[sequence_number], update_type='insert')
+    except ImportError:
+        USE_PYAOSCX_SDK = False
 
-    if state == 'delete':
-        aruba_ansible_module = acl.delete_acl(aruba_ansible_module, name,
-                                              list_type)
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
 
-    aruba_ansible_module.update_switch_config()
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
+
+        # Session
+        session = Session(ansible_module)
+
+        # Set Variables
+        state = ansible_module.params['state']
+        name = ansible_module.params['name']
+        list_type = ansible_module.params['type']
+        acl_entries = ansible_module.params['acl_entries']
+
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+        if state == 'delete':
+            # Create ACL Object
+            acl = pyaoscx_factory.acl(name, list_type)
+            # Delete it
+            acl.delete()
+            # Changed
+            result['changed'] = True
+
+        if state == 'create' or state == 'update':
+            # Create ACL Object
+            acl = pyaoscx_factory.acl(name, list_type)
+            # Verify if interface was create
+            if acl.was_modified():
+                # Changed
+                result['changed'] = True
+
+            # Modified variable
+            modified_op = False
+
+            if acl_entries is not None:
+                for sequence_number in acl_entries.keys():
+                    if isinstance(sequence_number, str):
+                        sequence_number_int = int(sequence_number)
+                    acl_entry = pyaoscx_factory.acl_entry(
+                        name,
+                        list_type,
+                        sequence_number_int,
+                        **acl_entries[sequence_number]
+                    )
+                    # Verify modification
+                    if acl_entry.was_modified():
+                        modified_op = True
+
+            # Changed
+            if modified_op:
+                result['changed'] = True
+
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
+    else:
+        aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
+        acl = ACL()
+        state = aruba_ansible_module.module.params['state']
+        name = aruba_ansible_module.module.params['name']
+        list_type = aruba_ansible_module.module.params['type']
+        acl_entries = aruba_ansible_module.module.params['acl_entries']
+
+        if (state == 'create') or (state == 'update'):
+            aruba_ansible_module = acl.create_acl(
+                aruba_ansible_module, name, list_type)
+            if acl_entries is not None:
+                for sequence_number in acl_entries.keys():
+                    acl_entry = acl_entries[sequence_number]
+                    if 'protocol' in acl_entry.keys():
+                        translated_protocol_name = translate_acl_entries_protocol(
+                            acl_entry['protocol'])
+                        if (translated_protocol_name is not None) and (
+                                translated_protocol_name != ""):
+                            acl_entry['protocol'] = translated_protocol_name
+                        elif (translated_protocol_name is not None) and (
+                                translated_protocol_name == ""):
+                            acl_entry.pop('protocol')
+
+                    if 'count' in acl_entry.keys():
+                        if acl_entry['count'] is False:
+                            acl_entry.pop('count')
+
+                    acl_entries[sequence_number] = acl_entry
+                for sequence_number in acl_entries.keys():
+                    aruba_ansible_module = acl.update_acl_entry(
+                        aruba_ansible_module, name, list_type, sequence_number,
+                        acl_entries[sequence_number], update_type='insert')
+
+        if state == 'delete':
+            aruba_ansible_module = acl.delete_acl(aruba_ansible_module, name,
+                                                  list_type)
+
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

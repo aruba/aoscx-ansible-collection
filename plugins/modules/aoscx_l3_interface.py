@@ -120,8 +120,8 @@ EXAMPLES = '''
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import L3_Interface, Interface
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
 
 def main():
@@ -137,68 +137,177 @@ def main():
         ip_helper_address=dict(type='list', default=None),
         state=dict(default='create', choices=['create', 'delete', 'update'])
     )
+    # Version management
+    try:
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-    aruba_ansible_module = ArubaAnsibleModule(module_args)
+        USE_PYAOSCX_SDK = True
 
-    interface_name = aruba_ansible_module.module.params['interface']
-    admin_state = aruba_ansible_module.module.params['admin_state']
-    description = aruba_ansible_module.module.params['description']
-    ipv4 = aruba_ansible_module.module.params['ipv4']
-    ipv6 = aruba_ansible_module.module.params['ipv6']
-    interface_qos_rate = aruba_ansible_module.module.params['interface_qos_rate']  # NOQA
-    interface_qos_schedule_profile = aruba_ansible_module.module.params[
-        'interface_qos_schedule_profile']
-    vrf = aruba_ansible_module.module.params['vrf']
-    ip_helper_address = aruba_ansible_module.module.params['ip_helper_address']
+    except ImportError:
 
-    state = aruba_ansible_module.module.params['state']
+        USE_PYAOSCX_SDK = False
 
-    l3_interface = L3_Interface()
-    interface = Interface()
-    if state == 'create':
-        aruba_ansible_module = l3_interface.create_l3_interface(aruba_ansible_module, interface_name)  # NOQA
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
+
+        interface_name = ansible_module.params['interface']
+        admin_state = ansible_module.params['admin_state']
+        description = ansible_module.params['description']
+        ipv4 = ansible_module.params['ipv4']
+        ipv6 = ansible_module.params['ipv6']
+        qos_rate = ansible_module.params['interface_qos_rate']
+        qos_profile_details = ansible_module.params['interface_qos_schedule_profile']
+        vrf = ansible_module.params['vrf']
+        ip_helper_addresses = ansible_module.params['ip_helper_address']
+        state = ansible_module.params['state']
+        
+        # Set IP variable as empty arrays
+        if ipv4 ==['']:
+            ipv4 = []
+        if ipv6 == ['']:
+            ipv6 = []
+
+        # Session
+        session = Session(ansible_module)
+
+        # Set Variables
         if vrf is None:
-            vrf = "default"
+            vrf = 'default'
 
-        if vrf is not None:
-            aruba_ansible_module = l3_interface.update_interface_vrf_details_from_l3(aruba_ansible_module, vrf, interface_name)  # NOQA
+        # Set result var
+        result = dict(
+            changed=False
+        )
 
-    if state == 'delete':
-        aruba_ansible_module = l3_interface.delete_l3_interface(
-            aruba_ansible_module, interface_name)
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
 
-    if (state == 'update') or (state == 'create'):
+        # Get session serialized information
+        session_info = session.get_session()
+        # Create pyaoscx.session object
+        s = Pyaoscx_Session.from_session(
+            session_info['s'], session_info['url'])
 
-        if admin_state is not None:
-            aruba_ansible_module = interface.update_interface_admin_state(
-                aruba_ansible_module, interface_name, admin_state)
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+        if state == 'delete':
+            # Create Interface Object
+            interface = pyaoscx_factory.interface(interface_name)
+            # Delete it
+            interface.delete()
 
-        if description is not None:
-            aruba_ansible_module = interface.update_interface_description(
-                aruba_ansible_module, interface_name, description)
+            # Changed
+            result['changed'] = True
 
-        if vrf is not None and vrf != "default":
-            aruba_ansible_module = l3_interface.update_interface_vrf_details_from_l3(aruba_ansible_module, vrf, interface_name)  # NOQA
+        if state == 'create' or state == 'update':
+            # Create Interface Object
+            interface = pyaoscx_factory.interface(interface_name)
+            # Verify if interface was create
+            if interface.was_modified():
+                # Changed
+                result['changed'] = True
+            # Configure L4
+            # Verify if object was changed
+            modified_op = interface.configure_l3(
+                ipv4=ipv4,
+                ipv6=ipv6,
+                vrf=vrf,
+                description=description,
+                admin=admin_state)
 
-        if interface_qos_rate is not None:
-            aruba_ansible_module = l3_interface.update_interface_qos_rate(
-                aruba_ansible_module, interface_name, interface_qos_rate)
+            if qos_profile_details is not None:
+                modified_op2 = interface.update_interface_qos_profile(
+                    qos_profile_details)
+                modified_op = modified_op2 or modified_op
 
-        if interface_qos_schedule_profile is not None:
-            aruba_ansible_module = l3_interface.update_interface_qos_profile(aruba_ansible_module, interface_name, interface_qos_schedule_profile)  # NOQA
+            if qos_rate is not None:
+                modified_op3 = interface.update_interface_qos_rate(
+                    qos_rate)
+                modified_op = modified_op3 or modified_op
 
-        if ipv4 is not None:
-            aruba_ansible_module = l3_interface.update_interface_ipv4_address(aruba_ansible_module, interface_name, ipv4)  # NOQA
+            if ip_helper_addresses is not None:
+                # Create DHCP_Relay object
+                dhcp_relay = pyaoscx_factory.dhcp_relay(
+                    vrf=vrf, port=interface_name)
+                # Add helper addresses
+                dhcp_relay.add_ipv4_addresses(ip_helper_addresses)
 
-        if ipv6 is not None:
-            aruba_ansible_module = l3_interface.update_interface_ipv6_address(aruba_ansible_module, interface_name, ipv6)  # NOQA
+            if modified_op:
+                # Changed
+                result['changed'] = True
 
-        if ip_helper_address is not None:
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
+    else:
+        aruba_ansible_module = ArubaAnsibleModule(module_args)
+
+        interface_name = aruba_ansible_module.module.params['interface']
+        admin_state = aruba_ansible_module.module.params['admin_state']
+        description = aruba_ansible_module.module.params['description']
+        ipv4 = aruba_ansible_module.module.params['ipv4']
+        ipv6 = aruba_ansible_module.module.params['ipv6']
+        interface_qos_rate = aruba_ansible_module.module.params['interface_qos_rate']  # NOQA
+        interface_qos_schedule_profile = aruba_ansible_module.module.params[
+            'interface_qos_schedule_profile']
+        vrf = aruba_ansible_module.module.params['vrf']
+        ip_helper_address = aruba_ansible_module.module.params['ip_helper_address']
+
+        state = aruba_ansible_module.module.params['state']
+
+        l3_interface = L3_Interface()
+        interface = Interface()
+        if state == 'create':
+            aruba_ansible_module = l3_interface.create_l3_interface(aruba_ansible_module, interface_name)  # NOQA
+            if vrf is None:
+                vrf = "default"
+
             if vrf is not None:
-                vrf = 'default'
-            aruba_ansible_module = l3_interface.update_interface_ip_helper_address(aruba_ansible_module, vrf, interface_name, ip_helper_address)  # NOQA
+                aruba_ansible_module = l3_interface.update_interface_vrf_details_from_l3(aruba_ansible_module, vrf, interface_name)  # NOQA
 
-    aruba_ansible_module.update_switch_config()
+        if state == 'delete':
+            aruba_ansible_module = l3_interface.delete_l3_interface(
+                aruba_ansible_module, interface_name)
+
+        if (state == 'update') or (state == 'create'):
+
+            if admin_state is not None:
+                aruba_ansible_module = interface.update_interface_admin_state(
+                    aruba_ansible_module, interface_name, admin_state)
+
+            if description is not None:
+                aruba_ansible_module = interface.update_interface_description(
+                    aruba_ansible_module, interface_name, description)
+
+            if vrf is not None and vrf != "default":
+                aruba_ansible_module = l3_interface.update_interface_vrf_details_from_l3(aruba_ansible_module, vrf, interface_name)  # NOQA
+
+            if interface_qos_rate is not None:
+                aruba_ansible_module = l3_interface.update_interface_qos_rate(
+                    aruba_ansible_module, interface_name, interface_qos_rate)
+
+            if interface_qos_schedule_profile is not None:
+                aruba_ansible_module = l3_interface.update_interface_qos_profile(aruba_ansible_module, interface_name, interface_qos_schedule_profile)  # NOQA
+
+            if ipv4 is not None:
+                aruba_ansible_module = l3_interface.update_interface_ipv4_address(aruba_ansible_module, interface_name, ipv4)  # NOQA
+
+            if ipv6 is not None:
+                aruba_ansible_module = l3_interface.update_interface_ipv6_address(aruba_ansible_module, interface_name, ipv6)  # NOQA
+
+            if ip_helper_address is not None:
+                if vrf is not None:
+                    vrf = 'default'
+                aruba_ansible_module = l3_interface.update_interface_ip_helper_address(aruba_ansible_module, vrf, interface_name, ip_helper_address)  # NOQA
+
+        aruba_ansible_module.update_switch_config()
 
 
 if __name__ == '__main__':

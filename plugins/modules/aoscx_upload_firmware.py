@@ -75,48 +75,116 @@ def main():
         remote_firmware_file_path=dict(type='str', default=None),
         vrf=dict(type='str', default=None)
     )
-    aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
-    http_path = aruba_ansible_module.module.params['remote_firmware_file_path']
-    vrf = aruba_ansible_module.module.params['vrf']
-    partition_name = aruba_ansible_module.module.params['partition_name']
-    firmware_file_path = \
-        aruba_ansible_module.module.params['firmware_file_path']
 
-    unsupported_versions = [
-        "10.00",
-        "10.01",
-        "10.02",
-        "10.03",
-    ]
+    # Version management
+    try:
 
-    if http_path is not None:
+        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
+        from pyaoscx.session import Session as Pyaoscx_Session
+        from pyaoscx.pyaoscx_factory import PyaoscxFactory
 
-        switch_current_firmware = aruba_ansible_module.switch_current_firmware
-        for version in unsupported_versions:
-            if version in switch_current_firmware:
-                aruba_ansible_module.module.fail_json(
-                    msg="Minimum supported firmware version is 10.04 for"
-                        " remote firmware upload, your version is {firmware}"
-                        "".format(firmware=switch_current_firmware))
+        USE_PYAOSCX_SDK = True
 
-        if vrf is None:
-            aruba_ansible_module.module.fail_json(
-                msg="VRF needs to be provided in order"
-                    " to upload firmware from HTTP server")
-        http_path_replace = http_path.replace("/", "%2F")
-        http_path_encoded = http_path_replace.replace(":", "%3A")
-        url = '/rest/v1/firmware?image={part}&from={path}&vrf={vrf}'\
-            .format(part=partition_name,
-                    path=http_path_encoded,
-                    vrf=vrf)
-        put(aruba_ansible_module.module, url)
+    except ImportError:
+        USE_PYAOSCX_SDK = False
+
+    # Use PYAOSCX SDK
+    if USE_PYAOSCX_SDK:
+        from ansible.module_utils.basic import AnsibleModule
+
+        # ArubaModule
+        ansible_module = AnsibleModule(
+            argument_spec=module_args,
+            supports_check_mode=True)
+
+        # Session
+        session = Session(ansible_module)
+
+        # Set Variables
+        http_path = ansible_module.params['remote_firmware_file_path']
+        vrf = ansible_module.params['vrf']
+        partition_name = ansible_module.params['partition_name']
+        firmware_file_path = \
+            ansible_module.params['firmware_file_path']
+
+        result = dict(
+            changed=False
+        )
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
+
+        # Get session serialized information
+        session_info = session.get_session()
+
+        # Create pyaoscx.session object
+        # Use username and password from session_info
+        s = Pyaoscx_Session.from_session(
+            session_info['s'],
+            session_info['url'],
+            session_info['credentials'])
+
+        # Create a Pyaoscx Factory Object
+        pyaoscx_factory = PyaoscxFactory(s)
+
+        # Create a Device Object
+        device = pyaoscx_factory.device()
+        success = device.upload_firmware(
+            partition_name=partition_name,
+            firmware_file_path=firmware_file_path,
+            remote_firmware_file_path=http_path,
+            vrf=vrf)
+
+        # Changed
+        result['changed'] = success
+
+        # Exit
+        ansible_module.exit_json(**result)
+
+    # Use Older version
     else:
-        url = '/rest/v1/firmware?image={part}'.format(part=partition_name)
-        file_upload(aruba_ansible_module, url, firmware_file_path)
-    result = dict(changed=aruba_ansible_module.changed,
-                  warnings=aruba_ansible_module.warnings)
-    result["changed"] = True
-    aruba_ansible_module.module.exit_json(**result)
+        aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
+        http_path = aruba_ansible_module.module.params['remote_firmware_file_path']
+        vrf = aruba_ansible_module.module.params['vrf']
+        partition_name = aruba_ansible_module.module.params['partition_name']
+        firmware_file_path = \
+            aruba_ansible_module.module.params['firmware_file_path']
+
+        unsupported_versions = [
+            "10.00",
+            "10.01",
+            "10.02",
+            "10.03",
+        ]
+
+        if http_path is not None:
+
+            switch_current_firmware = aruba_ansible_module.switch_current_firmware
+            for version in unsupported_versions:
+                if version in switch_current_firmware:
+                    aruba_ansible_module.module.fail_json(
+                        msg="Minimum supported firmware version is 10.04 for"
+                            " remote firmware upload, your version is {firmware}"
+                            "".format(firmware=switch_current_firmware))
+
+            if vrf is None:
+                aruba_ansible_module.module.fail_json(
+                    msg="VRF needs to be provided in order"
+                        " to upload firmware from HTTP server")
+            http_path_replace = http_path.replace("/", "%2F")
+            http_path_encoded = http_path_replace.replace(":", "%3A")
+            url = '/rest/v1/firmware?image={part}&from={path}&vrf={vrf}'\
+                .format(part=partition_name,
+                        path=http_path_encoded,
+                        vrf=vrf)
+            put(aruba_ansible_module.module, url)
+        else:
+            url = '/rest/v1/firmware?image={part}'.format(part=partition_name)
+            file_upload(aruba_ansible_module, url, firmware_file_path)
+        result = dict(changed=aruba_ansible_module.changed,
+                      warnings=aruba_ansible_module.warnings)
+        result["changed"] = True
+        aruba_ansible_module.module.exit_json(**result)
 
 
 if __name__ == '__main__':

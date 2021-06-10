@@ -8,7 +8,7 @@ management modules specifically designed for the AOS-CX network device.
 Requirements
 ------------
 
-* Python 2.7 or 3.5+
+* Python 3 or later
 * Ansible 2.9.0 or later
 * Minimum supported AOS-CX firmware version 10.03
 * Enable REST on your AOS-CX device with the following commands:
@@ -65,11 +65,48 @@ The variables that should be defined in your inventory for your AOS-CX host are:
 * `ansible_network_os`: Must always be set to `arubanetworks.aoscx.aoscx`
 * `ansible_connection`: Set to `httpapi` to use REST API modules, and to `network_cli` to use SSH/CLI modules
   * See [below](#using-both-rest-api-and-sshcli-modules-on-a-host) for info on using both REST API modules and SSH/CLI modules on a host
+  * See [below](#pyaoscx-modules) for info on our new pyaoscx implementation of the AOS-CX Ansible modules that will be the standard moving forward
 * `ansible_httpapi_use_ssl`: (Only required for REST API modules) Must always be `True` as AOS-CX uses port 443 for REST
 * `ansible_httpapi_validate_certs`: (Only required for REST API modules) Set `True` or `False` depending on if Ansible should attempt to validate certificates
 * `ansible_acx_no_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX
+* `ansible_aoscx_validate_certs`: Set to `True` or `False` depending if Ansible should bypass validating certificates to connect to AOS-CX. Only required when `ansible_connection` is set to `aoscx`
+* `ansible_aoscx_use_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX. Only required when `ansible_connection` is set to `aoscx`.
+
+
+
+pyaoscx Modules
+---------------
+In an effort to make use of our recently updated Python SDK for AOS-CX [Pyaoscx](https://pypi.org/project/pyaoscx/) we've redesigned our Ansible integration by making use of pyaoscx for all REST-API based modules.   
+**What does this mean if I've been using Ansible with AOS-CX REST API modules?**   
+Our previous implementation will continue to function but will not be supported for future modules. That means you should and eventually have to update your [Ansible Inventory variables](https://github.com/aruba/aoscx-ansible-collection#pyaoscx-modules-only) to specify the `ansible_network_os=aoscx` and additional variables as well as install the pyaoscx Python package using Python3 pip, **all playbooks will remain the same**:   
+`pip3 install pyaoscx`  
+The AOS-CX Ansible Collection will automatically determine if you have pyaoscx installed and will use that method when the `ansible_network_os` is set to `aoscx`. If it's set to `httpapi` it will continue to use the previous implementation method.    
 
 ### Sample Inventories:
+
+#### pyaoscx Modules Only:
+
+##### INI
+
+```INI
+aoscx_1 ansible_host=10.0.0.1 ansible_user=admin ansible_password=password ansible_network_os=arubanetworks.aoscx.aoscx ansible_connection=arubanetworks.aoscx.aoscx ansible_aoscx_validate_certs=False ansible_aoscx_use_proxy=False
+```
+
+##### YAML
+
+```yaml
+all:
+  hosts:
+    aoscx_1:
+      ansible_host: 10.0.0.1
+      ansible_user: admin
+      ansible_password: password
+      ansible_network_os: arubanetworks.aoscx.aoscx
+      ansible_connection: arubanetworks.aoscx.aoscx  # REST API via pyaoscx connection method
+      ansible_aoscx_validate_certs: False
+      ansible_aoscx_use_proxy: False
+
+```
 
 #### REST API Modules Only:
 
@@ -129,12 +166,12 @@ If collection installed through Galaxy add `arubanetworks.aoscx` to your list of
     - arubanetworks.aoscx
   gather_facts: False
   tasks:
-    - name: Create L3 Interface 1/1/3
-      aoscx_l3_interface:
-        interface: 1/1/3
-        description: Uplink_Interface
-        ipv4: ['10.20.1.3/24']
-        ipv6: ['2001:db8::1234/64']
+  - name: Create L3 Interface 1/1/3
+    aoscx_l3_interface:
+      interface: 1/1/3
+      description: Uplink_Interface
+      ipv4: ['10.20.1.3/24']
+      ipv6: ['2001:db8::1234/64']
 ```
 
 
@@ -180,7 +217,7 @@ sets the `ansible_connection` value accordingly):
 - hosts: all
   collections:
     - arubanetworks.aoscx
-  gather_facts: False    
+  gather_facts: False
   tasks:
     - name: Adding or Updating Banner
       aoscx_banner:
@@ -215,7 +252,7 @@ Author Information
 ------------------
  - Madhusudan Pranav Venugopal (@madhusudan-pranav-venugopal)
  - Yang Liu (@yliu-aruba)
- - Tiffany Chiapuzio-Wong (@tchiapuziowong)
+ - Tiffany Chiapuzio-Wong (@tchiapuziowong)qq:q
  - Derek Wang (@derekwangHPEAruba)
  - Melvin Gutierrez (@melvin-gutierrez)
  - Rodrigo Jose Hernandez (@rodrigo-j-hernandez)
