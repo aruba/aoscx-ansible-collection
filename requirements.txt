@@ -1,2 +1,3 @@
 ansible
 paramiko
+pyaoscx>=2.0.0
