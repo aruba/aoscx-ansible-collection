@@ -77,14 +77,14 @@ The variables that should be defined in your inventory for your AOS-CX host are:
 * `ansible_user`: Username for switch in `plaintext` format  
 * `ansible_password`: Password for switch in `plaintext` format
 * `ansible_network_os`: Must always be set to `arubanetworks.aoscx.aoscx`
-* `ansible_connection`: Set to `httpapi` to use REST API modules, and to `network_cli` to use SSH/CLI modules
+* `ansible_connection`: Set to `arubanetworks.aoscx.aoscx` to use REST API [modules](#pyaoscx-modules), to `network_cli` to use SSH/CLI modules, and to `httpapi` for legacy implementation of REST API modules.
   * See [below](#using-both-rest-api-and-sshcli-modules-on-a-host) for info on using both REST API modules and SSH/CLI modules on a host
   * See [below](#pyaoscx-modules) for info on our new pyaoscx implementation of the AOS-CX Ansible modules that will be the standard moving forward
 * `ansible_httpapi_use_ssl`: (Only required for REST API modules) Must always be `True` as AOS-CX uses port 443 for REST
 * `ansible_httpapi_validate_certs`: (Only required for REST API modules) Set `True` or `False` depending on if Ansible should attempt to validate certificates
 * `ansible_acx_no_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX
-* `ansible_aoscx_validate_certs`: Set to `True` or `False` depending if Ansible should bypass validating certificates to connect to AOS-CX. Only required when `ansible_connection` is set to `aoscx`
-* `ansible_aoscx_use_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX. Only required when `ansible_connection` is set to `aoscx`.
+* `ansible_aoscx_validate_certs`: Set to `True` or `False` depending if Ansible should bypass validating certificates to connect to AOS-CX. Only required when `ansible_connection` is set to `arubanetworks.aoscx.aoscx`
+* `ansible_aoscx_use_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX. Only required when `ansible_connection` is set to `arubanetworks.aoscx.aoscx`.
 
 
 
