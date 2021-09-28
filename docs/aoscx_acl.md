@@ -157,7 +157,7 @@ the rest of the network.
         comment: "Deny the host"
         action: deny
         count: true
-        scr_ip: 158.10.12.57/255.255.255.255
+        src_ip: 158.10.12.57/255.255.255.255
         protocol: tcp
       2:
         comment: "Allow the network"
