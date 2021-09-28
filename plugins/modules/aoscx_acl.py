@@ -17,79 +17,275 @@ ANSIBLE_METADATA = {
 }
 
 DOCUMENTATION = '''
----
 module: aoscx_acl
-version_added: "2.8"
-short_description: Manage ACL configuration for AOS-CX.
+short_description: Module for configuration of Access Control Lists in AOSCX switches.
 description:
-  - This modules provides configuration management and creation of Access Classifier Lists on AOS-CX devices.
-author: Aruba Networks (@ArubaNetworks)
+  - This module provides the functionality for configuring Access Control Lists
+  - on AOSCX switches. For more detailed documentation see docs/aoscx_acl.md
+  - in this repository.
+version_added: "2.8"
+author: "Aruba Networking"
 options:
   name:
-    description: Name of the Access Classifier List
-    type: str
+    description: Name of the access control list
     required: true
+    type: str
   type:
-    description: Type of the Access Classifier List
-    type: str
-    choices: ['ipv4', 'ipv6', 'mac']
+    description: Type of ACL
     required: true
-  acl_entries:
-    description: "Dictionary of dictionaries of Access Classifier Entries
-      configured in Access Classifier List. Each entry key of the dictionary
-      should be the sequence number of the ACL entry. Each ACL entry dictionary
-      should have the minimum following keys - action , src_ip, dst_ip. See
-      below for examples of options and values."
-    type: dict
-    required: false
-  state:
-    description: Create, Update, or Delete Access Classifier List
     type: str
-    choices: ['create', 'delete', 'update']
-    default: 'create'
+    choices:
+      - ipv4
+      - ipv6
+      - mac
+      - l4port
+  state:
+    description: The action taken with the current ACL
     required: false
+    type: str
+    choices:
+      - create
+      - update
+      - delete
+    default:
+      - create
+  acl_entries:
+    description:
+      - A dictionary, where the key is the sequence number of the Access Control
+      - Entry, and the value is a dictionary representing the Access Control
+      - Entry. A detailed description of these ACE dictionaries is provided in
+      - the notes section, and in docs/aoscx_acl.md
+    required: false
+    type: dictionary
+
+notes:
+  ace_dictionary:
+    description:
+      - The ACEs are configured using a dictionary representation. A description
+      - of all available fields are provided here. All fields are optional, but
+      - there are certain internal dependencies that are related to how ACLs
+      - work.
+    available_fileds:
+      comment:
+        type: str
+        description:
+          - Comment associated with the ACE
+      tcp_ack:
+        type: boolean
+        description:
+          - TCP Acknowledge flag matching attribute
+      tcp_cwr:
+        type: boolean
+        description:
+          - TCP CWR flag matching attribute
+      tcp_ece:
+        type: boolean
+        description:
+          - TCP ECE flag matching attribute
+      tcp_established:
+        type: boolean
+        description:
+          - TCP established state (ACK or RST flag is set)
+      tcp_fin:
+        type: boolean
+        description:
+          - TCP FIN flag matching attribute
+      tcp_psh:
+        type: boolean
+        description:
+          - TCP PSH flag matching attribute
+      tcp_rst:
+        type: boolean
+        description:
+          - TCP RST flag matching attribute
+      tcp_urg:
+        type: boolean
+        description:
+          - TCP URG flag matching attribute
+      src_l4_port_group:
+        type: str
+        description:
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and `src_l4_port_range_reverse` attributes, and if this attribute is configured, the other ones will be ignored. The referenced object group must be of type `l4port`"
+      src_l4_port_max:
+        type: int32
+        description:
+          - Maximum L4 port to match on the packet
+      src_l4_port_min:
+        type: int32
+        description:
+          - Minimum L4 port to match on the packet
+      dst_l4_port_group:
+        type: str
+        description:
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`.  This attribute is mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and `dst_l4_port_range_reverse` attributes. If this attribute is configured, the others will be ignored. The referenced object group must be of type `l4port`"
+      dst_l4_port_max:
+        type: int32
+        description:
+          - "Maximum IP destination port matching attribute. Used in conjunction with `dst_l4_port_min` and `dst_l4_port_range_reverse`"
+      dst_l4_port_min:
+        type: int32
+        description:
+          - "Minimum IP destination port matching attribute. Used in conjunction with `dst_l4_port_max` and `dst_l4_port_range_reverse`"
+      src_ip_group:
+        type: str
+        description:
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`."
+      src_ip:
+        type: str
+        description:
+          - "String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z)"
+      dst_ip_group:
+        type: str
+        description:
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`."
+      dst_ip:
+        type: str
+        description:
+          - "String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z)"
+      src_mac:
+        type: str
+        description:
+          - "String with source MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ)"
+      dst_mac:
+        type: str
+        description:
+          - String with destination MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ)
+      action:
+        type: str
+        description:
+          - "Define the action to take on an ACL match. There are two options: `permit`, and `deny`. `permit`: packets will be forwarded. `deny`: packets will be dropped. ACE will only be activated when an associated action is provided."
+      count:
+        type: boolean
+        description:
+          - When true, increment hit count for packets that match this ACL
+      dscp:
+        type: int32
+        description:
+          - Different Services Code Point matching attribute
+      ecn:
+        type: int32
+        description:
+          - Explicit Congestion Notification matching attribute
+      ethertype:
+        type: int32
+        description:
+          - Ethernet type matching attribute
+      fragment:
+        type: boolean
+        description:
+          - Fragment matching attribute
+      icmp_code:
+        type: int32
+        description:
+          - ICMP code matching attribute
+      icmp_type:
+        type: int32
+        description:
+          - ICMP type matching attribute
+      ip_precedence:
+        type: int32
+        description:
+          - IP Precedence matching attribute
+      log:
+        type: boolean
+        description:
+          - ACE attribute log action; when true, log information for packets that match ACL
+      pcp:
+        type: int32
+        description:
+          - Priority Code Point matching attribute
+      protocol:
+        type: int32
+        description:
+          - IPv4 protocol matching attribute
+      ttl:
+        type: int32
+        description:
+          - Time-to-live matching attribute
+      tos:
+        type: int32
+        description:
+          - IP Type of service value matching attribute
+      vlan:
+        type: int32
+        description:
+          - VLAN ID matching attribute
+
 '''  # NOQA
 
-EXAMPLES = r'''
-- name: Configure IPv4 ACL with entry - 1 deny tcp 10.10.12.12 10.10.12.11 count
-  aoscx_acl:
-    name: ipv4_acl_example
-    type: ipv4
-    acl_entries: {
-      '1': {action: deny, # ACL Entry Action - choices: ['permit', 'deny']
-            count: true, # Enable 'count' on the ACL Entry - choices: ['permit', 'deny']
-            dst_ip: 10.10.12.11/255.255.255.255,  # Matching Destination IPv4 address, format IP/MASK
-            protocol: tcp,  # Matching protocol
-            src_ip: 10.10.12.12/255.255.255.255 # Matching Source IPv4 address, format IP/MASK
-            }
-      }
+EXAMPLES = '''
+# 1. Deny a host inside an allowed network
 
-- name: Configure IPv6 ACL with entry - 809 permit icmpv6 2001:db8::11 2001:db8::12
-  aoscx_acl:
-    name: ipv6_acl_example
-    type: ipv6
-    acl_entries: {
-      '809': {action: permit, # ACL Entry Action - choices: ['permit', 'deny']
-              count: false, # Enable 'count' on the ACL Entry - choices: ['permit', 'deny']
-              dst_ip: 2001:db8::11/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff,  # Matching Destination IPv6 address, format IP/MASK
-              protocol: icmpv6,  # Matching protocol
-              src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff # Matching Source IPv6 address, format IP/MASK
-              }
-      }
+# The following example shows how to allow all incoming traffic from a certain
+# IPv4 network, but deny a single host, and keep a count of how many packets are
+# sent to the switch from that host. Two ACEs are added, the one with lowest
+# sequence number is checked first for matches. One ACE is in charge of denying
+# incoming traffic from the single host, while the other one allows incoming from
+# the rest of the network.
 
-- name: Change existing IPv4 ACL Entry - 1 permit tcp 10.10.12.12 10.10.12.11 count
+- name: Configure IPv4 ACL that allows traffic from a network except a single host
   aoscx_acl:
-    name: ipv4_acl_example
+    name: allow_network_deny_host
     type: ipv4
-    acl_entries: {
-      '1': {action: permit, # ACL Entry Action - choices: ['permit', 'deny']
-            count: true, # Enable 'count' on the ACL Entry - choices: ['permit', 'deny']
-            dst_ip: 10.10.12.11/255.255.255.255,  # Matching Destination IPv4 address, format IP/MASK
-            protocol: tcp,  # Matching protocol
-            src_ip: 10.10.12.12/255.255.255.255 # Matching Source IPv4 address, format IP/MASK
-            }
-      }
-    state: update
+    acl_entries:
+      1:
+        comment: "Deny the host"
+        action: deny
+        count: true
+        scr_ip: 158.10.12.57/255.255.255.255
+        protocol: tcp
+      2:
+        comment: "Allow the network"
+        action: permit
+        src_ip: 158.10.12.1/255.255.0.0
+        protocol: tcp
+
+# 2. Deny a host and log urgent packets
+
+# The following example shows how to deny all incoming and outgoing traffic from a
+# single host, and log only when packet was urgent.
+
+- name: Configure IPv6 ACL that denies all traffic and logs urgent packets
+  aoscx_acl:
+    name: deny_host_log_urgent
+    acl_entries:
+      9:
+        comment: "match urgent packets for log"
+        tcp_urg: true
+        log: true
+        src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        dst_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        action: deny
+      10:
+        comment: "match the rest of the packets"
+        log: false
+        src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        dst_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        action: deny
+
+# 4. Simple L4 example
+
+# The following example shows how to configure rules with L4 ports. It will allow
+# traffic form ports 5000, 5001 and 5002 to port 3657. Note that when
+# a match for only one port is intended, `src/dst_l4_port_max` and
+# `src/dst_l4_port_min` need to be equal.
+
+- name: Configure port range
+  aoscx_acl:
+    name: simple_ports
+    type: ipv4
+    acl_entries:
+      1:
+        comment: "Use a range of ports"
+        src_ip: 100.10.25.2/255.255.255.0
+        dst_ip: 100.10.25.2/255.255.255.0
+        src_l4_port_max: 5002
+        src_l4_port_min: 5000
+        dst_l4_port_max: 3657
+        dst_l4_port_min: 3567
+        action: permit
+
+# 3. Remove an ACL
 
 - name: Delete ipv4 ACL from config
   aoscx_acl:
@@ -145,7 +341,8 @@ def main():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.acl_entry import AclEntry
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -183,11 +380,11 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
         if state == 'delete':
             # Create ACL Object
-            acl = pyaoscx_factory.acl(name, list_type)
+            acl = device.acl(name, list_type)
             # Delete it
             acl.delete()
             # Changed
@@ -195,7 +392,7 @@ def main():
 
         if state == 'create' or state == 'update':
             # Create ACL Object
-            acl = pyaoscx_factory.acl(name, list_type)
+            acl = device.acl(name, list_type)
             # Verify if interface was create
             if acl.was_modified():
                 # Changed
@@ -206,22 +403,14 @@ def main():
 
             if acl_entries is not None:
                 for sequence_number in acl_entries.keys():
-                    if isinstance(sequence_number, str):
-                        sequence_number_int = int(sequence_number)
-                    acl_entry = pyaoscx_factory.acl_entry(
-                        name,
-                        list_type,
-                        sequence_number_int,
-                        **acl_entries[sequence_number]
-                    )
-                    # Verify modification
-                    if acl_entry.was_modified():
-                        modified_op = True
+                    acl_entry = AclEntry(
+                        acl.session, sequence_number=int(sequence_number),
+                        parent_acl=acl, **acl_entries[sequence_number])
+                    modified_op |= acl_entry.apply()
 
             # Changed
             if modified_op:
                 result['changed'] = True
-
 
         # Exit
         ansible_module.exit_json(**result)
