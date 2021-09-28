@@ -117,7 +117,7 @@ def main():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -157,11 +157,11 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
         # Create a Configuration Object
-        config = pyaoscx_factory.configuration()
+        config = device.configuration()
         success = config.backup_configuration(
             config_name=config_name,
             output_file=config_file,

@@ -39,7 +39,6 @@ options:
     required: false
   config_file:
     description: "File name and path for locally uploading configuration,
-      will be converted to JSON,
       only JSON version of configuration can be uploaded"
     type: str
     required: false
@@ -99,7 +98,7 @@ def main():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -139,11 +138,11 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
-        # Create an instance of the Configuration class from PyaoscxFactory
-        config = pyaoscx_factory.configuration()  # Contains action methods
+        # Create an instance of the Configuration class from Device
+        config = device.configuration()  # Contains action methods
 
         # Upload configuration file/json to switch
         success = config.upload_switch_config(

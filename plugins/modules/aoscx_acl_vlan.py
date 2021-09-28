@@ -100,7 +100,7 @@ def main():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -139,13 +139,13 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
         for vlan_name in acl_vlan_list:
             if state == 'delete':
                 # Create VLAN Object
-                vlan = pyaoscx_factory.vlan(vlan_name)
+                vlan = device.vlan(vlan_name)
                 # Delete acl
                 if acl_direction == 'in':
                     vlan.detach_acl_in(acl_name, acl_type)
@@ -156,7 +156,7 @@ def main():
 
             if state == 'create' or state == 'update':
                 # Create VLAN Object
-                vlan = pyaoscx_factory.vlan(vlan_name)
+                vlan = device.vlan(vlan_name)
                 # Verify if interface was create
                 if vlan.was_modified():
                     # Changed

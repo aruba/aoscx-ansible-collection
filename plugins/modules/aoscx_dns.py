@@ -147,7 +147,7 @@ def main():
     try:
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -188,8 +188,8 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
         if state == 'delete':
             # Modifed Variables
@@ -197,7 +197,7 @@ def main():
             modified_op2 = False
 
             # Create DNS object
-            dns = pyaoscx_factory.dns(vrf=vrf_name)
+            dns = device.dns(vrf=vrf_name)
 
             # Delete MGMT nameservers
             if mgmt_nameservers is not None:
@@ -223,7 +223,7 @@ def main():
             modified_op2 = False
 
             # Create DNS object
-            dns = pyaoscx_factory.dns(
+            dns = device.dns(
                 vrf=vrf_name,
                 domain_name=dns_domain_name,
                 domain_list=dns_domain_list,

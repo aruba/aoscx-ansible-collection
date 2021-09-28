@@ -134,7 +134,7 @@ def main():
     try:
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -193,12 +193,12 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
         if state == 'delete':
             # Create Interface Object
-            vlan_interface = pyaoscx_factory.interface(vlan_interface_id)
+            vlan_interface = device.interface(vlan_interface_id)
             # Delete it
             vlan_interface.delete()
             # Changed
@@ -206,7 +206,7 @@ def main():
 
         if state == 'create' or state == 'update':
             # Create Interface with incoming attributes
-            vlan_interface = pyaoscx_factory.interface(vlan_interface_id)
+            vlan_interface = device.interface(vlan_interface_id)
             # Verify if interface was create
             if vlan_interface.was_modified():
                 # Changed
@@ -229,7 +229,7 @@ def main():
 
             if ip_helper_address is not None:
                 # Create DHCP_Relay object
-                dhcp_relay = pyaoscx_factory.dhcp_relay(
+                dhcp_relay = device.dhcp_relay(
                     vrf=vrf, port=vlan_interface_id)
                 # Add helper addresses
                 modified_dhcp_relay = dhcp_relay.add_ipv4_addresses(

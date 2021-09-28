@@ -106,7 +106,7 @@ def run_module():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -147,18 +147,18 @@ def run_module():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
         if state == 'delete':
             # Create VSX Object
-            vsx = pyaoscx_factory.vsx()
+            vsx = device.vsx()
             # Delete it
             vsx.delete()
 
         if state == 'create':
             # Create VSX with incoming attributes
-            vsx = pyaoscx_factory.vsx(role, isl_port, keepalive_vrf,
+            vsx = device.vsx(role, isl_port, keepalive_vrf,
                                       keepalive_peer, keepalive_src, vsx_mac)
 
         # Exit

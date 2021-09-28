@@ -101,7 +101,7 @@ def main():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -140,12 +140,12 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
         for interface_name in acl_interface_list:
             if state == 'delete':
                 # Create ACL Object
-                interface = pyaoscx_factory.interface(interface_name)
+                interface = device.interface(interface_name)
                 # Delete it
                 interface.clear_acl(acl_type)
                 # Changed
@@ -153,7 +153,7 @@ def main():
 
             if state == 'create' or state == 'update':
                 # Create ACL Object
-                interface = pyaoscx_factory.interface(interface_name)
+                interface = device.interface(interface_name)
                 # Verify if interface was create
                 if interface.was_modified():
                     # Changed

@@ -65,7 +65,7 @@ def main():
 
         from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
         from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
+        from pyaoscx.device import Device
 
         USE_PYAOSCX_SDK = True
 
@@ -101,12 +101,12 @@ def main():
         s = Pyaoscx_Session.from_session(
             session_info['s'], session_info['url'])
 
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        # Create a Pyaoscx Device Object
+        device = Device(s)
 
         if state == 'delete':
             # Create VRF Object
-            vrf = pyaoscx_factory.vrf(vrf_name)
+            vrf = device.vrf(vrf_name)
             # Delete it
             vrf.delete()
             # Changed
@@ -114,7 +114,7 @@ def main():
 
         if state == 'create':
             # Create VRF with incoming attributes
-            vrf = pyaoscx_factory.vrf(vrf_name)
+            vrf = device.vrf(vrf_name)
             # Changed
             result['changed'] = vrf.was_modified()
 
