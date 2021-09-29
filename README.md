@@ -93,7 +93,7 @@ The variables that should be defined in your inventory for your AOS-CX host are:
 
 pyaoscx Modules
 ---------------
-In an effort to make use of our recently updated Python SDK for AOS-CX [Pyaoscx](https://pypi.org/project/pyaoscx/) we've redesigned our Ansible integration by making use of pyaoscx for all REST-API based modules.   
+In an effort to make use of our recently updated Python SDK for AOS-CX [Pyaoscx](https://pypi.org/project/pyaoscx/) we've redesigned our Ansible integration by making use of pyaoscx for all REST-API based modules.     
 **What does this mean if I've been using Ansible with AOS-CX REST API modules?**   
 Our previous implementation will continue to function but will not be supported for future modules. That means you should and eventually have to update your [Ansible Inventory variables](https://github.com/aruba/aoscx-ansible-collection#pyaoscx-modules-only) to specify the `ansible_network_os=arubanetworks.aoscx.aoscx` and additional variables as well as install the pyaoscx Python package using Python3 pip, **all playbooks will remain the same**:   
 `pip3 install pyaoscx`  
@@ -106,7 +106,7 @@ The AOS-CX Ansible Collection will automatically determine if you have pyaoscx i
 ##### INI
 
 ```INI
-aoscx_1 ansible_host=10.0.0.1 ansible_user=admin ansible_password=password ansible_network_os=arubanetworks.aoscx.aoscx ansible_connection=arubanetworks.aoscx.aoscx ansible_aoscx_validate_certs=False ansible_aoscx_use_proxy=False
+aoscx_1 ansible_host=10.0.0.1 ansible_user=admin ansible_password=password ansible_network_os=arubanetworks.aoscx.aoscx ansible_connection=arubanetworks.aoscx.aoscx ansible_aoscx_validate_certs=False ansible_aoscx_use_proxy=False ansible_acx_no_proxy=True
 ```
 
 ##### YAML
@@ -122,6 +122,7 @@ all:
       ansible_connection: arubanetworks.aoscx.aoscx  # REST API via pyaoscx connection method
       ansible_aoscx_validate_certs: False
       ansible_aoscx_use_proxy: False
+      ansible_acx_no_proxy: True
 
 ```
 
@@ -202,9 +203,11 @@ you must create separate plays such
 that each play uses either only REST API modules or only SSH/CLI modules.
 A play cannot mix and match REST API and SSH/CLI module calls.
 In each play, `ansible_connection` must possess the appropriate value
-according to the modules used.
-If the play uses REST API modules, the value should be `arubanetworks.aoscx.aoscx`.
-If the play uses SSH/CLI modules, the value should be `network_cli`.
+according to the modules used.  
+
+If the play uses REST API modules, the value should be `arubanetworks.aoscx.aoscx`.  
+
+If the play uses SSH/CLI modules, the value should be `network_cli`.  
 
 A recommended approach to successfully using both types of modules for a host
 is as follows:
@@ -223,7 +226,7 @@ all:
       ansible_user: admin
       ansible_password: password
       ansible_network_os: arubanetworks.aoscx.aoscx
-      ansible_connection: httpapi  # REST API connection method
+      ansible_connection: arubanetworks.aoscx.aoscx  # REST API connection method
       ansible_httpapi_validate_certs: False
       ansible_httpapi_use_ssl: True
       ansible_acx_no_proxy: True
