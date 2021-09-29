@@ -10,24 +10,25 @@ Requirements
 
 * Python 3 or later
 * Ansible 2.9.0 or later
+  * Refer to [Ansible's documentation](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) for installation steps
 * Minimum supported AOS-CX firmware version 10.04
 * Enable REST on your AOS-CX device with the following commands:
     ```
     switch(config)# https-server rest access-mode read-write
     switch(config)# https-server vrf mgmt
     ```
-* Install all Ansible requirements, with the following command:
-    ```
-    ansible-galaxy install -r requirements.yml
-    ```
-* Install all Python requirements with the following command:
-    ```
-    python3 -m pip install -r <collection_path>/requirements.txt
-    ```
-    
-  * After installing the collection using the `ansible-galaxy` command you'll find the path to the collection in the following output:
+
+Installation
+------------
+
+Through Galaxy:
+
+```
+ansible-galaxy collection install arubanetworks.aoscx
+```
+* After installing the collection using the `ansible-galaxy` command you'll find the path to the collection in the following output:
     ```bash
-    ubuntu-vm: $ ansible-galaxy collection install ~/arubanetworks-aoscx-3.0.0.tar.gz -f
+    ubuntu-vm: $ ansible-galaxy collection install arubanetworks.aoscx -f
     Process install dependency map
     Starting collection install process
     Skipping 'ansible.netcommon' as it is already installed
@@ -38,6 +39,16 @@ Requirements
     ```
     python3 -m pip  install -r /home/administrator/.ansible/collections/ansible_collections/arubanetworks/aoscx/requirements.txt
     ```
+* Install all Python requirements with the following command:
+    ```
+    python3 -m pip install -r <collection_path>/requirements.txt
+    ```
+
+* Install all Ansible requirements, with the following command:
+    ```
+    ansible-galaxy install -r <collection_path>/requirements.yml
+    ```
+    
 
 SSH/CLI Modules
 ---------------
@@ -59,14 +70,6 @@ SSH/CLI Modules
 	  is 30 secs` error, consider setting the environment variable
 	  `ANSIBLE_PERSISTENT_COMMAND_TIMEOUT` to a greater value. See Ansible documentation [here](https://docs.ansible.com/ansible/latest/network/user_guide/network_debug_troubleshooting.html).
 
-Installation
-------------
-
-Through Galaxy:
-
-```
-ansible-galaxy collection install arubanetworks.aoscx
-```
 
 Inventory Variables
 -------------------
@@ -82,7 +85,7 @@ The variables that should be defined in your inventory for your AOS-CX host are:
   * See [below](#pyaoscx-modules) for info on our new pyaoscx implementation of the AOS-CX Ansible modules that will be the standard moving forward
 * `ansible_httpapi_use_ssl`: (Only required for REST API modules) Must always be `True` as AOS-CX uses port 443 for REST
 * `ansible_httpapi_validate_certs`: (Only required for REST API modules) Set `True` or `False` depending on if Ansible should attempt to validate certificates
-* `ansible_acx_no_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX
+* `ansible_acx_no_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX, required.
 * `ansible_aoscx_validate_certs`: Set to `True` or `False` depending if Ansible should bypass validating certificates to connect to AOS-CX. Only required when `ansible_connection` is set to `arubanetworks.aoscx.aoscx`
 * `ansible_aoscx_use_proxy`: Set to `True` or `False` depending if Ansible should bypass environment proxies to connect to AOS-CX. Only required when `ansible_connection` is set to `arubanetworks.aoscx.aoscx`.
 
@@ -92,13 +95,13 @@ pyaoscx Modules
 ---------------
 In an effort to make use of our recently updated Python SDK for AOS-CX [Pyaoscx](https://pypi.org/project/pyaoscx/) we've redesigned our Ansible integration by making use of pyaoscx for all REST-API based modules.   
 **What does this mean if I've been using Ansible with AOS-CX REST API modules?**   
-Our previous implementation will continue to function but will not be supported for future modules. That means you should and eventually have to update your [Ansible Inventory variables](https://github.com/aruba/aoscx-ansible-collection#pyaoscx-modules-only) to specify the `ansible_network_os=aoscx` and additional variables as well as install the pyaoscx Python package using Python3 pip, **all playbooks will remain the same**:   
+Our previous implementation will continue to function but will not be supported for future modules. That means you should and eventually have to update your [Ansible Inventory variables](https://github.com/aruba/aoscx-ansible-collection#pyaoscx-modules-only) to specify the `ansible_network_os=arubanetworks.aoscx.aoscx` and additional variables as well as install the pyaoscx Python package using Python3 pip, **all playbooks will remain the same**:   
 `pip3 install pyaoscx`  
 The AOS-CX Ansible Collection will automatically determine if you have pyaoscx installed and will use that method when the `ansible_network_os` is set to `aoscx`. If it's set to `httpapi` it will continue to use the previous implementation method.    
 
 ### Sample Inventories:
 
-#### pyaoscx Modules Only:
+#### REST API Modules Only:
 
 ##### INI
 
@@ -122,7 +125,7 @@ all:
 
 ```
 
-#### REST API Modules Only:
+#### Legacy REST API Modules:
 
 ##### INI
 
@@ -200,7 +203,7 @@ that each play uses either only REST API modules or only SSH/CLI modules.
 A play cannot mix and match REST API and SSH/CLI module calls.
 In each play, `ansible_connection` must possess the appropriate value
 according to the modules used.
-If the play uses REST API modules, the value should be `httpapi`.
+If the play uses REST API modules, the value should be `arubanetworks.aoscx.aoscx`.
 If the play uses SSH/CLI modules, the value should be `network_cli`.
 
 A recommended approach to successfully using both types of modules for a host
