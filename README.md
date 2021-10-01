@@ -26,29 +26,45 @@ Through Galaxy:
 ```
 ansible-galaxy collection install arubanetworks.aoscx
 ```
-* After installing the collection using the `ansible-galaxy` command you'll find the path to the collection in the following output:
-    ```bash
-    ubuntu-vm: $ ansible-galaxy collection install arubanetworks.aoscx -f
-    Process install dependency map
-    Starting collection install process
-    Skipping 'ansible.netcommon' as it is already installed
-    Installing 'arubanetworks.aoscx:3.0.0' to '/home/administrator/.ansible/collections/ansible_collections/arubanetworks/aoscx'
-    ```
-    The requirements.txt file is located in the collection path. Based on the previous example, the command to install all Python3 requirements
-    is as follows:
-    ```
-    python3 -m pip  install -r /home/administrator/.ansible/collections/ansible_collections/arubanetworks/aoscx/requirements.txt
-    ```
-* Install all Python requirements with the following command:
-    ```
-    python3 -m pip install -r <collection_path>/requirements.txt
-    ```
+
+Example Output:
+```
+Starting galaxy collection install process
+Process install dependency map
+Starting collection install process
+Downloading https://galaxy.ansible.com/download/arubanetworks-aoscx-3.0.1.tar.gz to /users/chiapuzi/.ansible/tmp/ansible-local-73666vlr4p5zw/tmp0gw8hrxz/arubanetworks-aoscx-3.0.1-vx5v8cw0
+Installing 'arubanetworks.aoscx:3.0.1' to '/users/chiapuzi/.ansible/collections/ansible_collections/arubanetworks/aoscx'
+arubanetworks.aoscx:3.0.1 was installed successfully
+Skipping 'ansible.netcommon:2.3.0' as it is already installed
+Skipping 'ansible.utils:2.3.1' as it is already installed
+```
+
+* **Change into the collections directory** where the AOS-CX Ansible collection (arubanetworks.aoscx) was installed, execute `ansible-galaxy collection list` to find:
+	```
+	ansible-control-machine$ansible-galaxy collection list
+	# /users/chiapuzi/.ansible/collections/ansible_collections
+	Collection               Version
+	------------------------ -------
+	ansible.netcommon        2.3.0
+	ansible.posix            1.1.1
+	ansible.utils            2.3.1
+	arubanetworks.aos_switch 1.4.0
+	arubanetworks.aoscx      3.0.1
+	ansible-control-machine$
+	```
 
 * Install all Ansible requirements, with the following command:
     ```
-    ansible-galaxy install -r <collection_path>/requirements.yml
+    ansible-galaxy install -r requirements.yml
     ```
-    
+* Install all Python requirements with the following command:
+    ```
+    python3 -m pip install -r requirements.txt
+    ```
+* **Change back** into your working directory and begin automating!
+	```
+	ansible-control-machine$cd /users/chiapuzi/Desktop/sandbox/
+	```
 
 SSH/CLI Modules
 ---------------
