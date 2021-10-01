@@ -50,6 +50,10 @@ Skipping 'ansible.utils:2.3.1' as it is already installed
 	ansible.utils            2.3.1
 	arubanetworks.aos_switch 1.4.0
 	arubanetworks.aoscx      3.0.1
+	ansible-control-machine$cd /users/chiapuzi/.ansible/collections/ansible_collections/arubanetworks/aoscx/
+	ansible-control-machine$ls
+	CONTRIBUTING.md  FILES.json     meta     README.md         requirements.yml
+	docs             MANIFEST.json  plugins  requirements.txt
 	ansible-control-machine$
 	```
 
