@@ -105,7 +105,7 @@ notes:
       src_l4_port_group:
         type: str
         description:
-          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and `src_l4_port_range_reverse` attributes, and if this attribute is configured, the other ones will be ignored. The referenced object group must be of type `l4port`"
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and `src_l4_port_range_reverse` attributes, and if this attribute is configured, the other ones will be ignored. The referenced object group must be of type `l4port`"
       src_l4_port_max:
         type: int32
         description:
@@ -117,7 +117,7 @@ notes:
       dst_l4_port_group:
         type: str
         description:
-          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`.  This attribute is mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and `dst_l4_port_range_reverse` attributes. If this attribute is configured, the others will be ignored. The referenced object group must be of type `l4port`"
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format `"/system/acl_object_groups/{name},{object_type}"`.  This attribute is mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and `dst_l4_port_range_reverse` attributes. If this attribute is configured, the others will be ignored. The referenced object group must be of type `l4port`"
       dst_l4_port_max:
         type: int32
         description:
@@ -129,7 +129,7 @@ notes:
       src_ip_group:
         type: str
         description:
-          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`."
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`."
       src_ip:
         type: str
         description:
@@ -137,7 +137,7 @@ notes:
       dst_ip_group:
         type: str
         description:
-          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`."
+          - "URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`."
       dst_ip:
         type: str
         description:
