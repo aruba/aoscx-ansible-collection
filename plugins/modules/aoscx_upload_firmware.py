@@ -127,8 +127,6 @@ def main():
         # Create a Pyaoscx Device Object
         device = Device(s)
 
-        # Create a Device Object
-        device = device.device()
         success = device.upload_firmware(
             partition_name=partition_name,
             firmware_file_path=firmware_file_path,

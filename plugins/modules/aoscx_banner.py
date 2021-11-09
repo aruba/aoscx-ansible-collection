@@ -115,8 +115,6 @@ def main():
 
         # Create a Pyaoscx Device Object
         device = Device(s)
-        # Create Device Object
-        device = device.device()
 
         if state == 'delete':
             # Delete it

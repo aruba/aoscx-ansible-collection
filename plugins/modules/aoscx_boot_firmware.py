@@ -96,8 +96,6 @@ def main():
         # Create a Pyaoscx Device Object
         device = Device(s)
 
-        # Create a Device Object
-        device = device.device()
         success = device.boot_firmware(partition_name)
 
         # Changed
