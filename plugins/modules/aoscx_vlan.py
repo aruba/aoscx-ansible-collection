@@ -115,8 +115,6 @@ def main():
         if vlan_name is None:
             vlan_name = "VLAN{vlan_id}".format(vlan_id=vlan_id)
         description = ansible_module.params['description']
-        if description is None:
-            vlan_name = "vlan{vlan_id}".format(vlan_id=vlan_id)
         admin_state = ansible_module.params['admin_state']
         state = ansible_module.params['state']
 
