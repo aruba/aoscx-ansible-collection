@@ -36,10 +36,7 @@ class TerminalModule(TerminalBase):
 
     terminal_stdout_re = [re.compile(
         br"[\r\n]?[\w\+\-\.:\/\[\]]+(?:\([^\)]+\)){0,3}(?:[>#]) ?$")]
-    terminal_stderr_re = []
-    terminal_initial_prompt = []
-    terminal_initial_answer = []
-    terminal_inital_prompt_newline = []
+
 
     def on_open_shell(self):
         '''

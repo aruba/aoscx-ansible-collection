@@ -23,7 +23,7 @@ try:
     from ansible.module_utils.network.common.utils import to_list, ComplexList
 except ImportError:
     from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import to_list, ComplexList
-from ansible.module_utils.connection import exec_command, Connection, ConnectionError
+from ansible.module_utils.connection import Connection, ConnectionError
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_ztp import connect_ztp_device
 
 REQUESTS_IMP_ERR = None
@@ -92,10 +92,14 @@ def get_config(module, flags=None):
     try:
         return _DEVICE_CONFIGS[cmd]
     except KeyError:
-        rc, out, err = exec_command(module, cmd)
-        if rc != 0:
-            module.fail_json(msg='unable to retrieve current config', stderr=to_text(
-                err, errors='surrogate_then_replace'))
+        try:
+            out = exec_command(module, cmd)
+        except ConnectionError as exc:
+            module.fail_json(
+                msg='unable to retrieve current config',
+                err=to_text(exc, errors='surrogate_then_replace')
+            )
+
         cfg = to_text(out, errors='surrogate_then_replace').strip()
         _DEVICE_CONFIGS[cmd] = cfg
         return cfg
@@ -105,18 +109,25 @@ def load_config(module, commands):
     '''
     Loads the configuration onto the switch
     '''
-    rc, out, err = exec_command(module, 'configure terminal')
-    if rc != 0:
-        module.fail_json(msg='unable to enter configuration mode',
-                         err=to_text(out, errors='surrogate_then_replace'))
+    try:
+        out = exec_command(module, 'configure terminal')
+    except ConnectionError as exc:
+        module.fail_json(
+            msg='unable to enter configuration mode',
+            err=to_text(exc, errors='surrogate_then_replace')
+        )
 
     for command in to_list(commands):
         if command == 'end':
             continue
-        rc, out, err = exec_command(module, command)
-        if rc != 0:
-            module.fail_json(msg=to_text(
-                err, errors='surrogate_then_replace'), command=command, rc=rc)
+
+        try:
+            out = exec_command(module, command)
+        except ConnectionError as exc:
+            module.fail_json(
+                msg='unable to enter configuration mode',
+                err=to_text(exc, errors='surrogate_then_replace')
+            )
 
     exec_command(module, 'end')
 
@@ -126,14 +137,7 @@ def exec_command(module, command):
     Execute command on the switch
     '''
     conn = create_ssh_connection(module)
-    try:
-        out = conn.exec_command(command)
-    except ConnectionError as exc:
-        code = getattr(exc, 'code', 1)
-        msg = getattr(exc, 'err', exc)
-        return code, '', to_text(msg, errors='surrogate_then_replace')
-
-    return 0, out, ''
+    return conn.send_command(command)
 
 
 def sanitize(resp):
@@ -299,7 +303,6 @@ class HttpApi:
             error_text = "Error while uploading firmware"
             raise ConnectionError(error_text, code=res.status_code)
         return res
-
 
 
 def create_ssh_connection(module):
