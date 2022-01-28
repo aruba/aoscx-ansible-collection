@@ -200,24 +200,25 @@ class Connection(NetworkConnectionBase):
     def get_session(self):
         cookies = dict_from_cookiejar(self.session.cookies)
         return dict(
-          success=True, cookies=cookies,
-          url=self.base_url, use_proxy=self.use_proxy,
-          credentials=dict(
-            username=self.__username,
-            password=self.__password)
-          )
+            success=True, cookies=cookies,
+            url=self.base_url, use_proxy=self.use_proxy,
+            credentials=dict(
+                username=self.__username,
+                password=self.__password
+            )
+        )
 
     def close(self):
         if self.session is not None:
             login_session = dict(
-              s=self.session,
-              url=self.base_url,
-              credentials=dict(
-                username=self.__username,
-                password=self.__password
-              )
+                s=self.session,
+                url=self.base_url,
+                credentials=dict(
+                    username=self.__username,
+                    password=self.__password
+                )
             )
-            
+
             Session.logout(**login_session)
             self.use_proxy = None
             self.session = None
