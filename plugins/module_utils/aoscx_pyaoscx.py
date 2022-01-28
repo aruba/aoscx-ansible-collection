@@ -48,7 +48,7 @@ class Session(object):
             s=s,
             url=session_data["url"],
             credentials=session_data["credentials"]
-            )
+        )
 
     def get_session(self):
         return self._session
