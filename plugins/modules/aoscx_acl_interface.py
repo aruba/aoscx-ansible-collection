@@ -173,7 +173,6 @@ def main():
                     # Changed
                     result['changed'] = True
 
-
         # Exit
         ansible_module.exit_json(**result)
 
