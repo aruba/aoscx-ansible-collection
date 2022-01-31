@@ -61,6 +61,7 @@ RETURN = r''' # '''
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule, put
 
+
 def main():
     module_args = dict(
         source_config=dict(type='str', default='running-config'),

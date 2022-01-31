@@ -102,6 +102,7 @@ RETURN = r''' # '''
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule, comp_sort  # NOQA
 import json
 
+
 def main():
     module_args = dict(
         config_name=dict(type='str', default='running-config'),

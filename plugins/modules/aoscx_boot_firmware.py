@@ -47,6 +47,7 @@ RETURN = r''' # '''
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule, post
 
+
 def main():
     module_args = dict(
         partition_name=dict(type='str', default='primary',

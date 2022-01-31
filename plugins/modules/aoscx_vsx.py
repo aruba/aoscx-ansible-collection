@@ -89,6 +89,7 @@ from ansible.module_utils.aoscx_pyaoscx import Session
 from ansible.module_utils.basic import AnsibleModule
 import os
 
+
 def run_module():
     module_args = dict(
         role=dict(type='str', default='primary', choices=[
