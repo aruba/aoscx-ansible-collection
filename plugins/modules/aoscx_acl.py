@@ -23,7 +23,7 @@ description: >
   This module provides the functionality for configuring Access Control Lists
   on AOSCX switches. For more detailed documentation see docs/aoscx_acl.md
   in this repository.
-version_added: "2.8"
+version_added: "2.8.0"
 author: "Aruba Networking"
 options:
   name:

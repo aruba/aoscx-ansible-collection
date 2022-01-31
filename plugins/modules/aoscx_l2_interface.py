@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_l2_interface
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Create or Update or Delete Layer2 Interface configuration on AOS-CX
 description:
   - This modules provides configuration management of Layer2 Interfaces on

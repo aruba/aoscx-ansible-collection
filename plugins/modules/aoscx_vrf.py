@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_vrf
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Create or Delete VRF configuration on AOS-CX
 description:
   - This modules provides configuration management of VRFs on AOS-CX devices.

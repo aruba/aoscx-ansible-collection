@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_backup_config
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Download an existing configuration from AOS-CX switch.
 description:
   - This module downloads an existing configuration from AOS-CX devices.

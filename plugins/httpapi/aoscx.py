@@ -17,7 +17,7 @@ httpapi: aoscx
 short_description: Use REST to push configs to CX devices
 description:
   - This ArubaOSCX module provides REST interactions with ArubaOS-CX devices
-version_added: "2.8"
+version_added: "2.8.0"
 options:
   acx_no_proxy:
     type: bool

@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_upload_firmware
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Uploads a firmware image onto the AOS-CX switch.
 description:
   - This module uploads a firmware image onto the switch stored locally or it can also upload

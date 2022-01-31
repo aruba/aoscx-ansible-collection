@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_vlan
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Create or Delete VLAN configuration on AOS-CX
 description:
   - This modules provides configuration management of VLANs on AOS-CX devices.

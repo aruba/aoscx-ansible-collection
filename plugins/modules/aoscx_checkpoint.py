@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_checkpoint
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Creates a new checkpoint or copies an existing checkpoint to AOS-CX switch config.
 description:
   - This module creates a new checkpoint or copies existing checkpoint

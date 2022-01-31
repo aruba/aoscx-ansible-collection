@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_upload_config
-version_added: "2.8"
+version_added: "2.8.0"
 short_description:  Uploads a configuration onto the AOS-CX switch.
 description:
   - This module uploads a configuration onto the switch stored locally or it can also upload

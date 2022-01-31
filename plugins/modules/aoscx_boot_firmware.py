@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_boot_firmware
-version_added: "2.8"
+version_added: "2.8.0"
 short_description:  Boots the AOS-CX switch with image present to the specified partition
 description:
   - This module boots the AOS-CX switch with the image present to the specified partition.

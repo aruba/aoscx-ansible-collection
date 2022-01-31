@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_banner
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Create or Delete Banner configuration on AOS-CX
 description:
   - This modules provides configuration management of Banner on AOS-CX devices.

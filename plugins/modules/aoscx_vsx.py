@@ -31,7 +31,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = """
 ---
 module: aoscx_vsx
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Create or Delete VSX configuration on AOS-CX.
 description: >
   This modules provides configuration management of VSX on AOS-CX devices. Note

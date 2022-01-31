@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_acl_vlan
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Apply/Remove ACL configuration on VLANs for AOS-CX.
 description:
   - This modules provides application management of Access Classifier Lists
