@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_config
-version_added: "2.9"
+version_added: "2.9.0"
 short_description: Logs in and executes configuration commands on AOS-CX device via SSH connection
 description:
   - This module allows configuration of running-configs on AOS-CX devices via SSH connection

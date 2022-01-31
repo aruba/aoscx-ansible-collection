@@ -19,7 +19,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = '''
 ---
 module: aoscx_facts
-version_added: "2.9"
+version_added: "2.9.0"
 short_description: Collects facts from remote AOS-CX device
 description:
   - This module retrieves facts from Aruba devices running the AOS-CX operating system. 
