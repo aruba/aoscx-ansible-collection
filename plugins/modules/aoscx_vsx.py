@@ -160,7 +160,7 @@ def run_module():
         if state == 'create':
             # Create VSX with incoming attributes
             vsx = device.vsx(role, isl_port, keepalive_vrf,
-                                      keepalive_peer, keepalive_src, vsx_mac)
+                             keepalive_peer, keepalive_src, vsx_mac)
 
         # Exit
         ansible_module.exit_json(**result)
