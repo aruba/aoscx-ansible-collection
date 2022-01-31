@@ -166,7 +166,7 @@ def main():
         vrf = ansible_module.params['vrf']
         ip_helper_addresses = ansible_module.params['ip_helper_address']
         state = ansible_module.params['state']
-        
+
         # Set IP variable as empty arrays
         if ipv4 ==['']:
             ipv4 = []
