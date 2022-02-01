@@ -134,4 +134,4 @@ class Cliconf(CliconfBase):
         :return: None
         """
         if self._connection.connected:
-            self._update_cli_prompt_context(config_context='\(\S+\)#')
+            self._update_cli_prompt_context(config_context=r'\(\S+\)#')

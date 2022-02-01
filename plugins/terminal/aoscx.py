@@ -37,7 +37,6 @@ class TerminalModule(TerminalBase):
     terminal_stdout_re = [re.compile(
         br"[\r\n]?[\w\+\-\.:\/\[\]]+(?:\([^\)]+\)){0,3}(?:[>#]) ?$")]
 
-
     def on_open_shell(self):
         '''
         Tasks to be executed immediately after connecting to switch.

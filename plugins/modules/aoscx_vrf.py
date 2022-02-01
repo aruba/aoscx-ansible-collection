@@ -54,6 +54,7 @@ RETURN = r''' # '''
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import VRF
 
+
 def main():
     module_args = dict(
         name=dict(type='str', required=True),

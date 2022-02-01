@@ -262,7 +262,7 @@ class HttpApi:
                 # Using proxies
                 # Perform Login
                 response_login = requests.post(
-                    connection_details['url'] + \
+                    connection_details['url'] +
                     "/rest/v1/login?username={}&password={}".format(
                         user, password
                     ),
@@ -276,14 +276,14 @@ class HttpApi:
                 # Perform Logout
                 response_logout = requests.post(
                     connection_details['url'] + "/rest/v1/logout",
-                    verify=False,proxies=proxies,
+                    verify=False, proxies=proxies,
                     cookies=response_login.cookies)
 
             else:
                 # No proxies
                 # Perform Login
                 response_login = requests.post(
-                    connection_details['url'] + \
+                    connection_details['url'] +
                     "/rest/v1/login?username={}&password={}".format(
                         user, password
                     ),

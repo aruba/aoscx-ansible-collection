@@ -65,6 +65,7 @@ RETURN = r''' # '''
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
+
 def main():
     module_args = dict(banner_type=dict(type='str', required=True,
                                         choices=['banner', 'banner_exec']),

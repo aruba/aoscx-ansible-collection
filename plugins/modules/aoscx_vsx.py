@@ -89,6 +89,7 @@ from ansible.module_utils.aoscx_pyaoscx import Session
 from ansible.module_utils.basic import AnsibleModule
 import os
 
+
 def run_module():
     module_args = dict(
         role=dict(type='str', default='primary', choices=[
@@ -159,7 +160,7 @@ def run_module():
         if state == 'create':
             # Create VSX with incoming attributes
             vsx = device.vsx(role, isl_port, keepalive_vrf,
-                                      keepalive_peer, keepalive_src, vsx_mac)
+                             keepalive_peer, keepalive_src, vsx_mac)
 
         # Exit
         ansible_module.exit_json(**result)

@@ -162,7 +162,7 @@ def main():
         state = ansible_module.params['state']
 
         # Set IP variable as empty arrays
-        if ipv4 ==['']:
+        if ipv4 == ['']:
             ipv4 = []
         if ipv6 == ['']:
             ipv6 = []

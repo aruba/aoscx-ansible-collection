@@ -84,6 +84,7 @@ RETURN = r''' # '''
 import json
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
 
+
 def main():
     module_args = dict(
         config_name=dict(type='str', default='running-config'),
