@@ -38,7 +38,6 @@ options:
       - ipv4
       - ipv6
       - mac
-      - l4port
   state:
     description: The action taken with the current ACL
     required: false
@@ -47,8 +46,7 @@ options:
       - create
       - update
       - delete
-    default:
-      - create
+    default: create
   acl_entries:
     description:
       - A dictionary, where the key is the sequence number of the Access Control
