@@ -54,7 +54,7 @@ options:
       - Entry. A detailed description of these ACE dictionaries is provided in
       - the notes section, and in docs/aoscx_acl.md
     required: false
-    type: dictionary
+    type: dict
 
 notes:
   ace_dictionary:
