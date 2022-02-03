@@ -3,7 +3,7 @@ namespace: "arubanetworks"
 
 name: "aoscx"
 
-version: "3.1.0"
+version: "3.2.0"
 
 authors:
   - "Madhusudan Pranav Venugopal"
@@ -13,6 +13,7 @@ authors:
   - "Melvin Gutierrez"
   - "Rodrigo Jose Hernandez"
   - "Daniel Alvarado Bonilla"
+  - "David Cordero"
 
 dependencies:
     "ansible.netcommon": "*"

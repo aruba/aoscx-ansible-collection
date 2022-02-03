@@ -109,17 +109,17 @@ portal](https://developer.arubanetworks.com/aruba-aoscx/reference#acl_entry).
 | `tcp_rst`           | Boolean            | TCP RST flag matching attribute                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `tcp_urg`           | Boolean            | TCP URG flag matching attribute                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `src_l4_port_group` | URL                | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and `src_l4_port_range_reverse` attributes, and if this attribute is configured, the other ones will be ignored. The referenced object group must be of type `l4port` |
-| `src_l4_port_max`   | Int32              | Maximum L4 port to match on the packet                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `src_l4_port_min`   | Int32              | Minimum L4 port to match on the packet                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `src_l4_port_max`   | Int32              | Maximum L4 port to match on the packet. To match any port this field can be left empty.                                                                                                                                                                                                                                                                                                                                                      |
+| `src_l4_port_min`   | Int32              | Minimum L4 port to match on the packet. To match any port this field can be left empty.                                                                                                                                                                                                                                                                                                                                                      |
 | `dst_l4_port_group` | URL                | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`.  This attribute is mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and `dst_l4_port_range_reverse` attributes. If this attribute is configured, the others will be ignored. The referenced object group must be of type `l4port`        |
 | `dst_l4_port_max`   | Int32              | Maximum IP destination port matching attribute. Used in conjunction with `dst_l4_port_min` and `dst_l4_port_range_reverse`                                                                                                                                                                                                                                                                                                                   |
 | `dst_l4_port_min`   | Int32              | Minimum IP destination port matching attribute. Used in conjunction with `dst_l4_port_max` and `dst_l4_port_range_reverse`                                                                                                                                                                                                                                                                                                                   |
 | `src_ip_group`      | URL                | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`.                                                       |
-| `src_ip`            | IP Network Address | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z)                                                                                                                                                                                                  |
+| `src_ip`            | IP Network Address | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z). To match any address the field can be left empty or use the 'any' keyword                                                                                                                       |
 | `dst_ip_group`      | URL                | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`.                                                  |
-| `dst_ip`            | IP Network Address | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z)                                                                                                                                                                                     |
-| `src_mac`           | MAC address        | String with source MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ)                                                                                                                                                                                                                                                                                                                         |
-| `dst_mac`           | MAC address        | String with destination MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ)                                                                                                                                                                                                                                                                                                                    |
+| `dst_ip`            | IP Network Address | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z). To match any address the field can be left empty or use the 'any' keyword                                                                                                          |
+| `src_mac`           | MAC address        | String with source MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword                                                                                                                                                                                                                                              |
+| `dst_mac`           | MAC address        | String with destination MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword                                                                                                                                                                                                                                         |
 | `action`            | String             | Define the action to take on an ACL match. There are two options: `permit`, and `deny`. `permit`: packets will be forwarded. `deny`: packets will be dropped. ACE will only be activated when an associated action is provided.                                                                                                                                                                                                              |
 | `count`             | Boolean            | When true, increment hit count for packets that match this ACL                                                                                                                                                                                                                                                                                                                                                                               |
 | `dscp`              | Int32              | Different Services Code Point matching attribute                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -138,14 +138,16 @@ portal](https://developer.arubanetworks.com/aruba-aoscx/reference#acl_entry).
 
 # Examples
 
-## 1. Deny a host inside an allowed network
+## Deny a host inside an allowed network
 
 The following example shows how to allow all incoming traffic from a certain
 IPv4 network, but deny a single host, and keep a count of how many packets are
 sent to the switch from that host. Two ACEs are added, the one with lowest
 sequence number is checked first for matches. One ACE is in charge of denying
 incoming traffic from the single host, while the other one allows incoming from
-the rest of the network.
+the rest of the network. Note that in both cases the entries match all
+destination addresses, because `dst_ip` is empty. In that case, all destination
+traffic is denied because the first entry takes precedence.
 
 ```YAML
 - name: Configure IPv4 ACL that allows traffic from a network except a single host
@@ -166,7 +168,7 @@ the rest of the network.
         protocol: tcp
 ```
 
-## 2. Deny a host and log urgent packets
+## Deny a host and log urgent packets
 
 The following example shows how to deny all incoming and outgoing traffic from a
 single host, and log only when packet was urgent.
@@ -191,12 +193,12 @@ single host, and log only when packet was urgent.
         action: deny
 ```
 
-## 3. Simple L4 example
+## Simple L4 example
 
 The following example shows how to configure rules with L4 ports. It will allow
-traffic form ports 5000, 5001 and 5002 to port 3657. Note that when
-a match for only one port is intended, `src/dst_l4_port_max` and
-`src/dst_l4_port_min` need to be equal.
+traffic form ports 5000, 5001 and 5002 to port 3657. Note that when a match for
+only one port is intended, `src/dst_l4_port_max` and `src/dst_l4_port_min` must
+be equal.
 
 ```YAML
 - name: Configure port range
@@ -211,11 +213,11 @@ a match for only one port is intended, `src/dst_l4_port_max` and
         src_l4_port_max: 5002
         src_l4_port_min: 5000
         dst_l4_port_max: 3657
-        dst_l4_port_min: 3567
+        dst_l4_port_min: 3657
         action: permit
 ```
 
-## 4. Remove an ACL
+## Remove an ACL
 
 ```YAML
 - name: Delete ipv4 ACL from config

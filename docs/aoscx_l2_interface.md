@@ -1,74 +1,67 @@
-# module: aoscx_l2_interface
+# L2 Interface
 
-description: This modules provides configuration management of Layer2 Interfaces on AOS-CX devices.
+L2 Interface module for Ansible.
 
-##### ARGUMENTS
-```YAML
-  interface:
-    description: Interface name, should be in the format chassis/slot/port,
-      i.e. 1/2/3 , 1/1/32. Please note, if the interface is a Layer3 interface
-      in the existing configuration and the user wants to change the interface
-      to be Layer2, the user must delete the L3 interface then recreate the
-      interface as a Layer2.
-    type: str
-    required: true
-  admin_state:
-    description: Admin State status of interface.
-    default: 'up'
-    choices: ['up', 'down']
-    required: false
-    type: str
-  description:
-    description: Description of interface.
-    type: str
-    required: false
-  vlan_mode:
-    description: VLAN mode on interface, access or trunk.
-    choices: ['access', 'trunk']
-    required: false
-    type: str
-  vlan_access:
-    description: Access VLAN ID, vlan_mode must be set to access.
-    required: false
-    type: str
-  vlan_trunks:
-    description: List of trunk VLAN IDs, vlan_mode must be set to trunk.
-    required: false
-    type: list
-  trunk_allowed_all:
-    description: Flag for vlan trunk allowed all on L2 interface, vlan_mode
-      must be set to trunk.
-    required: false
-    type: bool
-  native_vlan_id:
-    description: VLAN trunk native VLAN ID, vlan_mode must be set to trunk.
-    required: false
-    type: str
-  native_vlan_tag:
-    description: Flag for accepting only tagged packets on VLAN trunk native,
-      vlan_mode must be set to trunk.
-    required: false
-    type: bool
-  interface_qos_schedule_profile:
-    description: Attaching existing QoS schedule profile to interface.
-    type: dict
-    required: False
-  interface_qos_rate:
-    description: "The rate limit value configured for
-      broadcast/multicast/unknown unicast traffic. Dictionary should have the
-      format ['type_of_traffic'] = speed i.e. {'unknown-unicast': 100pps,
-      'broadcast': 200pps, 'multicast': 200pps}"
-    type: dict
-    required: False
-  state:
-    description: Create, Update, or Delete Layer2 Interface
-    choices: ['create', 'delete', 'update']
-    default: 'create'
-    required: false
-    type: str
-```
+Version added: 2.8
 
-##### EXAMPLES
+ - [Synopsis](#Synopsis)
+ - [Parameters](#Parameters)
+ - [Examples](#Examples)
+
+## Synopsis
+
+This modules provides configuration management of Layer2 Interfaces on AOS-CX devices, including Speeds and Port Security features.
+
+## Parameters
+
+| Parameter                      | Type    | Choices/Defaults                        | Required | Comments                                                                                                                                                                                                                                                                                                  |
+|:-------------------------------|:-------:|:---------------------------------------:|:--------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| interface                      | string  |                                         | [x]      | Interface name, should be in the format chassis/slot/port, i.e. 1/2/3 , 1/1/32. Please note, if the interface is a Layer3 interface in the existing configuration and the user wants to change the interface to be Layer2, the user must delete the L3 interface then recreate the interface as a Layer2. |
+| description                    | string  |                                         | [x]      | Description of interface.                                                                                                                                                                                                                                                                                 |
+| vlan_mode                      | str     | [`access`, `trunk`]                     | [ ]      | VLAN mode on interface, access or trunk.                                                                                                                                                                                                                                                                  |
+| vlan_access                    | string  |                                         | [ ]      | Access VLAN ID, vlan_mode must be set to access.                                                                                                                                                                                                                                                          |
+| vlan_trunks                    | list    |                                         | [ ]      | List of trunk VLAN IDs, vlan_mode must be set to trunk.                                                                                                                                                                                                                                                   |
+| trunk_allowed_all              | bool    |                                         | [ ]      | Flag for vlan trunk allowed all on L2 interface, vlan_mode must be set to trunk.                                                                                                                                                                                                                          |
+| native_vlan_id                 | string  |                                         | [ ]      | VLAN trunk native VLAN ID, vlan_mode must be set to trunk.                                                                                                                                                                                                                                                |
+| native_vlan_tag                | bool    |                                         | [ ]      | Flag for accepting only tagged packets on VLAN trunk native, vlan_mode must be set to trunk.                                                                                                                                                                                                              |
+| interface_qos_schedule_profile | dict    |                                         | [ ]      | Attaching existing QoS schedule profile to interface. *This parameter is deprecated and will be removed in a future version                                                                                                                                                                               |
+| interface_qos_rate             | dict    |                                         | [ ]      | The rate limit value configured for broadcast/multicast/unknown unicast traffic.                                                                                                                                                                                                                          |
+| speeds                         | string  |                                         | [ ]      | Configure the speeds of the interface in megabits per second (aoscx connection). If this value is specified, duplex must also be specified                                                                                                                                                                |
+| duplex                         | bool    |                                         | [ ]      | Enable full duplex or disable for half duplex (aoscx connection). If this value is specified, speeds must also be specified                                                                                                                                                                               |
+| port_security_enable           | bool    |                                         | [ ]      | Enable port security in this interface (aoscx connection)                                                                                                                                                                                                                                                 |
+| port_security_client_limit     | int     |                                         | [ ]      | Maximum amount of MACs allowed in the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
+| port_security_sticky_learning  | bool    |                                         | [ ]      | Enable sticky MAC learning (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                                                   |
+| port_security_macs             | list    |                                         | [ ]      | List of allowed MAC addresses (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                                                |
+| port_security_sticky_macs      | dict    |                                         | [ ]      | Configure the sticky MAC addresses for the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                         |
+| port_security_violation_action | string  | [`notify`, `shutdown`]/`notify`         | [ ]      | Action to perform  when a violation is detected (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
+| port_security_recovery_time    | int     |                                         | [ ]      | Time in seconds to wait for recovery after a violation (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                       |
+| state                          | string  | [`create`, `delete`, `update`]/`create` | [ ]      | Create, Update, or Delete Layer2 Interface                                                                                                                                                                                                                                                                |
+
+### `interface_qos_schedule_profile` dictionary parameters:
+
+| Parameters | Type   | Choices/Defaults | Required | Comments                        |
+|:----------:|:------:|:----------------:|:--------:|:--------------------------------|
+| qos        | string |                  | [x]      | Name of a QoS Schedule Profile. |
+
+### `interface_qos_rate` dictionary parameters:
+
+| Parameters      | Type   | Choices/Defaults | Required | Comments                        |
+|:---------------:|:------:|:----------------:|:--------:|:--------------------------------|
+| unknown-unicast | string |                  | [ ]      | Unknow Unicast type of traffic. |
+| broadcast       | string |                  | [ ]      | Broadcast type of traffic.      |
+| multicast       | string |                  | [ ]      | Multicast type of traffic.      |
+
+See an example [here](#interface-qos-rate-example)
+
+### `port_security_sticky_macs` dictionary:
+
+Dictionary where each key is a string (MAC Address name), and value is a string (MAC Address).
+
+See an example [here](#allow-mac-addresses-to-a-port)
+## Examples
+
+Below you can find task examples of this module's implementation:
+
 ```YAML
 - name: Configure Interface 1/1/3 - vlan trunk allowed all
   aoscx_l2_interface:
@@ -120,4 +113,57 @@ description: This modules provides configuration management of Layer2 Interfaces
     vlan_mode: trunk
     trunk_allowed_all: True
     native_vlan_id: '200'
+
+- name: >
+    Configure Interface 1/1/2 - enable full duplex at 1000 Mbit/s.
+    IMPORTANT: The Interface must be enabled first.
+  aoscx_l2_interface:
+    interface: 1/1/2
+    duplex: full
+    speeds:
+      - '1000'
+
+- name: >
+    Configure Interface 1/1/3 - enable port security for a total of 10 MAC
+    addresses with sticky MAC learning, and two user set MAC addresses.
+  aoscx_l2_interface:
+    interface: 1/1/3
+    port_security_enable: true
+    port_security_client_limit: 10
+    port_security_sticky_learning: true
+    port_security_macs:
+      - 11:22:33:44:55:66
+      - aa:bb:cc:dd:ee:ff
+```
+
+### Interface QoS rate example:
+
+The following example shows how to configure an Interface's QoS broadcast,
+multicast, and unknown-unicast traffic rates.
+
+```YAML
+- name: Set the interface QoS rate limits
+  aoscx_l2_interface:
+    interface: 1/1/2
+    interface_qos_rate:
+      broadcast: 200pps
+      multicast: 100kbps
+      unknown-unicast: 150pps
+```
+
+### Allow Mac addresses to a port
+
+The following example shows how to configure an instrusion action to disable
+the interface if it sees a MAC address that is not on the allowed list.
+
+```YAML
+- name: >
+    Configure Interface 1/1/13 sticky macs
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_sticky_macs:
+      'mac1': 'aa:bb:cc:dd:ee:ff'
+      'mac2': 'ab:cd:ef:12:34:56'
+    port_security_violation_action: 'shutdown'
+    port_security_recovery_time: 60
 ```

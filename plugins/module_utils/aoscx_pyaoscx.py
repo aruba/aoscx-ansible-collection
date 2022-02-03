@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -24,6 +24,7 @@ urllib3.disable_warnings()
 # guard against pyaoscx published v0.2.0 which does not have a firmware module yet
 try:
     from pyaoscx import firmware
+    from pyaoscx.session import Session as PyaoscxSession
     HAS_PYAOSCX_FIRMWARE = True
 except ImportError:
     HAS_PYAOSCX_FIRMWARE = False
@@ -62,3 +63,12 @@ class Session(object):
             elif "10.00" in version or "10.01" in version or "10.02" in version:
                 ansible_module.fail_json(msg="Minimum supported "
                                          "firmware version is 10.03")
+
+def get_pyaoscx_session(ansible_module):
+    # Get session's serialized information
+    ansible_module_session = Session(ansible_module)
+    ansible_module_session_info = ansible_module_session.get_session()
+    # Create pyaoscx session object
+    requests_session = ansible_module_session_info["s"]
+    base_url = ansible_module_session_info["url"]
+    return PyaoscxSession.from_session(requests_session, base_url)

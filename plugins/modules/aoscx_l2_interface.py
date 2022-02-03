@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2020 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -34,12 +34,6 @@ options:
       interface as a Layer2.
     type: str
     required: true
-  admin_state:
-    description: Admin State status of interface.
-    default: 'up'
-    choices: ['up', 'down']
-    required: false
-    type: str
   description:
     description: Description of interface.
     type: str
@@ -72,7 +66,8 @@ options:
     required: false
     type: bool
   interface_qos_schedule_profile:
-    description: Attaching existing QoS schedule profile to interface.
+    description: Attaching existing QoS schedule profile to interface. *This
+      parameter is deprecated and will be removed in a future version
     type: dict
     required: False
   interface_qos_rate:
@@ -88,9 +83,83 @@ options:
     default: 'create'
     required: false
     type: str
+  speeds:
+    description: "Configure the speeds of the interface in megabits per second
+      (aoscx connection). If this value is specified, duplex must also be
+      specified"
+    type: str
+    required: false
+  duplex:
+    description: "Enable full duplex or disable for half duplex (aoscx
+      connection). If this value is specified, speeds must also be specified"
+    type: bool
+    required: false
+  port_security_enable:
+    description: Enable port security in this interface (aoscx connection)
+    type: bool
+    required: false
+  port_security_client_limit:
+    description: "Maximum amount of MACs allowed in the interface (aoscx
+      connection). Only valid when port_security is enabled"
+    type: int
+    required: false
+    default: 0
+  port_security_sticky_learning:
+    description: "Enable sticky MAC learning (aoscx connection).
+       Only valid when port_security is enabled"
+    type: bool
+    required: false
+    default: true
+  port_security_macs:
+    description: "List of allowed MAC addresses (aoscx connection).
+       Only valid when port_security is enabled"
+    type: list
+    required: false
+    default: []
+  port_security_sticky_macs:
+    description: "Configure the sticky MAC addresses for the interface (aoscx
+      connection). Only valid when port_security is enabled"
+    type: dict
+    required: false
+    default: {}
+  port_security_violation_action:
+    description: "Action to perform  when a violation is detected (aoscx
+      connection). Only valid when port_security is enabled"
+    type: str
+    choices: ['notify', 'shutdown']
+    required: false
+    default: notify
+  port_security_recovery_time:
+    description: "Time in seconds to wait for recovery after a violation
+      (aoscx connection). Only valid when port_security is enabled"
+    type: int
+    required: false
+    default: 10
 '''  # NOQA
 
 EXAMPLES = '''
+- name: >
+    Configure Interface 1/1/2 - enable interface and vsx-sync features
+    IMPORTANT NOTE the aoscx_interface module is needed to enable the interface
+    and set the VSX features to be synced
+  aoscx_interface:
+    name: 1/1/2
+    enabled: true
+    vsx_sync:
+      - acl
+      - irdp
+      - qos
+      - rate_limits
+      - vlan
+      - vsx_virtual
+- name: >
+    Configure Interface 1/1/2 - enable full duplex at 1000 Mbit/s
+    IMPORTANT NOTE see the above task, it is needed to enable the interface
+  aoscx_l2_interface:
+    interface: 1/1/2
+    duplex: full
+    speeds: ['1000']
+
 - name: Configure Interface 1/1/3 - vlan trunk allowed all
   aoscx_l2_interface:
     interface: 1/1/3
@@ -141,19 +210,36 @@ EXAMPLES = '''
     vlan_mode: trunk
     trunk_allowed_all: True
     native_vlan_id: '200'
+
+- name: >
+    Configure Interface 1/1/3 - enable port security for a total of 10 MAC
+    addresses with sticky MAC learning, and two user set MAC addresses.
+  aoscx_l2_interface:
+    interface: 1/1/3
+    port_security_enable: true
+    port_security_client_limit: 10
+    port_security_sticky_learning: true
+    port_security_macs: ["11:22:33:44:55:66", "aa:bb:cc:dd:ee:ff"]
 '''  # NOQA
 
 RETURN = r''' # '''
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import L2_Interface, Interface
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
+
+try:
+    from pyaoscx.device import Device
+    from ansible.module_utils.basic import AnsibleModule
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import get_pyaoscx_session
+    USE_PYAOSCX_SDK = True
+except ImportError:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import ArubaAnsibleModule
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import VLAN
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import L2_Interface, Interface
+    USE_PYAOSCX_SDK = False
 
 
 def main():
     module_args = dict(
         interface=dict(type='str', required=True),
-        admin_state=dict(type='str', default='up', choices=['up', 'down']),
         description=dict(type='str', default=None),
         vlan_mode=dict(type='str', default=None, choices=['access', 'trunk']),
         vlan_access=dict(type='str', default=None),
@@ -163,33 +249,46 @@ def main():
         native_vlan_tag=dict(type='bool', default=None),
         interface_qos_schedule_profile=dict(type='dict', default=None),
         interface_qos_rate=dict(type='dict', default=None),
-        state=dict(type='str', default='create',
-                   choices=['create', 'delete', 'update'])
+        state=dict(
+            type="str",
+            default="create",
+            choices=["create", "delete", "update"]
+        ),
+        speeds=dict(type="list", elements="str", default=None, required=False),
+        duplex=dict(type="str", default=None, required=False),
+        port_security_enable=dict(type='bool', default=None, required=False),
+        port_security_client_limit=dict(type='int', default=0, required=False),
+        port_security_sticky_learning=dict(
+            type='bool',
+            default=False,
+            required=False
+        ),
+        port_security_macs=dict(type='list', default=[], required=False),
+        port_security_sticky_macs=dict(
+            type='dict',
+            default={},
+            required=False
+        ),
+        port_security_violation_action=dict(
+            type='str',
+            choices=['notify', 'shutdown'],
+            default='notify',
+            required=False
+        ),
+        port_security_recovery_time=dict(
+            type='int',
+            default=10,
+            required=False
+        )
     )
 
-    # Version management
-    try:
-        from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import Session
-        from pyaoscx.session import Session as Pyaoscx_Session
-        from pyaoscx.pyaoscx_factory import PyaoscxFactory
-
-        USE_PYAOSCX_SDK = True
-
-    except ImportError:
-
-        USE_PYAOSCX_SDK = False
-
     if USE_PYAOSCX_SDK:
-
-        from ansible.module_utils.basic import AnsibleModule
-        # ArubaModule
         ansible_module = AnsibleModule(
             argument_spec=module_args,
-            supports_check_mode=True)
+            supports_check_mode=True
+        )
 
         interface_name = ansible_module.params['interface']
-        admin_state = ansible_module.params['admin_state']
-        # Set all variables
         description = ansible_module.params['description']
         vlan_mode = ansible_module.params['vlan_mode']
         vlan_access = ansible_module.params['vlan_access']
@@ -197,12 +296,21 @@ def main():
         trunk_allowed_all = ansible_module.params['trunk_allowed_all']
         native_vlan_id = ansible_module.params['native_vlan_id']
         native_vlan_tag = ansible_module.params['native_vlan_tag']
-        qos_profile_details = ansible_module.params['interface_qos_schedule_profile']
-        qos_rate = ansible_module.params['interface_qos_rate']
         state = ansible_module.params['state']
-
-        # Session
-        session = Session(ansible_module)
+        speeds = ansible_module.params['speeds']
+        duplex = ansible_module.params['duplex']
+        port_security_enable = ansible_module.params['port_security_enable']
+        port_security_client_limit = ansible_module.params[
+            'port_security_client_limit']
+        port_security_sticky_learning = ansible_module.params[
+            'port_security_sticky_learning']
+        port_security_macs = ansible_module.params['port_security_macs']
+        port_security_sticky_macs = ansible_module.params[
+            'port_security_sticky_macs']
+        port_security_violation_action = ansible_module.params[
+            'port_security_violation_action']
+        port_security_recovery_time = ansible_module.params[
+            'port_security_recovery_time']
 
         # Set result var
         result = dict(
@@ -212,24 +320,17 @@ def main():
         if ansible_module.check_mode:
             ansible_module.exit_json(**result)
 
-        # Get session serialized information
-        session_info = session.get_session()
-        # Create pyaoscx.session object
-        s = Pyaoscx_Session.from_session(
-            session_info['s'], session_info['url'])
-
-        # Create a Pyaoscx Factory Object
-        pyaoscx_factory = PyaoscxFactory(s)
+        session = get_pyaoscx_session(ansible_module)
+        device = Device(session)
         if state == 'delete':
             # Create Interface Object
-            interface = pyaoscx_factory.interface(interface_name)
+            interface = device.interface(interface_name)
             # Delete it
             interface.delete()
 
             # Changed
             result['changed'] = True
-
-        if state == 'create' or state == 'update':
+        else:
             # Set VLAN tag
             vlan_tag = None
             if vlan_access is not None:
@@ -241,7 +342,7 @@ def main():
                 vlan_tag = int(vlan_tag)
 
             # Create Interface Object
-            interface = pyaoscx_factory.interface(interface_name)
+            interface = device.interface(interface_name)
             # Verify if interface was create
             if interface.was_modified():
                 # Changed
@@ -250,21 +351,31 @@ def main():
             # Verify if object was changed
             modified_op = interface.configure_l2(
                 description=description,
-                admin=admin_state,
                 vlan_mode=vlan_mode,
                 vlan_tag=vlan_tag,
                 vlan_ids_list=vlan_trunks,
                 trunk_allowed_all=trunk_allowed_all,
                 native_vlan_tag=native_vlan_tag)
 
-            if qos_profile_details is not None:
-                modified_op2 = interface.update_interface_qos_profile(
-                    qos_profile_details)
-                modified_op = modified_op2 or modified_op
+            if speeds is not None and duplex is not None:
+                modified_op |= interface.speed_duplex_configure(
+                    speeds=speeds,
+                    duplex=duplex
+                )
 
-            if qos_rate is not None:
-                modified_op3 = interface.update_interface_qos_rate(qos_rate)
-                modified_op = modified_op3 or modified_op
+            if port_security_enable is not None:
+                if port_security_enable:
+                    modified_op |= interface.port_security_enable(
+                        client_limit=port_security_client_limit,
+                        sticky_mac_learning=port_security_sticky_learning,
+                        allowed_mac_addr=port_security_macs,
+                        allowed_sticky_mac_addr=port_security_sticky_macs,
+                        violation_action=port_security_violation_action,
+                        violation_recovery_time=port_security_recovery_time
+                    )
+                else:
+                    modified_op = (interface.port_security_disable() or
+                                   modified_op)
 
             if modified_op:
                 # Changed
@@ -310,10 +421,10 @@ def main():
 
                 else:
                     aruba_ansible_module.module.fail_json(
-    msg="VLAN {id} is not "
-    "configured"
-    "".format(
-        id=params['vlan_access']))  # NOQA
+                        msg="VLAN {0} is not configured".format(
+                            params["vlan_access"]
+                        )
+                   )
 
             elif params['vlan_mode'] == 'trunk':
 
@@ -333,8 +444,10 @@ def main():
                         interface_vlan_dict['vlan_tag'] = params['native_vlan_id']
                     else:
                         aruba_ansible_module.module.fail_json(
-                            msg="VLAN {id} is not configured".format(
-                                id=params['native_vlan_id']))
+                            msg="VLAN {0} is not configured".format(
+                                params['native_vlan_id']
+                            )
+                        )
 
                 elif params['native_vlan_tag']:
                     interface_vlan_dict['vlan_mode'] = 'native-tagged'
@@ -353,7 +466,8 @@ def main():
                             interface_vlan_dict['vlan_trunks'].append(str(id))
                         else:
                             aruba_ansible_module.module.fail_json(
-                                msg="VLAN {id} is not configured".format(id=id))
+                                msg="VLAN {0} is not configured".format(id)
+                            )
 
                 elif params['trunk_allowed_all']:
                     if 'vlan_mode' not in interface_vlan_dict.keys():
