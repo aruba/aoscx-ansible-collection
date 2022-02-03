@@ -261,9 +261,7 @@ try:
     from pyaoscx.device import Device
     from ansible.module_utils.basic import AnsibleModule
 except ImportError as imp:
-    raise ImportError(
-        "Unable to find PYAOSCX SDK, make sure it is installed correctly"
-    ) from imp
+    raise ImportError("Unable to find PYAOSCX SDK, make sure it is installed correctly") from imp  # NOQA
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
     aoscx_http_argument_spec,
 )

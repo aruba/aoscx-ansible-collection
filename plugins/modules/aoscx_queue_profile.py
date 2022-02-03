@@ -75,9 +75,7 @@ try:
     from pyaoscx.device import Device
     from pyaoscx.queue_profile import QueueProfile
 except ImportError as imp:
-    raise ImportError(
-        "Unable to find the PYAOSCX SDK. Make sure it is installed correctly."
-    ) from imp
+    raise ImportError("Unable to find PYAOSCX SDK, make sure it is installed correctly") from imp  # NOQA
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA

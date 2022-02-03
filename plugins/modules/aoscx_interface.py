@@ -5,7 +5,7 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, print_function)
+from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 
@@ -233,9 +233,7 @@ RETURN = r""" # """
 try:
     from pyaoscx.device import Device
 except ImportError as imp:
-    raise ImportError(
-        "Unable to find PYAOSCX SDK, make sure it is installed correctly"
-    ) from imp
+    raise ImportError("Unable to find PYAOSCX SDK, make sure it is installed correctly") from imp  # NOQA
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
