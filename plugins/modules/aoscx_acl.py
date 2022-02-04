@@ -24,7 +24,7 @@ description: >
   on AOSCX switches. For more detailed documentation see docs/aoscx_acl.md
   in this repository.
 version_added: "2.8.0"
-author: "Aruba Networking"
+author: Aruba Networks (@ArubaNetworks)
 options:
   name:
     description: Name of the access control list
