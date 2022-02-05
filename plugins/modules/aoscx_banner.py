@@ -40,7 +40,6 @@ options:
 
   banner:
     description : String to be configured as the banner.
-    required: True
     type: str
 '''
 

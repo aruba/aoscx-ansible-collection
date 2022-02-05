@@ -30,22 +30,18 @@ options:
       of the dictionary is primary or secondary and value is the respective IP
       address
     type: dict
-    required: True
   dns_domain_name:
     description: Domain name used for name resolution by the DNS client, if
       'dns_domain_list' is not configured
     type: str
-    required: True
   dns_domain_list:
     description: Domain list names to be used for address resolution, keyed by
       the resolution priority order
     type: dict
-    required: True
   dns_name_servers:
     description: Name servers to be used for address resolution, keyed by the
       resolution priority order
     type: dict
-    required: True
   vrf:
     description: VRF name where DNS configuration is added
     type: str
@@ -54,7 +50,6 @@ options:
     description: List of static host address configurations and the IPv4
       address associated with them
     type: dict
-    required: True
   state:
     description: Create or Update or Delete DNS configuration on the switch.
     default: create

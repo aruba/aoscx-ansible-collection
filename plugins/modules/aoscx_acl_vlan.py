@@ -44,7 +44,6 @@ options:
 
   acl_direction:
     description: Direction for which the ACL is to be applied or removed.
-    required: true
     choices: ['in', 'out']
     default: 'in'
     type: str
