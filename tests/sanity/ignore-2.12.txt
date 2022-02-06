@@ -1,0 +1,5 @@
+plugins/modules/aoscx_acl_interface.py validate-modules:parameter-list-no-elements #(acl_interface_list)
+plugins/modules/aoscx_acl_vlan.py validate-modules:parameter-list-no-elements #(acl_vlan_list)
+plugins/modules/aoscx_l2_interface.py validate-modules:parameter-list-no-elements #(port_security_macs, vlan_trunks)
+plugins/modules/aoscx_l3_interface.py validate-modules:parameter-list-no-elements #(ip_helper_address, ipv4, ipv6)
+plugins/modules/aoscx_vlan_interface.py validate-modules:parameter-list-no-elements #(ip_helper_address, ipv4, ipv6)
