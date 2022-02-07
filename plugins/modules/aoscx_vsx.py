@@ -1,21 +1,32 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2021 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
-
 
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
     "status": ["preview"],
     "supported_by": "certified",
 }
-
 
 DOCUMENTATION = """
 ---
@@ -257,18 +268,6 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
-    from ansible.module_utils.basic import AnsibleModule
-except ImportError as imp:
-    raise ImportError("Unable to find PYAOSCX SDK, make sure it is installed correctly") from imp  # NOQA
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-    aoscx_http_argument_spec,
-)
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-    get_pyaoscx_session,
-)
-
 
 def get_argument_spec():
     module_args = {
@@ -421,7 +420,6 @@ def get_argument_spec():
         },
         "system_mac": {"type": "str", "required": False, "default": None},
     }
-    module_args.update(aoscx_http_argument_spec)
     return module_args
 
 
@@ -436,6 +434,11 @@ def main():
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
+
+    if not HAS_PYAOSCX:
+        ansible_module.fail_json(
+            msg="Could not find the PYAOSCX SDK. Make sure it is installed."
+        )
 
     params = ansible_module.params.copy()
     state = params.pop("state")

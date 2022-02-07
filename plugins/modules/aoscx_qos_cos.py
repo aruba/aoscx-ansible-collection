@@ -1,12 +1,26 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2021 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2021-2022 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
+
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
@@ -69,21 +83,6 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-    aoscx_http_argument_spec,
-)
-try:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        Session,
-    )
-    from pyaoscx.session import Session as Pyaoscx_Session
-    from pyaoscx.device import Device
-    from ansible.module_utils.basic import AnsibleModule
-
-except ImportError:
-    raise ImportError(
-        "Unable to find the PYAOSCX SDK. Make sure PYAOSCX is installed correctly."
-    )
 
 def main():
     module_args = dict(
@@ -102,8 +101,6 @@ def main():
         local_priority=dict(type="int", required=False)
     )
 
-    module_args.update(aoscx_http_argument_spec)
-
     ansible_module = AnsibleModule(
         argument_spec=module_args,
         supports_check_mode=True
@@ -113,20 +110,18 @@ def main():
         changed = False
     )
 
-    # Get session's serialized information
-    ansible_module_session = Session(ansible_module)
-    ansible_module_session_info = ansible_module_session.get_session()
-
-    # Create pyaoscx session object
-    requests_session = ansible_module_session_info["s"]
-    base_url = ansible_module_session_info["url"]
-    session = Pyaoscx_Session.from_session(requests_session, base_url)
+    if not HAS_PYAOSCX:
+        ansible_module.fail_json(
+            msg="Could not find the PYAOSCX SDK. Make sure it is installed."
+        )
 
     # Get playbook's arguments
     code_point = ansible_module.params["code_point"]
     color = ansible_module.params["color"]
     description = ansible_module.params["description"]
     local_priority = ansible_module.params["local_priority"]
+
+    session = get_pyaoscx_session(ansible_module)
 
     # Get Pyaoscx device to handle switch configuration
     device = Device(session)
