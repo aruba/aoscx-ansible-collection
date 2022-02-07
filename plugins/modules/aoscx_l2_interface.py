@@ -87,12 +87,12 @@ options:
     description: "Configure the speeds of the interface in megabits per second
       (aoscx connection). If this value is specified, duplex must also be
       specified"
-    type: str
+    type: list
     required: false
   duplex:
     description: "Enable full duplex or disable for half duplex (aoscx
       connection). If this value is specified, speeds must also be specified"
-    type: bool
+    type: str
     required: false
   port_security_enable:
     description: Enable port security in this interface (aoscx connection)
@@ -109,7 +109,7 @@ options:
        Only valid when port_security is enabled"
     type: bool
     required: false
-    default: true
+    default: False
   port_security_macs:
     description: "List of allowed MAC addresses (aoscx connection).
        Only valid when port_security is enabled"
@@ -254,7 +254,7 @@ def main():
             default="create",
             choices=["create", "delete", "update"]
         ),
-        speeds=dict(type="list", elements="str", default=None, required=False),
+        speeds=dict(type="list", default=None, required=False),
         duplex=dict(type="str", default=None, required=False),
         port_security_enable=dict(type='bool', default=None, required=False),
         port_security_client_limit=dict(type='int', default=0, required=False),
