@@ -194,12 +194,8 @@ def main():
     ansible_module = AnsibleModule(
         argument_spec=get_argument_spec(),
         supports_check_mode=True,
-        mutually_exclusive=[
-          ("gmb_percent", "no_gmb_percent")
-        ],
-        required_if=[
-          ("algorithm", "min-bandwidth", ("gmb_percent",))
-        ],
+        mutually_exclusive=["gmb_percent", "no_gmb_percent"],
+        required_if=["algorithm", "min-bandwidth", "gmb_percent"],
     )
 
     result = dict(
