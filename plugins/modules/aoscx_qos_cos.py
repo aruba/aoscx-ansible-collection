@@ -111,7 +111,7 @@ def main():
     )
 
     result = dict(
-        changed = False
+        changed=False
     )
 
     # Get session's serialized information
