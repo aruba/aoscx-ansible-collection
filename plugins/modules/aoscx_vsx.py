@@ -100,26 +100,27 @@ options:
   isl_timers:
     description: Timing configuration for ISL functionality.
     type: dict
-    timeout:
-      description: Seconds to wait for hellos from peer.
-      type: int
-      required: true
-    peer_detect_interval:
-      description: >
-        Configures the amount of time in seconds that the device waits for ISL
-        interface to link up after a reboot. If the ISL link does not come up
-        within this time window, the device declares itself as split from its
-        peer.
-      type: int
-      required: true
-    hold_time:
-      description: Configures ISL port-flap hold time in seconds.
-      type: int
-      required: true
-    hello_interval:
-      description: ISLP hello interval in seconds.
-      type: int
-      required: true
+    suboptions:
+      timeout:
+        description: Seconds to wait for hellos from peer.
+        type: int
+        required: true
+      peer_detect_interval:
+        description: >
+          Configures the amount of time in seconds that the device waits for ISL
+          interface to link up after a reboot. If the ISL link does not come up
+          within this time window, the device declares itself as split from its
+          peer.
+        type: int
+        required: true
+      hold_time:
+        description: Configures ISL port-flap hold time in seconds.
+        type: int
+        required: true
+      hello_interval:
+        description: ISLP hello interval in seconds.
+        type: int
+        required: true
   config_sync_features:
     description: >
       Feature configurations to be globally synchronized between VSX peers.
@@ -167,16 +168,17 @@ options:
     description: Timing configuration for keepalive functionality.
     required: false
     type: dict
-    hello_interval:
-      description: Keepalive hello interval in seconds.
-      type: int
-      required: true
-    dead_interval:
-      description: >
-        Configures the amount of time in seconds to wait for keepalive packets
-        from a peer.
-      type: int
-      required: true
+    suboptions:
+      hello_interval:
+        description: Keepalive hello interval in seconds.
+        type: int
+        required: true
+      dead_interval:
+        description: >
+          Configures the amount of time in seconds to wait for keepalive packets
+          from a peer.
+        type: int
+        required: true
   keepalive_peer_ip:
     description: >
       IPv4 address of the peer device. If not configured, keepalive
