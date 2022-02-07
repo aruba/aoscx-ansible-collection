@@ -64,6 +64,7 @@ class Session(object):
                 ansible_module.fail_json(msg="Minimum supported "
                                          "firmware version is 10.03")
 
+
 def get_pyaoscx_session(ansible_module):
     # Get session's serialized information
     ansible_module_session = Session(ansible_module)
