@@ -164,7 +164,7 @@ def get_argument_spec():
         "gmb_percent": {
             "type": "int",
             "required": False,
-            "default" : None,
+            "default": None,
         },
         "no_gmb_percent": {
             "type": "bool",
