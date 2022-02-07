@@ -424,7 +424,7 @@ def main():
                         msg="VLAN {0} is not configured".format(
                             params["vlan_access"]
                         )
-                   )
+                    )
 
             elif params['vlan_mode'] == 'trunk':
 
