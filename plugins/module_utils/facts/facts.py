@@ -17,7 +17,7 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.facts.legacy i
     Fans, ResourceUtilization, DomainName
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.facts.vlans import VlansFacts
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.facts.vrfs import VrfsFacts
-from ansible.module_utils.network.common.facts.facts import FactsBase
+from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.facts.facts import FactsBase
 
 
 FACT_LEGACY_SUBSETS = dict(

@@ -12,7 +12,7 @@ __metaclass__ = type
 import json
 from threading import RLock
 from ansible.module_utils.six import itervalues
-from ansible.module_utils.network.common.utils import to_list
+from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import to_list
 
 _registered_providers = {}
 _provider_lock = RLock()

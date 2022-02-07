@@ -296,7 +296,7 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import r
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import aoscx_argument_spec  # NOQA
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import check_args as aoscx_check_args  # NOQA
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.network.common.config import NetworkConfig, dumps
+from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.config import NetworkConfig, dumps
 
 
 def get_running_config(module, config=None):

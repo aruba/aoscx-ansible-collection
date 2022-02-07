@@ -196,8 +196,8 @@ import time
 import json
 from ansible.module_utils._text import to_text
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.network.common.parsing import Conditional
-from ansible.module_utils.network.common.utils import to_lines, ComplexList
+from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.parsing import Conditional
+from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import to_lines, ComplexList
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import run_commands, aoscx_argument_spec
 
 
