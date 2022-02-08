@@ -74,7 +74,6 @@ options:
       Controls which attributes should be synchronized between VSX peers.
     type: list
     required: false
-    elements: str
     choices:
       - acl
       - irdp
