@@ -39,7 +39,7 @@ _DEVICE_CONFIGS = {}
 _DEVICE_ZTP = False
 
 aoscx_provider_spec = {
-    'host': dict(),
+    'host': dict(required=True),
     'port': dict(type='int'),
     'username': dict(fallback=(env_fallback, ['ANSIBLE_NET_USERNAME'])),
     'password': dict(fallback=(env_fallback, ['ANSIBLE_NET_PASSWORD']), no_log=True),
@@ -50,18 +50,18 @@ aoscx_provider_spec = {
 }
 
 aoscx_http_provider_spec = {
-    'host': dict(),
+    'host': dict(required=True),
     'port': dict(type='int'),
     'username': dict(fallback=(env_fallback, ['ANSIBLE_NET_USERNAME'])),
     'password': dict(fallback=(env_fallback, ['ANSIBLE_NET_PASSWORD']), no_log=True)
 }
 
 aoscx_argument_spec = {
-    'provider': dict(type='dict', options=aoscx_provider_spec, removed_in_version='2.14.0', removed_from_collection='arubanetworks.aoscx'),
+    'provider': dict(type='dict', options=aoscx_provider_spec),
 }
 
 aoscx_http_argument_spec = {
-    'provider': dict(type='dict', options=aoscx_http_provider_spec, removed_in_version='2.14.0', removed_from_collection='arubanetworks.aoscx'),
+    'provider': dict(type='dict', options=aoscx_http_provider_spec),
 }
 
 
