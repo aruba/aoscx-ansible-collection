@@ -57,11 +57,11 @@ aoscx_http_provider_spec = {
 }
 
 aoscx_argument_spec = {
-    'provider': dict(type='dict', options=aoscx_provider_spec, removed_in_version=2.14),
+    'provider': dict(type='dict', options=aoscx_provider_spec, removed_in_version='2.14.0', removed_from_collection='arubanetworks.aoscx'),
 }
 
 aoscx_http_argument_spec = {
-    'provider': dict(type='dict', options=aoscx_http_provider_spec, removed_in_version=2.14),
+    'provider': dict(type='dict', options=aoscx_http_provider_spec, removed_in_version='2.14.0', removed_from_collection='arubanetworks.aoscx'),
 }
 
 
