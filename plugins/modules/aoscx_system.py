@@ -47,6 +47,7 @@ options:
       global_queue_profile option.
     type: bool
     required: false
+    default: false
   global_schedule_profile:
     description: >
       Schedule Profile to set as the global one for an AOS-CX device. This
@@ -61,6 +62,7 @@ options:
       the global_queue_profile option.
     type: bool
     required: false
+    default: false
 """
 
 EXAMPLES = """
