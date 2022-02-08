@@ -43,13 +43,11 @@ options:
     required: false
     type: list
     elements: int
-    default: None
   cos:
     description: One or more cos assigned to this entry.
     required: false
     type: list
     elements: int
-    default: None
   state:
     description: Create, update or delete a Queue Profile.
     required: false
