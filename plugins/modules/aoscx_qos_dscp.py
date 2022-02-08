@@ -62,7 +62,7 @@ options:
       with the packet. This value will be used later to select the egress queue
       for the packet.
     required: false
-    type: str
+    type: int
 """
 
 EXAMPLES = """
