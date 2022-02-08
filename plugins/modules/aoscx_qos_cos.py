@@ -90,7 +90,6 @@ def main():
         code_point=dict(
             type="int",
             required=True,
-            default=None,
             choices=[0, 1, 2, 3, 4, 5, 6 ,7]
         ),
         color=dict(
