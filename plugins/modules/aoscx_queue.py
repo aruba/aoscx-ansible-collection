@@ -69,7 +69,6 @@ options:
       option is mutually exclusive with the no_gmb_percent option.
     required: false
     type: int
-    default: None
   no_gmb_percent:
     description: >
       Option to remove the Guaranteed Minimum Bandwidth. This option is
@@ -165,7 +164,6 @@ def get_argument_spec():
         "gmb_percent": {
             "type": "int",
             "required": False,
-            "default" : None,
         },
         "no_gmb_percent": {
             "type": "bool",
