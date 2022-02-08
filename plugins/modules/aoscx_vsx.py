@@ -84,6 +84,7 @@ options:
       - primary
       - secondary
     required: false
+    default: primary
   isl_timers:
     description: Timing configuration for ISL functionality.
     type: dict
