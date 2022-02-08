@@ -89,8 +89,7 @@ def get_argument_spec():
     argument_spec = {
         "name": {
             "type": "str",
-            "required": False,
-            "default": None,
+            "required": True,
         },
         "vsx_sync": {
             "type": "list",
