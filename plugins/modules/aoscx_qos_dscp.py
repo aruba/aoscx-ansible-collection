@@ -31,7 +31,6 @@ options:
       6-bit integer value used to mark packets for different per-hop behavior
       as defined by IETF RFC2474. It is carried within the Differentiated
       Services (DS) field of the IPv4 or IPv6 header. Used as an identifier.
-    required: True
     type: int
   color:
     description: >
