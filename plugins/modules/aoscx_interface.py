@@ -336,17 +336,19 @@ def get_argument_spec():
             "type": "dict",
             "required": False,
             "default": None,
-            "unknown-unicast": {
-                "type": "str",
-                "required": False,
-            },
-            "broadcast": {
-                "type": "str",
-                "required": False,
-            },
-            "multicast": {
-                "type": "str",
-                "required": False,
+            "options": {
+                "unknown-unicast": {
+                    "type": "str",
+                    "required": False,
+                },
+                "broadcast": {
+                    "type": "str",
+                    "required": False,
+                },
+                "multicast": {
+                    "type": "str",
+                    "required": False,
+                },
             },
         },
         "state": {
