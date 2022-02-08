@@ -30,12 +30,13 @@ options:
       priority levels, defined as Class of Service Priority Code Point (PCP) in
       IEEE 802.1Q VLAN tag.
     required: True
+    choices: [0, 1, 2, 3, 4, 5, 6, 7]
     type: int
   color:
     description: String to identify the color which may be used later in the
       pipeline in packet-drop decision points.
     required: false
-    choices: ["green, yellow, red"]
+    choices: ["green", "yellow", "red"]
     type: str
   description:
     description: String used for customer documentation.
