@@ -9,20 +9,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.device import Device
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
     "status": ["preview"],
@@ -47,6 +33,7 @@ options:
     description: Attributes to be synchronized between VSX peers.
     required: false
     type: list
+    elements: str
     choices:
       - all_attributes_and_dependents
   state:
@@ -93,6 +80,20 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
+
 
 def get_argument_spec():
     argument_spec = {
@@ -107,6 +108,7 @@ def get_argument_spec():
         },
         "vsx_sync": {
             "type": "list",
+            "elements": "str",
             "required": False,
             "choices": ["all_attributes_and_dependents"],
             "default": None,
@@ -121,9 +123,7 @@ def main():
         supports_check_mode=True,
     )
 
-    result = dict(
-        changed=False
-    )
+    result = dict(changed=False)
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)

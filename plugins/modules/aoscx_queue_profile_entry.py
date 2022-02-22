@@ -5,23 +5,9 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
-
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.queue_profile import QueueProfile
-    from pyaoscx.queue_profile_entry import QueueProfileEntry
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
@@ -57,13 +43,11 @@ options:
     required: false
     type: list
     elements: int
-    default: None
   cos:
     description: One or more cos assigned to this entry.
     required: false
     type: list
     elements: int
-    default: None
   state:
     description: Create, update or delete a Queue Profile.
     required: false
@@ -94,6 +78,21 @@ EXAMPLES = """
 """
 
 RETURN = r""" # """
+
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.queue_profile import QueueProfile
+    from pyaoscx.queue_profile_entry import QueueProfileEntry
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
 
 
 def get_argument_spec():
@@ -139,9 +138,7 @@ def main():
         supports_check_mode=True,
     )
 
-    result = dict(
-        changed=False
-    )
+    result = dict(changed=False)
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)

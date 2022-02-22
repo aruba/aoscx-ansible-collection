@@ -5,22 +5,9 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
-
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.device import Device
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
@@ -31,7 +18,7 @@ ANSIBLE_METADATA = {
 DOCUMENTATION = """
 ---
 module: aoscx_vsx
-version_added: "2.8"
+version_added: "2.8.0"
 short_description: Create or Delete VSX configuration on AOS-CX.
 description: >
   This modules provides configuration management of VSX on AOS-CX devices. Note
@@ -90,9 +77,9 @@ options:
   device_role:
     description: >
       Specifies whether the device will act as primary or secondary for vsx
-      operation requires a switch to be primary and another to be
-      secondary.
+      operation requires a switch to be primary and another to be secondary.
     type: str
+    default: primary
     choices:
       - primary
       - secondary
@@ -100,30 +87,32 @@ options:
   isl_timers:
     description: Timing configuration for ISL functionality.
     type: dict
-    timeout:
-      description: Seconds to wait for hellos from peer.
-      type: int
-      required: true
-    peer_detect_interval:
-      description: >
-        Configures the amount of time in seconds that the device waits for ISL
-        interface to link up after a reboot. If the ISL link does not come up
-        within this time window, the device declares itself as split from its
-        peer.
-      type: int
-      required: true
-    hold_time:
-      description: Configures ISL port-flap hold time in seconds.
-      type: int
-      required: true
-    hello_interval:
-      description: ISLP hello interval in seconds.
-      type: int
-      required: true
+    suboptions:
+      timeout:
+        description: Seconds to wait for hellos from peer.
+        type: int
+        required: true
+      peer_detect_interval:
+        description: >
+          Configures the amount of time in seconds that the device waits for
+          ISL interface to link up after a reboot. If the ISL link does not
+          come up within this time window, the device declares itself as split
+          from its peer.
+        type: int
+        required: true
+      hold_time:
+        description: Configures ISL port-flap hold time in seconds.
+        type: int
+        required: true
+      hello_interval:
+        description: ISLP hello interval in seconds.
+        type: int
+        required: true
   config_sync_features:
     description: >
       Feature configurations to be globally synchronized between VSX peers.
     type: list
+    elements: str
     choices:
       - aaa
       - acl-log-timer
@@ -167,16 +156,17 @@ options:
     description: Timing configuration for keepalive functionality.
     required: false
     type: dict
-    hello_interval:
-      description: Keepalive hello interval in seconds.
-      type: int
-      required: true
-    dead_interval:
-      description: >
-        Configures the amount of time in seconds to wait for keepalive packets
-        from a peer.
-      type: int
-      required: true
+    suboptions:
+      hello_interval:
+        description: Keepalive hello interval in seconds.
+        type: int
+        required: true
+      dead_interval:
+        description: >
+          Configures the amount of time in seconds to wait for keepalive
+          packets from a peer.
+        type: int
+        required: true
   keepalive_peer_ip:
     description: >
       IPv4 address of the peer device. If not configured, keepalive
@@ -201,7 +191,7 @@ options:
     required: false
   software_update_schedule_time:
     description: >
-      Time (in seconds from epoch) when the update should be performed.  When
+      Time (in seconds from epoch) when the update should be performed. When
       the software update parameters (URL, VRF, schedule_time[optional] are
       added/updated, the new image is downloaded to alternate bank of both,
       primary and secondary. Post download, the secondary is rebooted and then
@@ -210,7 +200,7 @@ options:
     required: false
   state:
     description: Create or delete VSX configuration.
-    required: true
+    required: false
     choices:
       - create
       - update
@@ -268,6 +258,20 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
+
 
 def get_argument_spec():
     module_args = {
@@ -284,6 +288,7 @@ def get_argument_spec():
         },
         "config_sync_features": {
             "type": "list",
+            "elements": "str",
             "required": False,
             "default": None,
             "choices": [
@@ -444,7 +449,10 @@ def main():
     state = params.pop("state")
 
     # NOTE: remove all values that are unspecified in playbook
-    vsx_kw = {k: v for k, v in params.items() if v is not None}
+    vsx_kw = {}
+    for k, v in params.items():
+        if v is not None:
+            vsx_kw[k] = v
 
     session = get_pyaoscx_session(ansible_module)
 

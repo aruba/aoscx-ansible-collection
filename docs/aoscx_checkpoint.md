@@ -1,23 +1,27 @@
 # module: aoscx_checkpoint
 
-description: This module creates a new checkpoint or copies an existing checkpoint to the running or startup config of an AOS-CX switch.   
+description: This module creates a new checkpoint or copies an existing
+checkpoint to the running or startup config of an AOS-CX switch.
 
 ##### ARGUMENTS
+
 ```YAML
   source_config:
-    description: Name of the source configuration from which checkpoint needs
-      to be created or copied.
+    description: >
+      Name of the source configuration from which checkpoint needs to be
+      created or copied.
     type: str
-    required: False
-    default: 'running-config'
-
+    required: false
+    default: running-config
   destination_config:
     description: Name of the destination configuration or name of checkpoint.
     type: str
-    required: False
+    required: false
+    default: startup-config
 ```
 
 ##### EXAMPLES
+
 ```YAML
 - name: Copy running-config to startup-config
   aoscx_checkpoint:

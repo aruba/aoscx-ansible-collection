@@ -5,27 +5,14 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
-
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.device import Device
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
     "status": ["preview"],
-    "supported_by": "certified"
+    "supported_by": "certified",
 }
 
 DOCUMENTATION = """
@@ -42,13 +29,25 @@ options:
     description: 3-bit integer value that marks packets with one of eight
       priority levels, defined as Class of Service Priority Code Point (PCP) in
       IEEE 802.1Q VLAN tag.
-    required: True
+    required: true
+    choices:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      - 6
+      - 7
     type: int
   color:
     description: String to identify the color which may be used later in the
       pipeline in packet-drop decision points.
     required: false
-    choices: ["green, yellow, red"]
+    choices:
+      - green
+      - yellow
+      - red
     type: str
   description:
     description: String used for customer documentation.
@@ -59,7 +58,7 @@ options:
       associated with the packet. This value will be used later to select the
       egress queue for the packet.
     required: false
-    type: str
+    type: int
 """
 
 EXAMPLES = """
@@ -74,7 +73,9 @@ EXAMPLES = """
     code_point: 5
     color: yellow
 
-- name: Update color and local priority of QoS COS trust type map entry with code point 5
+- name: >
+    Update color and local priority of QoS COS trust type map entry with code
+    point 5.
   aoscx_qos_cos:
     code_point: 5
     color: yellow
@@ -83,32 +84,38 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
+
 
 def main():
     module_args = dict(
         code_point=dict(
-            type="int",
-            required=True,
-            default=None,
-            choices=[0, 1, 2, 3, 4, 5, 6 ,7]
+            type="int", required=True, choices=[0, 1, 2, 3, 4, 5, 6, 7]
         ),
         color=dict(
-            type="str",
-            required=False,
-            choices=["green", "yellow", "red"]
+            type="str", required=False, choices=["green", "yellow", "red"]
         ),
         description=dict(type="str", required=False),
-        local_priority=dict(type="int", required=False)
+        local_priority=dict(type="int", required=False),
     )
 
     ansible_module = AnsibleModule(
-        argument_spec=module_args,
-        supports_check_mode=True
+        argument_spec=module_args, supports_check_mode=True
     )
 
-    result = dict(
-        changed = False
-    )
+    result = dict(changed=False)
 
     if not HAS_PYAOSCX:
         ansible_module.fail_json(

@@ -1,19 +1,25 @@
 # module: aoscx_banner
 
-description: This modules provides configuration management of Banner on AOS-CX devices.
+description: This modules provides configuration management of Banner on AOS-CX
+devices.
 
 ##### ARGUMENTS
+
 ```YAML
   banner_type:
     description: Type of banner being configured on the switch.
     required: True
-    choices: ['banner', 'banner_exec']
+    choices:
+      - banner
+      - banner_exec
     type: str
 
   state:
     description: Create or Delete Banner on the switch.
     default: create
-    choices: ['create', 'delete']
+    choices:
+      - create
+      - delete
     required: False
     type: str
 
@@ -24,6 +30,7 @@ description: This modules provides configuration management of Banner on AOS-CX 
 ```
 
 ##### EXAMPLES
+
 ```YAML
 - name: Adding or Updating Banner
   aoscx_banner:

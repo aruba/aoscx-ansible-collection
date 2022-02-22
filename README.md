@@ -97,7 +97,7 @@ Inventory Variables
 The variables that should be defined in your inventory for your AOS-CX host are:
 
 * `ansible_host`: IP address of switch in `A.B.C.D` format. For IPv6 hosts use a string and enclose in square brackets E.G. `'[2001::1]'`.
-* `ansible_user`: Username for switch in `plaintext` format  
+* `ansible_user`: Username for switch in `plaintext` format
 * `ansible_password`: Password for switch in `plaintext` format
 * `ansible_network_os`: Must always be set to `arubanetworks.aoscx.aoscx`
 * `ansible_connection`: Set to `arubanetworks.aoscx.aoscx` to use REST API [modules](#pyaoscx-modules), to `network_cli` to use SSH/CLI modules, and to `httpapi` for legacy implementation of REST API modules.
@@ -113,11 +113,11 @@ The variables that should be defined in your inventory for your AOS-CX host are:
 
 pyaoscx Modules
 ---------------
-In an effort to make use of our recently updated Python SDK for AOS-CX [Pyaoscx](https://pypi.org/project/pyaoscx/) we've redesigned our Ansible integration by making use of pyaoscx for all REST-API based modules.     
-**What does this mean if I've been using Ansible with AOS-CX REST API modules?**   
-Our previous implementation will continue to function but will not be supported for future modules. That means you should and eventually have to update your [Ansible Inventory variables](https://github.com/aruba/aoscx-ansible-collection#pyaoscx-modules-only) to specify the `ansible_network_os=arubanetworks.aoscx.aoscx` and additional variables as well as install the pyaoscx Python package using Python3 pip, **all playbooks will remain the same**:   
-`pip3 install pyaoscx`  
-The AOS-CX Ansible Collection will automatically determine if you have pyaoscx installed and will use that method when the `ansible_network_os` is set to `aoscx`. If it's set to `httpapi` it will continue to use the previous implementation method.    
+In an effort to make use of our recently updated Python SDK for AOS-CX [Pyaoscx](https://pypi.org/project/pyaoscx/) we've redesigned our Ansible integration by making use of pyaoscx for all REST-API based modules.
+**What does this mean if I've been using Ansible with AOS-CX REST API modules?**
+Our previous implementation will continue to function but will not be supported for future modules. That means you should and eventually have to update your [Ansible Inventory variables](https://github.com/aruba/aoscx-ansible-collection#pyaoscx-modules-only) to specify the `ansible_network_os=arubanetworks.aoscx.aoscx` and additional variables as well as install the pyaoscx Python package using Python3 pip, **all playbooks will remain the same**:
+`pip3 install pyaoscx`
+The AOS-CX Ansible Collection will automatically determine if you have pyaoscx installed and will use that method when the `ansible_network_os` is set to `aoscx`. If it's set to `httpapi` it will continue to use the previous implementation method.
 
 ### Sample Inventories:
 
@@ -203,15 +203,17 @@ If collection installed through Galaxy add `arubanetworks.aoscx` to your list of
   collections:
     - arubanetworks.aoscx
   vars:
-    ansible_python_interpreter: /usr/bin/python3    
+    ansible_python_interpreter: /usr/bin/python3
   gather_facts: False
   tasks:
   - name: Create L3 Interface 1/1/3
     aoscx_l3_interface:
       interface: 1/1/3
       description: Uplink_Interface
-      ipv4: ['10.20.1.3/24']
-      ipv6: ['2001:db8::1234/64']
+      ipv4:
+        - 10.20.1.3/24
+      ipv6:
+        - 2000:db8::1234/64
 ```
 
 
@@ -223,11 +225,11 @@ you must create separate plays such
 that each play uses either only REST API modules or only SSH/CLI modules.
 A play cannot mix and match REST API and SSH/CLI module calls.
 In each play, `ansible_connection` must possess the appropriate value
-according to the modules used.  
+according to the modules used.
 
-If the play uses REST API modules, the value should be `arubanetworks.aoscx.aoscx`.  
+If the play uses REST API modules, the value should be `arubanetworks.aoscx.aoscx`.
 
-If the play uses SSH/CLI modules, the value should be `network_cli`.  
+If the play uses SSH/CLI modules, the value should be `network_cli`.
 
 A recommended approach to successfully using both types of modules for a host
 is as follows:
@@ -260,7 +262,7 @@ sets the `ansible_connection` value accordingly):
   collections:
     - arubanetworks.aoscx
   vars:
-    ansible_python_interpreter: /usr/bin/python3    
+    ansible_python_interpreter: /usr/bin/python3
   gather_facts: False
   tasks:
     - name: Adding or Updating Banner
@@ -271,19 +273,20 @@ sets the `ansible_connection` value accordingly):
 - hosts: all
   collections:
     - arubanetworks.aoscx
-  gather_facts: False    
+  gather_facts: False
   vars:
     ansible_connection: network_cli
   tasks:
     - name: Execute show run on the switch
       aoscx_command:
-        commands: ['show run']
+        commands:
+          - show run
 ```
 
 Contribution
 -------
 At Aruba Networks we're dedicated to ensuring the quality of our products, so if you find any
-issues at all please open an issue on our [Github](https://github.com/aruba/aoscx-ansible-collection) and we'll be sure to respond promptly!  
+issues at all please open an issue on our [Github](https://github.com/aruba/aoscx-ansible-collection) and we'll be sure to respond promptly!
 
 For more contribution opportunities follow our guidelines outlined in our [CONTRIBUTING.md](https://github.com/aruba/aoscx-ansible-collection/blob/master/CONTRIBUTING.md)
 
@@ -296,7 +299,7 @@ Author Information
 ------------------
  - Madhusudan Pranav Venugopal (@madhusudan-pranav-venugopal)
  - Yang Liu (@yliu-aruba)
- - Tiffany Chiapuzio-Wong (@tchiapuziowong)qq:q
+ - Tiffany Chiapuzio-Wong (@tchiapuziowong)
  - Derek Wang (@derekwangHPEAruba)
  - Melvin Gutierrez (@melvin-gutierrez)
  - Rodrigo Jose Hernandez (@rodrigo-j-hernandez)

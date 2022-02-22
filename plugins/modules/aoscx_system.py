@@ -5,28 +5,14 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
-
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.qos import Qos
-    from pyaoscx.queue_profile import QueueProfile
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
     "status": ["preview"],
-    "supported_by": "certified"
+    "supported_by": "certified",
 }
 
 DOCUMENTATION = """
@@ -60,6 +46,7 @@ options:
       default global queue profile, this option is mutually exclusive with the
       global_queue_profile option.
     type: bool
+    default: false
     required: false
   global_schedule_profile:
     description: >
@@ -74,6 +61,7 @@ options:
       default global schedule profile, this option is mutually exclusive with
       the global_queue_profile option.
     type: bool
+    default: false
     required: false
 """
 
@@ -108,6 +96,21 @@ EXAMPLES = """
 """
 
 RETURN = r""" # """
+
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.qos import Qos
+    from pyaoscx.queue_profile import QueueProfile
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
 
 
 def get_argument_spec():
@@ -151,9 +154,7 @@ def main():
         ],
     )
 
-    result = dict(
-        changed=False
-    )
+    result = dict(changed=False)
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)

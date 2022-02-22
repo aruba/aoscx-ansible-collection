@@ -1,12 +1,15 @@
 # module: aoscx_vlan
 
-description: This modules provides configuration management of VLANs on AOS-CX devices.
+description: This modules provides configuration management of VLANs on AOS-CX
+devices.
 
 ##### ARGUMENTS
+
 ```YAML
   vlan_id:
-    description: The ID of this VLAN. Non-internal VLANs must have an 'id'
-                 between 1 and 4094 to be effectively instantiated.
+    description: >
+      The ID of this VLAN. Non-internal VLANs must have an 'id' between 1 and
+      4094 to be effectively instantiated.
     required: true
     type: int
   name:
@@ -20,17 +23,23 @@ description: This modules provides configuration management of VLANs on AOS-CX d
   admin_state:
     description: The Admin State of the VLAN, options are 'up' and 'down'.
     required: false
-    choices: ['up', 'down']
+    choices:
+      - up
+      - down
     type: str
   state:
     description: Create or update or delete the VLAN.
     required: false
-    choices: ['create', 'update', 'delete']
+    choices:
+      - create
+      - update
+      - delete
     default: create
     type: str
 ```
 
 ##### EXAMPLES
+
 ```YAML
 - name: Create VLAN 200 with description
   aoscx_vlan:

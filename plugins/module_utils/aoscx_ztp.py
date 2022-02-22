@@ -1,23 +1,26 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+from __future__ import absolute_import, division, print_function
 
-from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
+
+import time
+import traceback
+
+from contextlib import closing
 
 from ansible.module_utils._text import to_text
 from ansible.module_utils.basic import missing_required_lib
-from contextlib import closing
-import time
-import traceback
 
 PARAMIKO_IMP_ERR = None
 try:
     import paramiko
+
     HAS_PARAMIKO_LIB = True
 except ImportError:
     HAS_PARAMIKO_LIB = False
@@ -28,9 +31,9 @@ READ_TIMEOUT = 10
 READ_WAIT_TIME = 2
 BUFFER_SIZE = 4096
 BLANK_PASSWORD = ""
-ENTER_PASSWORD_MSG = 'Enter new password:'
-CONFIRM_PASSWORD_MSG = 'Confirm new password:'
-SHELL_PROMPT = '#'
+ENTER_PASSWORD_MSG = "Enter new password:"
+CONFIRM_PASSWORD_MSG = "Confirm new password:"
+SHELL_PROMPT = "#"
 
 
 def connect_ztp_device(module, hostname, username, password):
@@ -53,17 +56,20 @@ def connect_ztp_device(module, hostname, username, password):
     """
 
     if not HAS_PARAMIKO_LIB:
-        module.fail_json(msg=missing_required_lib(
-            "paramiko"), exception=PARAMIKO_IMP_ERR)
+        module.fail_json(
+            msg=missing_required_lib("paramiko"), exception=PARAMIKO_IMP_ERR
+        )
 
     with closing(paramiko.SSHClient()) as ssh_client:
 
         # Define SSH parameters
-        paramiko_ssh_connection_args = {'hostname': hostname,
-                                        'username': username,
-                                        'password': BLANK_PASSWORD,
-                                        'look_for_keys': False,
-                                        'allow_agent': False}
+        paramiko_ssh_connection_args = {
+            "hostname": hostname,
+            "username": username,
+            "password": BLANK_PASSWORD,
+            "look_for_keys": False,
+            "allow_agent": False,
+        }
 
         # Default AutoAdd as Policy
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -130,17 +136,17 @@ def read_from_channel(shell_channel):
         recv = shell_channel.recv(BUFFER_SIZE)
         if not recv:
             break
-        recv = recv.decode('utf-8', 'ignore')
+        recv = recv.decode("utf-8", "ignore")
     return recv
 
 
 def write_to_channel(shell_channel, cmd):
-    """ Writes commands to the channel.
+    """Writes commands to the channel.
 
     :param shell_channel: The channel to write to.
     :param cmd: The command itself.
     """
     cmd = cmd.rstrip()
-    cmd += '\n'
-    cmd = cmd.encode('ascii', 'ignore')
+    cmd += "\n"
+    cmd = cmd.encode("ascii", "ignore")
     shell_channel.send(cmd)

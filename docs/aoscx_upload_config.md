@@ -1,8 +1,10 @@
 # module: aoscx_upload_config
 
-description: This module uploads a configuration onto the switch stored locally or it can also upload the configuration from a TFTP server. 
+description: This module uploads a configuration onto the switch stored locally
+or it can also upload the configuration from a TFTP server.
 
 ##### ARGUMENTS
+
 ```YAML
   config_name:
     description: "Config file or checkpoint to be uploaded to. When using TFTP
@@ -28,12 +30,15 @@ description: This module uploads a configuration onto the switch stored locally 
     type: str
     required: false
   vrf:
-    description: VRF to be used to contact TFTP server, required if remote_output_file_tftp_path is provided
+    description: >
+      VRF to be used to contact TFTP server, required if
+      remote_output_file_tftp_path is provided.
     type: str
     required: false
 ```
 
 ##### EXAMPLES
+
 ```YAML
 - name: Copy Running Config from local JSON file as JSON
   aoscx_upload_config:
@@ -45,7 +50,7 @@ description: This module uploads a configuration onto the switch stored locally 
     config_name: 'running-config'
     remote_config_file_tftp_path: 'tftp://192.168.1.2/running.json'
     vrf: 'mgmt'
-   
+
 - name: Copy CLI from TFTP Server to Running Config
   aoscx_upload_config:
     config_name: 'running-config'

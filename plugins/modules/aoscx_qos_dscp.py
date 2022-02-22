@@ -9,21 +9,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.device import Device
-    from pyaoscx.qos_dscp import QosDscp
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
     "status": ["preview"],
@@ -45,7 +30,6 @@ options:
       6-bit integer value used to mark packets for different per-hop behavior
       as defined by IETF RFC2474. It is carried within the Differentiated
       Services (DS) field of the IPv4 or IPv6 header. Used as an identifier.
-    required: True
     type: int
   color:
     description: >
@@ -76,7 +60,7 @@ options:
       with the packet. This value will be used later to select the egress queue
       for the packet.
     required: false
-    type: str
+    type: int
 """
 
 EXAMPLES = """
@@ -107,6 +91,21 @@ EXAMPLES = """
 """
 
 RETURN = r""" # """
+
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+    from pyaoscx.qos_dscp import QosDscp
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
 
 
 def get_argument_spec():

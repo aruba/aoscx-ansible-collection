@@ -5,22 +5,9 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
-
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.device import Device
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
@@ -68,13 +55,14 @@ options:
       Configure the speeds of the interface in megabits per second. If this
       value is specified, duplex must also be specified.
     type: list
+    elements: str
     required: false
   vsx_sync:
     description: >
       Controls which attributes should be synchronized between VSX peers.
     type: list
-    required: false
     elements: str
+    required: false
     choices:
       - acl
       - irdp
@@ -120,7 +108,7 @@ options:
     type: dict
     required: false
     suboptions:
-      unknown-unicast:
+      unknown_unicast:
         description: >
           Ingress unknown unicast rate-limit bandwidth value. The unit type is
           specified by the end of the string, i.e.: 200pps or 100kbps.
@@ -176,7 +164,8 @@ EXAMPLES = """
   aoscx_interface:
     name: 1/1/2
     duplex: full
-    speeds: ['1000']
+    speeds:
+      - '1000'
     enabled: true
 
 - name: Administratively disable interface 1/1/2
@@ -224,14 +213,15 @@ EXAMPLES = """
     name: 1/1/17
     qos_rate:
       broadcast: 200pps
-      unknown-unicast: 100kbps
+      unknown_unicast: 100kbps
       multicast: 200pps
 
 - name: Configure Interface 1/1/2 - enable vsx-sync features
   aoscx_interface:
     name: 1/1/2
     duplex: full
-    speeds: ['1000']
+    speeds:
+      - '1000'
     vsx_sync:
       - acl
       - irdp
@@ -243,17 +233,26 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
+
 
 def get_argument_spec():
     argument_spec = {
         "name": {
             "type": "str",
             "required": True,
-        },
-        "description": {
-            "type": "str",
-            "required": False,
-            "default": None,
         },
         "enabled": {
             "type": "bool",
@@ -273,11 +272,13 @@ def get_argument_spec():
         },
         "speeds": {
             "type": "list",
+            "elements": "str",
             "required": False,
             "default": None,
         },
         "vsx_sync": {
             "type": "list",
+            "elements": "str",
             "default": None,
             "choices": [
                 "acl",
@@ -336,17 +337,19 @@ def get_argument_spec():
             "type": "dict",
             "required": False,
             "default": None,
-            "unknown-unicast": {
-                "type": "str",
-                "required": False,
-            },
-            "broadcast": {
-                "type": "str",
-                "required": False,
-            },
-            "multicast": {
-                "type": "str",
-                "required": False,
+            "options": {
+                "unknown_unicast": {
+                    "type": "str",
+                    "required": False,
+                },
+                "broadcast": {
+                    "type": "str",
+                    "required": False,
+                },
+                "multicast": {
+                    "type": "str",
+                    "required": False,
+                },
             },
         },
         "state": {
@@ -401,9 +404,7 @@ def main():
         ],
     )
 
-    result = dict(
-        changed=False
-    )
+    result = dict(changed=False)
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -472,6 +473,9 @@ def main():
     if qos_trust_mode:
         modified |= interface.update_interface_qos_trust_mode(qos_trust_mode)
     if qos_rate:
+        if "unknown_unicast" in qos_rate:
+            _unknown_unicast = qos_rate.pop("unknown_unicast")
+            qos_rate["unknown-unicast"] = _unknown_unicast
         modified |= interface.update_interface_qos_rate(qos_rate)
 
     result["changed"] = modified

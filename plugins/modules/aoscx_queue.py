@@ -5,22 +5,9 @@
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
-from __future__ import (absolute_import, division, print_function)
+from __future__ import absolute_import, division, print_function
+
 __metaclass__ = type
-
-from ansible.module_utils.basic import AnsibleModule
-
-try:
-    from pyaoscx.queue import Queue
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
 
 ANSIBLE_METADATA = {
     "metadata_version": "1.1",
@@ -82,7 +69,6 @@ options:
       option is mutually exclusive with the no_gmb_percent option.
     required: false
     type: int
-    default: None
   no_gmb_percent:
     description: >
       Option to remove the Guaranteed Minimum Bandwidth. This option is
@@ -140,6 +126,20 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
+
+try:
+    from pyaoscx.queue import Queue
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
+
+if HAS_PYAOSCX:
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+        get_pyaoscx_session,
+    )
+
 
 def get_argument_spec():
     argument_spec = {
@@ -164,7 +164,6 @@ def get_argument_spec():
         "gmb_percent": {
             "type": "int",
             "required": False,
-            "default" : None,
         },
         "no_gmb_percent": {
             "type": "bool",
@@ -193,17 +192,11 @@ def main():
     ansible_module = AnsibleModule(
         argument_spec=get_argument_spec(),
         supports_check_mode=True,
-        mutually_exclusive=[
-          ("gmb_percent", "no_gmb_percent")
-        ],
-        required_if=[
-          ("algorithm", "min-bandwidth", ("gmb_percent",))
-        ],
+        mutually_exclusive=[("gmb_percent", "no_gmb_percent")],
+        required_if=[("algorithm", "min-bandwidth", ("gmb_percent",))],
     )
 
-    result = dict(
-        changed=False
-    )
+    result = dict(changed=False)
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)

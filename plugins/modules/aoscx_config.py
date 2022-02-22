@@ -1,257 +1,279 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
+from __future__ import absolute_import, division, print_function
 
-from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
-
 ANSIBLE_METADATA = {
-    'metadata_version': '1.1',
-    'status': ['preview'],
-    'supported_by': 'certified'
+    "metadata_version": "1.1",
+    "status": ["preview"],
+    "supported_by": "certified",
 }
 
-DOCUMENTATION = '''
+DOCUMENTATION = """
 ---
 module: aoscx_config
-version_added: "2.9"
-short_description: Logs in and executes configuration commands on AOS-CX device via SSH connection
-description:
-  - This module allows configuration of running-configs on AOS-CX devices via SSH connection
+version_added: "2.9.0"
+short_description: >
+  Logs in and executes configuration commands on AOS-CX device via SSH
+  connection.
+description: >
+  This module allows configuration of running-configs on AOS-CX devices via SSH
+  connection.
 author: Aruba Networks (@ArubaNetworks)
 options:
-
   lines:
     description:
-      - List of configuration commands to be executed. If "parents" is specified, these
-        are the child lines contained under/within the parent entry. If "parents" is not 
-        specified, these lines will be checked and/or placed under the global config level. 
-        These commands must correspond with what would be found in the device's running-config.
-    required: False
+      List of configuration commands to be executed. If "parents" is specified,
+      these are the child lines contained under/within the parent entry. If
+      "parents" is not specified, these lines will be checked and/or placed
+      under the global config level. These commands must correspond with what
+      would be found in the device's running-config.
+    required: false
     type: list
-    aliases: ['commands']
-
+    elements: str
+    aliases:
+      - commands
   parents:
-    description:
-      - Parent lines that identify the configuration section or context under which the
-        "lines" lines should be checked and/or placed. 
-    required: False
+    description: >
+      Parent lines that identify the configuration section or context under
+      which the "lines" lines should be checked and/or placed.
+    required: false
     type: list
-
+    elements: str
   src:
-    description:
-      - Path to the file containing the configuration to load into the device.  The path can 
-        be either a full system path to the configuration file if the value starts with "/"
-        or a path relative to the directory containing the playbook. This argument is mutually 
-        exclusive with the "lines" and "parents" arguments. This src file must have same 
-        indentation as a live switch config. The operation is purely additive, as it doesn't remove
-        any lines that are present in the existing running-config, but not in the source config.
-    required: False
+    description: >
+      Path to the file containing the configuration to load into the device.
+      The path can be either a full system path to the configuration file if
+      the value starts with "/" or a path relative to the directory containing
+      the playbook. This argument is mutually exclusive with the "lines" and
+      "parents" arguments. This src file must have same indentation as a live
+      switch config. The operation is purely additive, as it doesn't remove any
+        lines that are present in the existing running-config, but not in the
+        source config.
+    required: false
     type: path
-
   before:
-    description:
-      - Commands to be executed prior to execution of the parent and child lines. This option
-        can be used to guarantee idempotency.
-    required: False
+    description: >
+      Commands to be executed prior to execution of the parent and child lines.
+      This option can be used to guarantee idempotency.
+    required: false
     type: list
-
+    elements: str
   after:
-    description:
-      - Commands to be executed following the execution of the parent and child lines. This 
-        option can be used to guarantee idempotency.
-    required: False
+    description: >
+      Commands to be executed following the execution of the parent and child
+      lines. This option can be used to guarantee idempotency.
+    required: false
     type: list
-
+    elements: str
   match:
-    description:
-      - Specifies the method of matching. Matching is the comparison against the existing 
-        running-config to determine whether changes need to be applied.
-        If "match" is set to "line," commands are matched line by line.  
-        If "match" is set to "strict," command lines are matched with respect to position.  
-        If "match" is set to "exact," command lines must be an equal match.  
-        If "match" is set to "none," the module will not attempt to compare the source 
-        configuration with the running-config on the remote device.
+    description: >
+      Specifies the method of matching. Matching is the comparison against the
+      existing running-config to determine whether changes need to be applied.
+      If "match" is set to "line," commands are matched line by line. If
+      "match" is set to "strict," command lines are matched with respect to
+      position. If "match" is set to "exact," command lines must be an equal
+      match. If "match" is set to "none," the module will not attempt to
+      compare the source configuration with the running-config on the remote
+      device.
     default: line
-    choices: ['line', 'strict', 'exact', 'none']
-    required: False
+    choices:
+      - line
+      - strict
+      - exact
+      - none
+    required: false
     type: str
-
   replace:
     description:
-      - Specifies the approach the module will take when performing configuration on the 
-        device. 
-        If "replace" is set to "line," then only the differing and missing configuration lines 
-        are pushed to the device. 
-        If "replace" is set to "block," then the entire command block is pushed to the device 
-        if there is any differing or missing line at all.
+      Specifies the approach the module will take when performing configuration
+      on the device. If "replace" is set to "line," then only the differing
+      and missing configuration lines are pushed to the device. If "replace"
+      is set to "block," then the entire command block is pushed to the device
+      if there is any differing or missing line at all.
     default: line
-    choices: ['line', 'block']
-    required: False
+    choices:
+      - line
+      - block
+    required: false
     type: str
-
   backup:
-    description:
-      - Specifies whether a full backup of the existing running-config on the device will be 
-        performed before any changes are potentially made. If the "backup_options" value is not 
-        specified, the backup file is written to the "backup" folder in the playbook root 
-        directory. If the directory does not exist, it is created.
-    required: False
+    description: >
+      Specifies whether a full backup of the existing running-config on the
+      device will be performed before any changes are potentially made. If the
+      "backup_options" value is not specified, the backup file is written to
+      the "backup" folder in the playbook root directory. If the directory does
+      not exist, it is created.
+    required: false
     type: bool
-    default: False
-
+    default: false
   backup_options:
-    description:
-      - File path and name options for backing up the existing running-config. 
-        To be used with "backup."
+    description: >
+      File path and name options for backing up the existing running-config. To
+      be used with "backup".
+    type: dict
     suboptions:
       filename:
-        description:
-          - Name of file in which the running-config will be saved.
-        required: False
+        description: Name of file in which the running-config will be saved.
+        required: false
         type: str
       dir_path:
-        description:
-          - Path to directory in which the backup file should reside.
-        required: False
+        description: Path to directory in which the backup file should reside.
+        required: false
         type: path
-    type: dict
-
   running_config:
-    description:
-      - Specifies an alternative running-config to be used as the base config for matching. The 
-        module, by default, will connect to the device and retrieve the current running-config 
-        to use as the basis for comparison against the source.  This argument is handy for times 
-        when it is not desirable to have the task get the current running-config, and instead use
-        another config for matching. 
-    aliases: ['config']
-    required: False
+    description: >
+      Specifies an alternative running-config to be used as the base config for
+      matching. The module, by default, will connect to the device and retrieve
+      the current running-config to use as the basis for comparison against the
+      source. This argument is handy for times when it is not desirable to have
+      the task get the current running-config, and instead use another config
+      for matching.
+    aliases:
+      - config
+    required: false
     type: str
 
   save_when:
-    description:
-      - Specifies when to copy the running-config to the startup-config. When changes are made to 
-        the device running-configuration, the changes are not copied to non-volatile storage by default.  
-        If "save_when" is set to "always," the running-config will unconditionally be copied to 
-        startup-config.
-        If "save_when" is set to "never," the running-config will never be copied to startup-config.
-        If "save_when" is set to "modified," the running-config will be copied to startup-config 
-        if the two differ.
-        If "save_when" is set to "changed," the running-config will be copied to startup-config 
-        if the task modified the running-config.
+    description: >
+      Specifies when to copy the running-config to the startup-config. When
+      changes are made to the device running-configuration, the changes are not
+      copied to non-volatile storage by default. If "save_when" is set to
+      "always," the running-config will unconditionally be copied to
+      startup-config. If "save_when" is set to "never," the running-config
+      will never be copied to startup-config. If "save_when" is set to
+      "modified," the running-config will be copied to startup-config if the
+      two differ. If "save_when" is set to "changed," the running-config will
+      be copied to startup-config if the task modified the running-config.
     default: never
-    choices: ['always', 'never', 'modified', 'changed']
-    required: False
+    choices:
+      - always
+      - never
+      - modified
+      - changed
+    required: false
     type: str
-
   diff_against:
-    description:
-      - When using the "ansible-playbook --diff" command line argument this module can generate 
-        diffs against different sources. This argument specifies the particular config against 
-        which a diff of the running-config will be performed. 
-        If "diff_against" is set to "startup," the module will return the diff of the running-config 
-        against the startup configuration.
-        If "diff_against" is set to "intended," the module will return the diff of the running-config 
-        against the configuration provided in the "intended_config" argument.
-        If "diff_against" is set to "running," the module will return before and after diff of the 
-        running-config with respect to any changes made to the device configuration.
-    choices: ['startup', 'intended', 'running']
-    required: False
+    description: >
+      When using the "ansible-playbook --diff" command line argument this
+      module can generate diffs against different sources. This argument
+      specifies the particular config against which a diff of the
+      running-config will be performed. If "diff_against" is set to "startup,"
+      the module will return the diff of the running-config against the startup
+      configuration. If "diff_against" is set to "intended," the module will
+      return the diff of the running-config against the configuration provided
+      in the "intended_config" argument. If "diff_against" is set to
+      "running," the module will return before and after diff of the
+      running-config with respect to any changes made to the device
+      configuration.
+    choices:
+      - startup
+      - intended
+      - running
+    required: false
     type: str
-
   diff_ignore_lines:
-    description:
-      - Specifies one or more lines that should be ignored during the diff. This is used to 
-        ignore lines in the configuration that are automatically updated by the system. This 
-        argument takes a list of regular expressions or exact commands.
-    required: False
+    description: >
+      Specifies one or more lines that should be ignored during the diff. This
+      is used to ignore lines in the configuration that are automatically
+      updated by the system. This argument takes a list of regular expressions
+      or exact commands.
+    required: false
     type: list
-
+    elements: str
   intended_config:
-    description:
-      - Path to file containing the intended configuration that the device should conform to, and 
-        that is used to check the final running-config against. To be used with "diff_against," 
-        which should be set to "intended."
-    required: False
+    description: >
+      Path to file containing the intended configuration that the device should
+      conform to, and that is used to check the final running-config against.
+      To be used with "diff_against," which should be set to "intended".
+    required: false
     type: str
-
   provider:
     description: A dict object containing connection details.
     suboptions:
       auth_pass:
         description:
-          - Specifies the password to use if required to enter privileged mode on the
-            remote device. If authorize is false, then this argument does nothing.
-            If the value is not specified in the task, the value of  environment variable
-            ANSIBLE_NET_AUTH_PASS will be used instead.
+          Specifies the password to use if required to enter privileged mode on
+          the remote device. If authorize is false, then this argument does
+          nothing. If the value is not specified in the task, the value of
+          environment variable ANSIBLE_NET_AUTH_PASS will be used instead.
         type: str
       authorize:
         description:
-          - Instructs the module to enter privileged mode on the remote device before
-            sending any commands. If not specified, the device will attempt to execute
-            all commands in non-privileged mode. If the value is not specified in the
-            task, the value of environment variable ANSIBLE_NET_AUTHORIZE will be used instead.
+          Instructs the module to enter privileged mode on the remote device
+          before sending any commands. If not specified, the device will
+          attempt to execute all commands in non-privileged mode. If the value
+          is not specified in the task, the value of environment variable
+          ANSIBLE_NET_AUTHORIZE will be used instead.
         type: bool
       host:
         description:
-          - Specifies the DNS host name or address for connecting to the remote device over the
-            specified transport. The value of host is used as the destination address for the transport.
-        required: True
+          Specifies the DNS host name or address for connecting to the remote
+          device over the specified transport. The value of host is used as the
+          destination address for the transport.
+        required: true
         type: str
       password:
         description:
-          - Specifies the password to use to authenticate the connection to the remote device.
-            This value is used to authenticate the SSH session. If the value is not specified
-            in the task, the value of environment variable ANSIBLE_NET_PASSWORD will be used instead.
+          Specifies the password to use to authenticate the connection to the
+          remote device. This value is used to authenticate the SSH session.
+          If the value is not specified in the task, the value of environment
+          variable ANSIBLE_NET_PASSWORD will be used instead.
         type: str
       port:
-        description:
-          - Specifies the port to use when building the connection to the remote device.
+        description: >
+          Specifies the port to use when building the connection to the remote
+          device.
         type: int
       ssh_keyfile:
-        description:
-          - Specifies the SSH key to use to authenticate the connection to the remote device.
-            This value is the path to the key used to authenticate the SSH session. If the value
-            is not specified in the task, the value of environment variable ANSIBLE_NET_SSH_KEYFILE
-            will be used instead.
+        description: >
+          Specifies the SSH key to use to authenticate the connection to the
+          remote device. This value is the path to the key used to
+          authenticate the SSH session. If the value is not specified in the
+          task, the value of environment variable ANSIBLE_NET_SSH_KEYFILE will
+          be used instead.
         type: path
       timeout:
-        description:
-          - Specifies the timeout in seconds for communicating with the network device for either
-            connecting or sending commands. If the timeout is exceeded before the operation is completed,
-            the module will error.
+        description: >
+          Specifies the timeout in seconds for communicating with the network
+          device for either connecting or sending commands. If the timeout is
+          exceeded before the operation is completed, the module will error.
         type: int
       username:
-        description:
-          - Configures the username to use to authenticate the connection to the remote device.
-            This value is used to authenticate the SSH session. If the value is not specified in the task,
-            the value of environment variable ANSIBLE_NET_USERNAME will be used instead.
+        description: >
+          Configures the username to use to authenticate the connection to the
+          remote device. This value is used to authenticate the SSH session.
+          If the value is not specified in the task, the value of environment
+          variable ANSIBLE_NET_USERNAME will be used instead.
         type: str
     type: dict
-'''  # NOQA
+"""
 
-EXAMPLES = '''
+EXAMPLES = """
 - name: First delete VLAN 44, then configure VLAN 45, and lastly create VLAN 46
   aoscx_config:
-    before: 
+    before:
       - no vlan 44
-    parents: 
+    parents:
       - vlan 45
     lines:
       - name testvlan
       - description test_vlan
-    after: 
+    after:
       - vlan 46
 
-- name: Back up running-config, then create VLAN 100, and save running-config to startup-config if change was made
+- name: >
+    Back up running-config, then create VLAN 100, and save running-config to
+    startup-config if change was made.
   aoscx_config:
     backup: True
-    lines: 
+    lines:
       - vlan 100
     backup_options:
       filename: backup.cfg
@@ -263,9 +285,11 @@ EXAMPLES = '''
     diff_against: intended
     intended_config: /users/Home/backup.cfg
 
-- name: Configure VLAN 2345 and compare resulting running-config with previous running-config
+- name: >
+    Configure VLAN 2345 and compare resulting running-config with previous
+    running-config.
   aoscx_config:
-    lines: 
+    lines:
       - vlan 2345
     diff_against: running
 
@@ -273,7 +297,9 @@ EXAMPLES = '''
   aoscx_config:
     src:  /users/Home/golden.cfg
 
-- name: Update interface 1/1/4, matching only if both "parents" and "lines" are present
+- name: >
+    Update interface 1/1/4, matching only if both "parents" and "lines" are
+    present.
   aoscx_config:
     lines:
       - ip address 4.4.4.5/24
@@ -288,22 +314,34 @@ EXAMPLES = '''
       - this is banner line 3 banner_motd
     before: "banner motd `"
     after: "`"
-'''  # NOQA
+"""
 
-RETURN = r''' # '''
+RETURN = r""" # """
 
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import run_commands, get_config, load_config  # NOQA
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import aoscx_argument_spec  # NOQA
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import check_args as aoscx_check_args  # NOQA
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.network.common.config import NetworkConfig, dumps
+
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
+    run_commands,
+    get_config,
+    load_config,
+)
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
+    aoscx_argument_spec,
+)
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
+    check_args as aoscx_check_args,
+)
+from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.config import (  # NOQA
+    NetworkConfig,
+    dumps,
+)
 
 
 def get_running_config(module, config=None):
-    '''
+    """
     Gets the running-config from the switch
-    '''
-    contents = module.params['running_config']
+    """
+    contents = module.params["running_config"]
     if not contents:
         if config:
             contents = config
@@ -313,211 +351,220 @@ def get_running_config(module, config=None):
 
 
 def get_candidate(module):
-    '''
+    """
     Gets config candidate
-    '''
+    """
     candidate = NetworkConfig()
 
-    if module.params['src']:
-        candidate.loadfp(module.params['src'])
-    elif module.params['lines']:
-        parents = module.params['parents'] or list()
-        candidate.add(module.params['lines'], parents=parents)
+    if module.params["src"]:
+        candidate.loadfp(module.params["src"])
+    elif module.params["lines"]:
+        parents = module.params["parents"] or list()
+        candidate.add(module.params["lines"], parents=parents)
     return candidate
 
 
 def save_config(module, result):
-    '''
+    """
     Saves config to memory
-    '''
-    result['changed'] = True
+    """
+    result["changed"] = True
     if not module.check_mode:
-        run_commands(module, 'write memory')
+        run_commands(module, "write memory")
     else:
-        module.warn('Skipping command `write memory` '
-                    'due to check_mode.  Configuration not copied to '
-                    'non-volatile storage')
+        module.warn(
+            "Skipping command `write memory` "
+            "due to check_mode. Configuration not copied to "
+            "non-volatile storage"
+        )
 
 
 def main():
-    """ main entry point for module execution
-    """
-    backup_spec = dict(
-        filename=dict(),
-        dir_path=dict(type='path')
-    )
+    """main entry point for module execution"""
+    backup_spec = dict(filename=dict(), dir_path=dict(type="path"))
 
     argument_spec = dict(
-        src=dict(type='path'),
-
-        lines=dict(aliases=['commands'], type='list'),
-        parents=dict(type='list'),
-
-        before=dict(type='list'),
-        after=dict(type='list'),
-
-        match=dict(default='line',
-                   choices=['line', 'strict', 'exact', 'none']),
-        replace=dict(default='line', choices=['line', 'block']),
-
-        running_config=dict(aliases=['config']),
+        src=dict(type="path"),
+        lines=dict(type="list", elements="str", aliases=["commands"]),
+        parents=dict(type="list", elements="str"),
+        before=dict(type="list", elements="str"),
+        after=dict(type="list", elements="str"),
+        match=dict(
+            default="line", choices=["line", "strict", "exact", "none"]
+        ),
+        replace=dict(default="line", choices=["line", "block"]),
+        running_config=dict(aliases=["config"]),
         intended_config=dict(),
-
-        backup=dict(type='bool', default=False),
-        backup_options=dict(type='dict', options=backup_spec),
-
-        save_when=dict(choices=['always', 'never', 'modified', 'changed'],
-                       default='never'),
-
-        diff_against=dict(choices=['running', 'startup', 'intended']),
-        diff_ignore_lines=dict(type='list'),
+        backup=dict(type="bool", default=False),
+        backup_options=dict(type="dict", options=backup_spec),
+        save_when=dict(
+            choices=["always", "never", "modified", "changed"], default="never"
+        ),
+        diff_against=dict(choices=["running", "startup", "intended"]),
+        diff_ignore_lines=dict(type="list", elements="str"),
     )
 
     argument_spec.update(aoscx_argument_spec)
 
-    mutually_exclusive = [('lines', 'src'),
-                          ('parents', 'src')]
+    mutually_exclusive = [("lines", "src"), ("parents", "src")]
 
-    required_if = [('match', 'strict', ['lines']),
-                   ('match', 'exact', ['lines']),
-                   ('replace', 'block', ['lines']),
-                   ('diff_against', 'intended', ['intended_config'])]
+    required_if = [
+        ("match", "strict", ["lines"]),
+        ("match", "exact", ["lines"]),
+        ("replace", "block", ["lines"]),
+        ("diff_against", "intended", ["intended_config"]),
+    ]
 
-    module = AnsibleModule(argument_spec=argument_spec,
-                           mutually_exclusive=mutually_exclusive,
-                           required_if=required_if,
-                           supports_check_mode=True)
+    module = AnsibleModule(
+        argument_spec=argument_spec,
+        mutually_exclusive=mutually_exclusive,
+        required_if=required_if,
+        supports_check_mode=True,
+    )
 
     warnings = list()
     aoscx_check_args(module, warnings)
-    result = {'changed': False, 'warnings': warnings}
+    result = {"changed": False, "warnings": warnings}
 
     config = None
 
-    if module.params['diff_against'] is not None:
+    if module.params["diff_against"] is not None:
         module._diff = True
 
-    if module.params['backup'] or (module._diff and
-                                   module.params['diff_against'] == 'running'):
+    if module.params["backup"] or (
+        module._diff and module.params["diff_against"] == "running"
+    ):
         contents = get_config(module)
         config = NetworkConfig(contents=contents)
-        if module.params['backup']:
-            result['__backup__'] = contents
-            result['backup_options'] = module.params['backup_options']
-            if module.params['backup_options']:
-                if 'dir_path' in module.params['backup_options']:
-                    dir_path = module.params['backup_options']['dir_path']
+        if module.params["backup"]:
+            result["__backup__"] = contents
+            result["backup_options"] = module.params["backup_options"]
+            if module.params["backup_options"]:
+                if "dir_path" in module.params["backup_options"]:
+                    dir_path = module.params["backup_options"]["dir_path"]
                 else:
                     dir_path = ""
-                if 'filename' in module.params['backup_options']:
-                    filename = module.params['backup_options']['filename']
+                if "filename" in module.params["backup_options"]:
+                    filename = module.params["backup_options"]["filename"]
                 else:
                     filename = "backup.cfg"
 
-                with open(dir_path + '/' + filename, 'w') as backupfile:
+                with open(dir_path + "/" + filename, "w") as backupfile:
                     backupfile.write(contents)
                     backupfile.write("\n")
 
-    if any((module.params['src'], module.params['lines'])):
-        match = module.params['match']
-        replace = module.params['replace']
+    if any((module.params["src"], module.params["lines"])):
+        match = module.params["match"]
+        replace = module.params["replace"]
 
         candidate = get_candidate(module)
 
-        if match != 'none':
+        if match != "none":
             config = get_running_config(module, config)
-            path = module.params['parents']
+            path = module.params["parents"]
             configobjs = candidate.difference(
-                config, match=match, replace=replace, path=path)
+                config, match=match, replace=replace, path=path
+            )
         else:
             configobjs = candidate.items
 
         if configobjs:
-            commands = dumps(configobjs, 'commands').split('\n')
+            commands = dumps(configobjs, "commands").split("\n")
 
-            if module.params['before']:
-                commands[:0] = module.params['before']
+            if module.params["before"]:
+                commands[:0] = module.params["before"]
 
-            if module.params['after']:
-                commands.extend(module.params['after'])
+            if module.params["after"]:
+                commands.extend(module.params["after"])
 
-            result['commands'] = commands
-            result['updates'] = commands
+            result["commands"] = commands
+            result["updates"] = commands
 
             if not module.check_mode:
                 load_config(module, commands)
 
-            result['changed'] = True
+            result["changed"] = True
 
     running_config = None
     startup_config = None
 
-    diff_ignore_lines = module.params['diff_ignore_lines']
+    diff_ignore_lines = module.params["diff_ignore_lines"]
     if diff_ignore_lines is None:
         diff_ignore_lines = []
 
     diff_ignore_lines.append("Current configuration:")
     diff_ignore_lines.append("Startup configuration:")
 
-    if module.params['save_when'] == 'always':
+    if module.params["save_when"] == "always":
         save_config(module, result)
-    elif module.params['save_when'] == 'modified':
-        output = run_commands(module,
-                              ['show running-config', 'show startup-config'])
+    elif module.params["save_when"] == "modified":
+        output = run_commands(
+            module, ["show running-config", "show startup-config"]
+        )
 
         running_config = NetworkConfig(
-            contents=output[0], ignore_lines=diff_ignore_lines)
+            contents=output[0], ignore_lines=diff_ignore_lines
+        )
         startup_config = NetworkConfig(
-            contents=output[1], ignore_lines=diff_ignore_lines)
+            contents=output[1], ignore_lines=diff_ignore_lines
+        )
 
         if running_config.sha1 != startup_config.sha1:
             save_config(module, result)
-    elif module.params['save_when'] == 'changed':
-        if result['changed']:
+    elif module.params["save_when"] == "changed":
+        if result["changed"]:
             save_config(module, result)
 
     if module._diff:
         if not running_config:
-            output = run_commands(module, 'show running-config')
+            output = run_commands(module, "show running-config")
             contents = output[0]
         else:
             contents = running_config.config_text
 
         # recreate the object in order to process diff_ignore_lines
         running_config = NetworkConfig(
-            contents=contents, ignore_lines=diff_ignore_lines)
+            contents=contents, ignore_lines=diff_ignore_lines
+        )
 
-        if module.params['diff_against'] == 'running':
+        if module.params["diff_against"] == "running":
             if module.check_mode:
-                module.warn("unable to perform diff against "
-                            "running-config due to check mode")
+                module.warn(
+                    "unable to perform diff against "
+                    "running-config due to check mode"
+                )
                 contents = None
             else:
                 contents = config.config_text
 
-        elif module.params['diff_against'] == 'startup':
+        elif module.params["diff_against"] == "startup":
             if not startup_config:
-                output = run_commands(module, 'show startup-config')
+                output = run_commands(module, "show startup-config")
                 contents = output[0]
             else:
                 contents = startup_config.config_text
 
-        elif module.params['diff_against'] == 'intended':
-            with open(module.params['intended_config'], 'r') as intended_file:
+        elif module.params["diff_against"] == "intended":
+            with open(module.params["intended_config"], "r") as intended_file:
                 contents = intended_file.read()
         if contents is not None:
             base_config = NetworkConfig(
-                contents=contents, ignore_lines=diff_ignore_lines)
+                contents=contents, ignore_lines=diff_ignore_lines
+            )
 
             if running_config.sha1 != base_config.sha1:
-                result.update({
-                    'changed': True,
-                    'diff': {'before': str(base_config),
-                             'after': str(running_config)}
-                })
+                result.update(
+                    {
+                        "changed": True,
+                        "diff": {
+                            "before": str(base_config),
+                            "after": str(running_config),
+                        },
+                    }
+                )
 
     module.exit_json(**result)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
