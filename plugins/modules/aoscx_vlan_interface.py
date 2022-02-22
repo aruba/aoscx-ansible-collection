@@ -237,7 +237,7 @@ def main():
             )
 
             if active_gateway_ip and active_gateway_mac_v4:
-                modified_op2 = vlan_interface.set_active_gateaway(
+                modified_op2 = vlan_interface.set_active_gateway(
                     active_gateway_ip, active_gateway_mac_v4
                 )
                 modified_op = modified_op2 or modified_op
