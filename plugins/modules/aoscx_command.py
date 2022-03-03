@@ -39,7 +39,6 @@ options:
       to the desired time in seconds.
     required: true
     type: list
-    elements: str
   wait_for:
     description: >
       A list of conditions to wait to be satisfied before continuing execution.
@@ -227,7 +226,7 @@ from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.p
 )
 from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import (  # NOQA
     to_lines,
-    ComplexList,
+    EntityCollection,
 )
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
     run_commands,
@@ -237,9 +236,13 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (
 
 def transform_commands(module):
     """
-    Transform the command to a complex list
+    Transform the command list to an EntityCollection, which takes the module
+        itself, and an argument spec dictionary, this parses the list of
+        commands so that they can be processed line-by-line, which is why the
+        argument spec MUST not specify the commands list elements as str.
     """
-    transform = ComplexList(
+    transform = EntityCollection(
+        module,
         dict(
             command=dict(key=True),
             prompt=dict(type="list"),
@@ -248,19 +251,11 @@ def transform_commands(module):
             sendonly=dict(type="bool", default=False),
             check_all=dict(type="bool", default=False),
         ),
-        module,
     )
 
-    return transform(module.params["commands"])
+    value = module.params["commands"]
 
-
-def parse_commands(module, warnings):
-    """
-    Parse the command
-    """
-    commands = transform_commands(module)
-
-    return commands
+    return transform(value)
 
 
 def main():
@@ -269,7 +264,7 @@ def main():
     """
 
     argument_spec = dict(
-        commands=dict(type="list", elements="str", required=True),
+        commands=dict(type="list", required=True),
         wait_for=dict(type="list", elements="str", aliases=["waitfor"]),
         match=dict(default="all", choices=["any", "all"]),
         retries=dict(default=10, type="int"),
@@ -289,7 +284,8 @@ def main():
         argument_spec=argument_spec, supports_check_mode=True
     )
 
-    commands = parse_commands(module, warnings)
+    commands = transform_commands(module)
+
     wait_for = module.params["wait_for"] or list()
 
     try:
