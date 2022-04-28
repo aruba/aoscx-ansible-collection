@@ -61,9 +61,14 @@ jobs:
       - name: Install ansible-base (${{ matrix.ansible }})
         run: pip install https://github.com/ansible/ansible/archive/${{ matrix.ansible }}.tar.gz --disable-pip-version-check
 
+      # OPTIONAL If your unit test requires Python libraries from other collections
+      # Install them like this
+      - name: Install collection dependencies
+        run: ansible-galaxy collection install ansible.netcommon ansible.utils -p .
       # run ansible-test sanity inside of Docker.
       # The docker container has all the pinned dependencies that are required
       # and all python versions ansible supports.
+      
       - name: Run sanity tests
         run: ansible-test sanity --docker -v --color --coverage
         working-directory: ./ansible_collections/${{env.NAMESPACE}}/${{env.COLLECTION_NAME}}
