@@ -12,7 +12,7 @@ __metaclass__ = type
 DOCUMENTATION = """
 ---
 author: Aruba Networks (@ArubaNetworks)
-httpapi: aoscx
+name: aoscx
 short_description: Use REST to push configs to CX devices
 description: >
   This ArubaOSCX module provides REST interactions with ArubaOS-CX devices
