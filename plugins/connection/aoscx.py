@@ -1,10 +1,14 @@
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
 from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
 DOCUMENTATION = """
 author: Aruba Networks (@ArubaNetworks)
-connection: aoscx
+name: aoscx
 short_description: Use pyaocx to run commands on AOS-CX switches
 description: >
   This connection plugin provides a REST API connection to AOS-CX switches.

@@ -59,3 +59,5 @@ plugins/modules/aoscx_vlan_interface.py import-2.6!skip
 plugins/modules/aoscx_vrf.py compile-2.6!skip
 plugins/modules/aoscx_vrf.py import-2.6!skip
 plugins/modules/aoscx_command.py validate-modules:parameter-list-no-elements #commands
+plugins/terminal/aoscx.py compile-2.6!skip
+plugins/terminal/aoscx.py compile-2.7!skip

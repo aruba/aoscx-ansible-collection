@@ -17,12 +17,12 @@ ANSIBLE_METADATA = {
 
 DOCUMENTATION = """
 ---
-module: aoscx
 version_added: "2.8.0"
 short_description: Perform CLI operations in AOS-CX devices.
 description: >
   This module provides management of CLI operations in AOS-CX devices.
-author: Aruba Networks (ArubaNetworks)
+author: Aruba Networks (@ArubaNetworks)
+name: 'aoscx'
 """
 
 import json
