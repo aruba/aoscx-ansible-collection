@@ -11,7 +11,7 @@ Version added: 2.8
 ## Synopsis
 
 This modules provides configuration management of Layer2 Interfaces on AOS-CX
-devices, including Speeds and Port Security features.
+devices, including Port Security features.
 
 ## Parameters
 
@@ -27,14 +27,12 @@ devices, including Speeds and Port Security features.
 | `native_vlan_tag`                | bool |                                         | [ ]      | Flag for accepting only tagged packets on VLAN trunk native, vlan_mode must be set to trunk.                                                                                                                                                                                                              |
 | `interface_qos_schedule_profile` | dict |                                         | [ ]      | Attaching existing QoS schedule profile to interface. \*This parameter is deprecated and will be removed in a future version                                                                                                                                                                              |
 | `interface_qos_rate`             | dict |                                         | [ ]      | The rate limit value configured for broadcast/multicast/unknown unicast traffic.                                                                                                                                                                                                                          |
-| `speeds`                         | str  |                                         | [ ]      | Configure the speeds of the interface in megabits per second (aoscx connection). If this value is specified, `duplex` must also be specified                                                                                                                                                              |
-| `duplex`                         | bool |                                         | [ ]      | Enable full duplex or disable for half duplex (aoscx connection). If this value is specified, `speeds` must also be specified                                                                                                                                                                             |
 | `port_security_enable`           | bool |                                         | [ ]      | Enable port security in this interface (aoscx connection)                                                                                                                                                                                                                                                 |
 | `port_security_client_limit`     | int  |                                         | [ ]      | Maximum amount of MACs allowed in the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
 | `port_security_sticky_learning`  | bool |                                         | [ ]      | Enable sticky MAC learning (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                                                   |
 | `port_security_macs`             | list |                                         | [ ]      | List of allowed MAC addresses (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                                                |
-| `port_security_sticky_macs`      | dict |                                         | [ ]      | Configure the sticky MAC addresses for the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                         |
-| `port_security_violation_action` | str  | [`notify`, `shutdown`]/`notify`         | [ ]      | Action to perform  when a violation is detected (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
+| `port_security_sticky_macs`      | list |                                         | [ ]      | Configure the sticky MAC addresses for the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                         |
+| `port_security_violation_action` | str  | [`notify`, `shutdown`]                  | [ ]      | Action to perform  when a violation is detected (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
 | `port_security_recovery_time`    | int  |                                         | [ ]      | Time in seconds to wait for recovery after a violation (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                       |
 | `state`                          | str  | [`create`, `delete`, `update`]/`create` | [ ]      | Create, Update, or Delete Layer2 Interface                                                                                                                                                                                                                                                                |
 
@@ -54,10 +52,12 @@ devices, including Speeds and Port Security features.
 
 See an example [here](#interface-qos-rate-example)
 
-### `port_security_sticky_macs` dictionary:
+### `port_security_sticky_macs` list's dictionary elements:
 
-Dictionary where each key is a string (MAC Address name), and value is a string
-(MAC Address).
+| Parameters        | Type | Choices/Defaults | Required | Comments                  |
+|:------------------|:-----|:----------------:|:--------:|:--------------------------|
+| `mac`             | str  |                  | [x]      | MAC Address.              |
+| `vlans`           | list |                  | [x]      | List of integer VLAN IDs. |
 
 See an example [here](#allow-mac-addresses-to-a-port)
 
@@ -127,15 +127,6 @@ Below you can find task examples of this module's implementation:
     native_vlan_id: '200'
 
 - name: >
-    Configure Interface 1/1/2 - enable full duplex at 1000 Mbit/s.
-    IMPORTANT: The Interface must be enabled first.
-  aoscx_l2_interface:
-    interface: 1/1/2
-    duplex: full
-    speeds:
-      - '1000'
-
-- name: >
     Configure Interface 1/1/3 - enable port security for a total of 10 MAC
     addresses with sticky MAC learning, and two user set MAC addresses.
   aoscx_l2_interface:
@@ -145,7 +136,24 @@ Below you can find task examples of this module's implementation:
     port_security_sticky_learning: true
     port_security_macs:
       - 11:22:33:44:55:66
-      - aa:bb:cc:dd:ee:ff
+      - AA:BB:CC:DD:EE:FF
+
+- name: >
+    Configure Interface 1/1/3 -  remove allowed MAC address AA:BB:CC:DD:EE:FF
+    Previous allowed MAC addresses:
+    - 12:34:56:78:90:01
+    - AA:BB:CC:DD:EE:FF
+  aoscx_l2_interface:
+    interface: 1/1/3
+    port_security_enable: true
+    port_security_macs:
+      - 12:34:56:78:90:01
+
+- name: >
+    Configure Interface 1/1/3 - disable port security.
+  aoscx_l2_interface:
+    interface: 1/1/3
+    port_security_enable: false
 ```
 
 ### Interface QoS rate example:
@@ -174,8 +182,15 @@ the interface if it sees a MAC address that is not on the allowed list.
   aoscx_l2_interface:
     interface: 1/1/13
     port_security_sticky_macs:
-      'mac1': 'aa:bb:cc:dd:ee:ff'
-      'mac2': 'ab:cd:ef:12:34:56'
-    port_security_violation_action: 'shutdown'
+      - mac: AA:BB:CC:DD:EE:FF
+        vlans:
+          - 1
+          - 2
+          - 3
+      - mac: AB:CD:EF:12:34:56
+        vlans:
+          - 1
+          - 2
+    port_security_violation_action: shutdown
     port_security_recovery_time: 60
 ```

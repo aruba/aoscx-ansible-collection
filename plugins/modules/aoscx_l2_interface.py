@@ -28,7 +28,7 @@ author: Aruba Networks (@ArubaNetworks)
 options:
   interface:
     description: >
-      Interface name, should be in the format chassis/slot/port, i.e. 1/2/3 ,
+      Interface name, should be in the format chassis/slot/port, i.e. 1/2/3,
       1/1/32. Please note, if the interface is a Layer3 interface in the
       existing configuration and the user wants to change the interface to be
       Layer2, the user must delete the L3 interface then recreate the interface
@@ -82,32 +82,19 @@ options:
       The rate limit value configured for broadcast/multicast/unknown unicast
       traffic. Dictionary should have the format <type_of_traffic>: <speed>.
       e.g. unknown-unicast: 100pps
-           broadcast: 200pps
+           broadcast: 200kbps
            multicast: 200pps
     type: dict
     required: false
   state:
-    description: Create, Update, or Delete Layer2 Interface
+    description: Create, Update, or Delete Layer2 Interface.
     choices:
       - create
       - update
       - delete
-    default: 'create'
+    default: create
     required: false
     type: str
-  speeds:
-    description: >
-      Configure the speeds of the interface in megabits per second (aoscx
-      connection). If this value is specified, duplex must also be specified.
-    type: list
-    elements: str
-    required: false
-  duplex:
-    description: >
-      Enable full duplex or disable for half duplex (aoscx connection). If this
-      value is specified, speeds must also be specified.
-    type: str
-    required: false
   port_security_enable:
     description: Enable port security in this interface (aoscx connection).
     type: bool
@@ -118,14 +105,12 @@ options:
       valid when port_security is enabled.
     type: int
     required: false
-    default: 0
   port_security_sticky_learning:
     description: >
       Enable sticky MAC learning (aoscx connection). Only valid when
       port_security is enabled.
     type: bool
     required: false
-    default: False
   port_security_macs:
     description: >
       List of allowed MAC addresses (aoscx connection). Only valid when
@@ -133,14 +118,23 @@ options:
     type: list
     elements: str
     required: false
-    default: []
   port_security_sticky_macs:
     description: >
       Configure the sticky MAC addresses for the interface (aoscx connection).
       Only valid when port_security is enabled.
-    type: dict
+    type: list
     required: false
-    default: {}
+    elements: dict
+    suboptions:
+      mac:
+        description: a mac address.
+        type: str
+        required: true
+      vlans:
+        description: a list of VLAN IDs.
+        type: list
+        elements: int
+        required: true
   port_security_violation_action:
     description: >
       Action to perform when a violation is detected (aoscx connection). Only
@@ -150,21 +144,97 @@ options:
       - notify
       - shutdown
     required: false
-    default: notify
   port_security_recovery_time:
     description: >
       Time in seconds to wait for recovery after a violation (aoscx
       connection). Only valid when port_security is enabled.
     type: int
     required: false
-    default: 10
 """
 
 EXAMPLES = """
+- name: Configure Interface 1/1/13 - set allowed MAC address
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_macs:
+      - AA:BB:CC:DD:EE:FF
+
+- name: >
+    Configure Interface 1/1/13 - retain an allowed mac address by changing its
+    setting to sticky mac.
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_sticky_learning: true
+    port_security_sticky_macs:
+      - mac: AA:BB:CC:DD:EE:FF
+        vlans:
+          - 1
+          - 2
+          - 3
+
+- name: >
+    Configure Interface 1/1/13 - retain an allowed mac address by changing its
+    setting to sticky mac.
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_sticky_learning: true
+    port_security_sticky_macs:
+      - mac: AA:BB:CC:DD:EE:FF
+        vlans: []
+
+- name: >
+    Configure Interface 1/1/13 - set intrusion action to disable the interface
+    if it identifies a MAC address that is not on the allow list.
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_violation_action: shutdown
+    port_security_recovery_time: 60
+
+- name: >
+    Configure Interface 1/1/13 - set port security to dynamically add the first
+    8 addresses it sees to the allowed MAC address list.
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_client_limit: 8
+    port_security_sticky_learning: true
+
+- name: >
+    Configure Interface 1/1/3 - enable port security for a total of 10 MAC
+    addresses with sticky MAC learning, and two user set MAC addresses.
+  aoscx_l2_interface:
+    interface: 1/1/3
+    port_security_enable: true
+    port_security_client_limit: 10
+    port_security_sticky_learning: true
+    port_security_macs:
+      - 11:22:33:44:55:66
+      - AA:BB:CC:DD:EE:FF
+
+- name: >
+    Configure Interface 1/1/13 - remove allowed MAC address AA:BB:CC:DD:EE:FF
+    Previous allowed MAC addresses:
+    - 12:34:56:78:90:01
+    - AA:BB:CC:DD:EE:FF
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_macs:
+      - 12:34:56:78:90:01
+
+- name: Configure Interface 1/1/13 - disable port security.
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: false
+
 - name: >
     Configure Interface 1/1/2 - enable interface and vsx-sync features
     IMPORTANT NOTE: the aoscx_interface module is needed to enable the
-    interface and set the VSX features to be synced
+    interface and set the VSX features to be synced.
   aoscx_interface:
     name: 1/1/2
     enabled: true
@@ -175,14 +245,6 @@ EXAMPLES = """
       - rate_limits
       - vlan
       - vsx_virtual
-- name: >
-    Configure Interface 1/1/2 - enable full duplex at 1000 Mbit/s
-    IMPORTANT NOTE: see the above task, it is needed to enable the interface
-  aoscx_l2_interface:
-    interface: 1/1/2
-    duplex: full
-    speeds:
-      - '1000'
 
 - name: Configure Interface 1/1/3 - vlan trunk allowed all
   aoscx_l2_interface:
@@ -243,18 +305,6 @@ EXAMPLES = """
     vlan_mode: trunk
     trunk_allowed_all: true
     native_vlan_id: '200'
-
-- name: >
-    Configure Interface 1/1/3 - enable port security for a total of 10 MAC
-    addresses with sticky MAC learning, and two user set MAC addresses.
-  aoscx_l2_interface:
-    interface: 1/1/3
-    port_security_enable: true
-    port_security_client_limit: 10
-    port_security_sticky_learning: true
-    port_security_macs:
-      - 11:22:33:44:55:66
-      - AA:BB:CC:DD:EE:FF
 """
 
 RETURN = r""" # """
@@ -285,51 +335,124 @@ else:
     )
 
 
-def main():
-    module_args = dict(
-        interface=dict(type="str", required=True),
-        description=dict(type="str", default=None),
-        vlan_mode=dict(type="str", default=None, choices=["access", "trunk"]),
-        vlan_access=dict(type="str", default=None),
-        vlan_trunks=dict(type="list", elements="str", default=None),
-        trunk_allowed_all=dict(type="bool", default=None),
-        native_vlan_id=dict(type="str", default=None),
-        native_vlan_tag=dict(type="bool", default=None),
-        interface_qos_schedule_profile=dict(type="dict", default=None),
-        interface_qos_rate=dict(type="dict", default=None),
-        state=dict(
-            type="str",
-            default="create",
-            choices=["create", "delete", "update"],
-        ),
-        speeds=dict(type="list", elements="str", default=None, required=False),
-        duplex=dict(type="str", default=None, required=False),
-        port_security_enable=dict(type="bool", default=None, required=False),
-        port_security_client_limit=dict(type="int", default=0, required=False),
-        port_security_sticky_learning=dict(
-            type="bool", default=False, required=False
-        ),
-        port_security_macs=dict(
-            type="list", elements="str", default=[], required=False
-        ),
-        port_security_sticky_macs=dict(
-            type="dict", default={}, required=False
-        ),
-        port_security_violation_action=dict(
-            type="str",
-            choices=["notify", "shutdown"],
-            default="notify",
-            required=False,
-        ),
-        port_security_recovery_time=dict(
-            type="int", default=10, required=False
-        ),
-    )
+def get_argument_spec():
+    module_args = {
+        "state": {
+            "type": "str",
+            "default": "create",
+            "choices": ["create", "delete", "update"],
+        },
+        "interface": {
+            "type": "str",
+            "required": True,
+        },
+        "description": {
+            "type": "str",
+            "required": False,
+            "default": None,
+        },
+        "vlan_mode": {
+            "type": "str",
+            "default": None,
+            "required": False,
+            "choices": ["access", "trunk"],
+        },
+        "vlan_access": {
+            "type": "str",
+            "default": None,
+            "required": False,
+        },
+        "vlan_trunks": {
+            "type": "list",
+            "elements": "str",
+            "default": None,
+            "required": False,
+        },
+        "trunk_allowed_all": {
+            "type": "bool",
+            "default": None,
+            "required": False,
+        },
+        "native_vlan_id": {
+            "type": "str",
+            "default": None,
+            "required": False,
+        },
+        "native_vlan_tag": {
+            "type": "bool",
+            "default": None,
+            "required": False,
+        },
+        "interface_qos_schedule_profile": {
+            "type": "dict",
+            "default": None,
+            "required": False,
+        },
+        "interface_qos_rate": {
+            "type": "dict",
+            "default": None,
+            "required": False,
+        },
+        "port_security_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "port_security_client_limit": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
+        "port_security_sticky_learning": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "port_security_macs": {
+            "type": "list",
+            "elements": "str",
+            "required": False,
+            "default": None,
+        },
+        "port_security_sticky_macs": {
+            "type": "list",
+            "elements": "dict",
+            "required": False,
+            "default": None,
+            "options": {
+                "mac": {"type": "str", "required": True},
+                "vlans": {
+                    "type": "list",
+                    "elements": "int",
+                    "required": True,
+                },
+            },
+        },
+        "port_security_violation_action": {
+            "type": "str",
+            "required": False,
+            "default": None,
+            "choices": ["notify", "shutdown"],
+        },
+        "port_security_recovery_time": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
+    }
+    return module_args
 
+
+def main():
     if USE_PYAOSCX_SDK:
         ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
+            argument_spec=get_argument_spec(), supports_check_mode=True
         )
+
+        result = dict(changed=False)
+
+        if ansible_module.check_mode:
+            ansible_module.exit_json(**result)
 
         interface_name = ansible_module.params["interface"]
         description = ansible_module.params["description"]
@@ -340,8 +463,6 @@ def main():
         native_vlan_id = ansible_module.params["native_vlan_id"]
         native_vlan_tag = ansible_module.params["native_vlan_tag"]
         state = ansible_module.params["state"]
-        speeds = ansible_module.params["speeds"]
-        duplex = ansible_module.params["duplex"]
         port_security_enable = ansible_module.params["port_security_enable"]
         port_security_client_limit = ansible_module.params[
             "port_security_client_limit"
@@ -360,78 +481,83 @@ def main():
             "port_security_recovery_time"
         ]
 
-        # Set result var
-        result = dict(changed=False)
-
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
         session = get_pyaoscx_session(ansible_module)
         device = Device(session)
         if state == "delete":
-            # Create Interface Object
             interface = device.interface(interface_name)
-            # Delete it
             interface.delete()
 
-            # Changed
             result["changed"] = True
-        else:
-            # Set VLAN tag
-            vlan_tag = None
-            if vlan_access is not None:
-                vlan_tag = vlan_access
-            elif native_vlan_id is not None:
-                vlan_tag = native_vlan_id
+            ansible_module.exit_json(**result)
+        vlan_tag = None
+        if vlan_access is not None:
+            vlan_tag = vlan_access
+        elif native_vlan_id is not None:
+            vlan_tag = native_vlan_id
 
-            if isinstance(vlan_tag, str):
-                vlan_tag = int(vlan_tag)
+        if isinstance(vlan_tag, str):
+            vlan_tag = int(vlan_tag)
 
-            # Create Interface Object
-            interface = device.interface(interface_name)
-            # Verify if interface was create
-            if interface.was_modified():
-                # Changed
-                result["changed"] = True
-            # Configure L2
-            # Verify if object was changed
-            modified_op = interface.configure_l2(
-                description=description,
-                vlan_mode=vlan_mode,
-                vlan_tag=vlan_tag,
-                vlan_ids_list=vlan_trunks,
-                trunk_allowed_all=trunk_allowed_all,
-                native_vlan_tag=native_vlan_tag,
-            )
+        interface = device.interface(interface_name)
+        if interface.was_modified():
+            result["changed"] = True
+        modified_op = interface.configure_l2(
+            description=description,
+            vlan_mode=vlan_mode,
+            vlan_tag=vlan_tag,
+            vlan_ids_list=vlan_trunks,
+            trunk_allowed_all=trunk_allowed_all,
+            native_vlan_tag=native_vlan_tag,
+        )
 
-            if speeds is not None and duplex is not None:
-                modified_op |= interface.speed_duplex_configure(
-                    speeds=speeds, duplex=duplex
-                )
+        if port_security_enable is not None:
+            port_security_sticky_macs = port_security_sticky_macs or []
+            if not port_security_enable:
+                modified_op |= interface.port_security_disable()
+            else:
+                port_sec_kw = {}
+                if port_security_client_limit:
+                    port_sec_kw["client_limit"] = port_security_client_limit
 
-            if port_security_enable is not None:
-                if port_security_enable:
-                    modified_op |= interface.port_security_enable(
-                        client_limit=port_security_client_limit,
-                        sticky_mac_learning=port_security_sticky_learning,
-                        allowed_mac_addr=port_security_macs,
-                        allowed_sticky_mac_addr=port_security_sticky_macs,
-                        violation_action=port_security_violation_action,
-                        violation_recovery_time=port_security_recovery_time,
-                    )
-                else:
-                    modified_op = (
-                        interface.port_security_disable() or modified_op
-                    )
+                if port_security_sticky_learning is not None:
+                    port_sec_kw[
+                        "sticky_mac_learning"
+                    ] = port_security_sticky_learning
 
-            if modified_op:
-                # Changed
-                result["changed"] = True
+                if port_security_macs:
+                    port_sec_kw["allowed_mac_addr"] = port_security_macs
 
-        # Exit
+                converted_sticky_macs = {
+                    el["mac"]: el["vlans"] for el in port_security_sticky_macs
+                }
+                if converted_sticky_macs:
+                    port_sec_kw[
+                        "allowed_sticky_mac_addr"
+                    ] = converted_sticky_macs
+
+                if port_security_violation_action:
+                    port_sec_kw[
+                        "violation_action"
+                    ] = port_security_violation_action
+
+                if port_security_recovery_time:
+                    port_sec_kw[
+                        "violation_recovery_time"
+                    ] = port_security_recovery_time
+
+                _result = False
+                try:
+                    _result = interface.port_security_enable(**port_sec_kw)
+                except Exception as exc:
+                    ansible_module.fail_json(msg=str(exc))
+
+                modified_op |= _result
+        if modified_op:
+            result["changed"] = True
+
         ansible_module.exit_json(**result)
     else:
-        aruba_ansible_module = ArubaAnsibleModule(module_args)
+        aruba_ansible_module = ArubaAnsibleModule(get_argument_spec())
 
         params = {}
         for param in aruba_ansible_module.module.params.keys():

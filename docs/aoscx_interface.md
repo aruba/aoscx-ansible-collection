@@ -8,51 +8,75 @@ Version added: 4.0.0
  - [Parameters](#Parameters)
  - [Examples](#Examples)
 
-# Synopsis
+## Synopsis
 
 This module manages the interface attributes of Aruba AOSCX network devices.
 
-# Parameters
+## Parameters
 
-| Parameter        | Type | Choices/Defaults                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Required | Comments                                                                                                                   |
-|:-----------------|:-----|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|:---------------------------------------------------------------------------------------------------------------------------|
-| `name`           | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [x]      | Name of the interface. Should be in the format chassis/slot/port e.g. 1/2/3.                                               |
-| `enabled`        | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Administrative state of the interface. Use true to administratively enable it.                                             |
-| `description`    | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Description of the interface.                                                                                              |
-| `duplex`         | str  | [`full`, `half`]                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [ ]      | Configure the interface for full duplex or half duplex. If this value is specified, `speeds` must also be specified.       |
-| `speeds`         | list |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Configure the speeds of the interface in megabits per second. If this value is specified, `duplex` must also be specified. |
-| `qos`            | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of existing QoS configuration to apply to the interface.                                                              |
-| `no_qos`         | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Flag to remove the existing Qos of the interface. Use True to remove it.                                                   |
-| `queue_profile`  | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of queue profile to apply to interface.                                                                               |
-| `qos_trust_mode` | str  | [`cos`, `dscp`, `name`, `global`]                                                                                                                                                                                                                                                                                                                                                                                                                                          | [ ]      | Specifies the interface QoS Trust Mode. 'global' configures the interface to use the global configuration instead.         |
-| `state`          | str  | [`create`, `delete`, `update`]/`create`                                                                                                                                                                                                                                                                                                                                                                                                                                    | [ ]      | The action to be taken with the current Interface.                                                                         |
-| `vsx_sync`       | list | [`acl`, `irdp`, `qos`, `rate_limits`, `vlan`, `vsx_virtual`, `virtual_gw_l3_src_mac_enable`, `policy`, `threshold_profile`, `macsec_policy`, `mka_policy`, `portfilter`, `client_ip_track_configuration`, `mgmd_acl`, `mgmd_enable`, `mgmd_robustness`, `mgmd_querier_max_response_time`, `mgmd_mld_version`, `mgmd_querier_interval`, `mgmd_last_member_query_interval`, `mgmd_querier_enable`, `mgmd_mld_static_groups`, `mgmd_igmp_static_groups`, `mgmd_igmp_version`] | [ ]      | Controls which attributes should be synchonized between VSX peers.                                                         |
+| Parameter         | Type | Choices/Defaults                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Required | Comments                                                                                                                   |
+|:------------------|:-----|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------:|:---------------------------------------------------------------------------------------------------------------------------|
+| `name`            | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [x]      | Name of the interface. Should be in the format chassis/slot/port e.g. 1/2/3.                                               |
+| `enabled`         | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Administrative state of the interface. Use true to administratively enable it.                                             |
+| `description`     | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Description of the interface.                                                                                              |
+| `configure_speed` | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Option to configure speed/duplex in the interface. If `true`, `autoneg` is required.                                       |
+| `autoneg`         | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Configure the auto-negotiation state of the interface. If `false` both `speeds`, and `duplex` are required.                |
+| `duplex`          | str  | [`full`, `half`]                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [ ]      | Configure the interface for full duplex or half duplex. If `autoneg` is `on` this must be omitted.                         |
+| `speeds`          | list |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Configure the speeds of the interface in megabits per second. If `duplex` is defined only one speed may be specified.      |
+| `qos`             | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of existing QoS configuration to apply to the interface.                                                              |
+| `no_qos`          | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Flag to remove the existing Qos of the interface. Use True to remove it.                                                   |
+| `queue_profile`   | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of queue profile to apply to interface.                                                                               |
+| `qos_trust_mode`  | str  | [`cos`, `dscp`, `name`, `global`]                                                                                                                                                                                                                                                                                                                                                                                                                                          | [ ]      | Specifies the interface QoS Trust Mode. 'global' configures the interface to use the global configuration instead.         |
+| `state`           | str  | [`create`, `delete`, `update`]/`create`                                                                                                                                                                                                                                                                                                                                                                                                                                    | [ ]      | The action to be taken with the current Interface.                                                                         |
+| `vsx_sync`        | list | [`acl`, `irdp`, `qos`, `rate_limits`, `vlan`, `vsx_virtual`, `virtual_gw_l3_src_mac_enable`, `policy`, `threshold_profile`, `macsec_policy`, `mka_policy`, `portfilter`, `client_ip_track_configuration`, `mgmd_acl`, `mgmd_enable`, `mgmd_robustness`, `mgmd_querier_max_response_time`, `mgmd_mld_version`, `mgmd_querier_interval`, `mgmd_last_member_query_interval`, `mgmd_querier_enable`, `mgmd_mld_static_groups`, `mgmd_igmp_static_groups`, `mgmd_igmp_version`] | [ ]      | Controls which attributes should be synchonized between VSX peers.                                                         |
 
 
-# Examples
+## Examples
 
-## Enable full duplex at 1000 Mbits/s
-
-Ansible version:
+### Configure speed/duplex for an interface
 
 ```YAML
-- name: Configure Interface 1/1/2 - enable full duplex at 1000 Mbit/s
+- name: >
+    Configure Interface 1/1/2 - full duplex, speed of 1000 Mbps and no
+    auto-negotiation.
   aoscx_interface:
     name: 1/1/2
+    configure_speed: true
+    autoneg: off
     duplex: full
     speeds:
-      - '1000'
-    enabled: true
+      - 1000
+
+- name: >
+    Configure Interface 1/1/2 - half duplex, speed of 10 Mbps and no
+    auto-negotiation.
+  aoscx_interface:
+    name: 1/1/2
+    configure_speed: true
+    autoneg: off
+    duplex: half
+    speeds:
+      - 10
+
+- name: >
+    Configure Interface 1/1/2 - advertise only 100 Mbps and 1000 Mbps speeds
+    and duplex auto-negotiaton.
+  aoscx_interface:
+    name: 1/1/2
+    configure_speed: true
+    autoneg: on
+    speeds:
+      - 100
+      - 1000
+
+- name: Configure Interface 1/1/2 - speeds and duplex auto-negotiation.
+  aoscx_interface:
+    name: 1/1/2
+    configure_speed: true
+    autoneg: on
 ```
 
-CLI version:
-
-```
-interface 1/1/2
-speed 1000-full
-```
-
-## Administratively disable an interface
+### Administratively disable an interface
 
 Ansible version:
 
@@ -63,14 +87,7 @@ Ansible version:
     enabled: false
 ```
 
-CLI version:
-
-```
-interface 1/1/2
-shutdown
-```
-
-## Configure a QoS trust mode
+### Configure a QoS trust mode
 
 It is possible to set an specific trust mode for a particular interface, or to
 configure an interface to use the global default trust mode of the device.
@@ -87,7 +104,7 @@ configure an interface to use the global default trust mode of the device.
     qos_trust_mode: global
 ```
 
-## Configure a Queue Profile trust mode
+### Configure a Queue Profile trust mode
 
 ```YAML
 - name: Set a Queue Profile for interface 1/1/2
@@ -101,7 +118,7 @@ configure an interface to use the global default trust mode of the device.
     use_global_queue_profile: true
 ```
 
-## Associate QoS Schedule Profiles to an interface
+### Associate QoS Schedule Profiles to an interface
 
 To assign a Schedule Profile to an interface, you have to specify the name, to
 remove it simply use the `no_qos` option.
@@ -118,7 +135,7 @@ remove it simply use the `no_qos` option.
     no_qos: true
 ```
 
-## Set QoS rate for an interface
+### Set QoS rate for an interface
 
 ```YAML
 - name: Set the QoS rate to the 1/1/17 Interface
@@ -130,15 +147,16 @@ remove it simply use the `no_qos` option.
       multicast: 200pps
 ```
 
-## Enable vsx-sync for interface 1/1/2
+### Enable vsx-sync for interface 1/1/2
 
 ```YAML
 - name: Configure Interface 1/1/2 - enable vsx-sync features
   aoscx_interface:
     name: 1/1/2
+    configure_speed: true
     duplex: full
     speeds:
-      - '1000'
+      - 1000
     vsx_sync:
       - acl
       - irdp

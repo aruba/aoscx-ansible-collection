@@ -41,10 +41,23 @@ options:
     description: Description of the interface.
     type: str
     required: false
+  configure_speed:
+    description: >
+      Option to configure speed/duplex in the interface. It `true`, `autoneg`
+      is required.
+    type: bool
+    required: false
+    default: false
+  autoneg:
+    description: >
+      Configure the auto-negotiation state of the interface. If `off` both
+      `speeds`, and `duplex` are required.
+    type: bool
+    required: false
   duplex:
     description: >
-      Enable full duplex or disable for half duplex. If this value is
-      specified, speeds must also be specified.
+      Configure the interface for full duplex or half duplex. If `autoneg`is
+      `on` this must be omitted.
     type: str
     choices:
       - full
@@ -52,10 +65,10 @@ options:
     required: false
   speeds:
     description: >
-      Configure the speeds of the interface in megabits per second. If this
-      value is specified, duplex must also be specified.
+      Configure the speeds of the interface in megabits per second. If `duplex`
+      is defined only one speed may be specified.
     type: list
-    elements: str
+    elements: int
     required: false
   vsx_sync:
     description: >
@@ -160,13 +173,44 @@ options:
 """
 
 EXAMPLES = """
-- name: Configure Interface 1/1/2 - enable full duplex at 1000 Mbit/s
+- name: >
+    Configure Interface 1/1/2 - full duplex, speed of 1000 Mbps and no
+    auto-negotiation.
   aoscx_interface:
     name: 1/1/2
+    configure_speed: true
+    autoneg: off
     duplex: full
     speeds:
-      - '1000'
-    enabled: true
+      - 1000
+
+- name: >
+    Configure Interface 1/1/2 - half duplex, speed 10 Mbps and no
+    auto-negotiation.
+  aoscx_interface:
+    name: 1/1/2
+    configure_speed: true
+    autoneg: off
+    duplex: half
+    speeds:
+      - 10
+
+- name: >
+    Configure Interface 1/1/2 - advertise only 100 Mbps and 1000 Mbps speeds
+    and duplex auto-negotiation.
+  aoscx_interface:
+    name: 1/1/2
+    configure_speed: true
+    autoneg: on
+    speeds:
+      - 100
+      - 1000
+
+- name: Configure Interface 1/1/2 - speeds and duplex auto-negotiation.
+  aoscx_interface:
+    name: 1/1/2
+    configure_speed: true
+    autoneg: on
 
 - name: Administratively disable interface 1/1/2
   aoscx_interface:
@@ -219,9 +263,10 @@ EXAMPLES = """
 - name: Configure Interface 1/1/2 - enable vsx-sync features
   aoscx_interface:
     name: 1/1/2
+    configure_speed: true
     duplex: full
     speeds:
-      - '1000'
+      - 1000
     vsx_sync:
       - acl
       - irdp
@@ -237,6 +282,7 @@ from ansible.module_utils.basic import AnsibleModule
 
 try:
     from pyaoscx.device import Device
+    from pyaoscx.interface import Interface
 
     HAS_PYAOSCX = True
 except ImportError:
@@ -264,6 +310,16 @@ def get_argument_spec():
             "required": False,
             "default": None,
         },
+        "configure_speed": {
+            "type": "bool",
+            "required": False,
+            "default": False,
+        },
+        "autoneg": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
         "duplex": {
             "type": "str",
             "required": False,
@@ -272,7 +328,7 @@ def get_argument_spec():
         },
         "speeds": {
             "type": "list",
-            "elements": "str",
+            "elements": "int",
             "required": False,
             "default": None,
         },
@@ -397,10 +453,13 @@ def main():
     ansible_module = AnsibleModule(
         argument_spec=get_argument_spec(),
         supports_check_mode=True,
-        required_together=[["duplex", "speeds"]],
         mutually_exclusive=[
             ("qos", "no_qos"),
             ("queue_profile", "use_global_queue_profile"),
+        ],
+        required_if=[
+            ("configure_speed", True, ("autoneg",), False),
+            ("autoneg", "off", ("duplex", "speeds"), False),
         ],
     )
 
@@ -418,8 +477,6 @@ def main():
     name = ansible_module.params["name"]
     enabled = ansible_module.params["enabled"]
     description = ansible_module.params["description"]
-    duplex = ansible_module.params["duplex"]
-    speeds = ansible_module.params["speeds"]
     vsx_sync = ansible_module.params["vsx_sync"]
     state = ansible_module.params["state"]
     qos = ansible_module.params["qos"]
@@ -430,6 +487,11 @@ def main():
     ]
     qos_trust_mode = ansible_module.params["qos_trust_mode"]
     qos_rate = ansible_module.params["qos_rate"]
+
+    configure_speed = ansible_module.params["configure_speed"]
+    autoneg = ansible_module.params["autoneg"]
+    duplex = ansible_module.params["duplex"]
+    speeds = ansible_module.params["speeds"]
 
     session = get_pyaoscx_session(ansible_module)
     device = Device(session)
@@ -458,10 +520,56 @@ def main():
         interface.vsx_sync = clean_vsx_features
 
     modified |= interface.apply()
-    if duplex and speeds:
-        modified |= interface.speed_duplex_configure(
-            speeds=speeds, duplex=duplex
+
+    if configure_speed:
+        # Ansible detects on/off as True/False, so we accept the boolean, and
+        # convert to the str, which is what the REST API accepts
+
+        autoneg = "on" if autoneg else "off"
+        _user_config = {"autoneg": autoneg}
+        if speeds and duplex:
+            _user_config["autoneg"] = "off"
+        modified |= (
+            "autoneg" not in interface.user_config
+            or interface.user_config["autoneg"] != autoneg
         )
+
+        status_int = Interface(session, name)
+        status_int.get(selector="status")
+
+        if speeds:
+            _user_config["speeds"] = speeds
+            playbook_speeds = set(speeds)
+            if "speeds" in interface.user_config:
+                sw_str_speeds = interface.user_config["speeds"]
+                switch_speeds = set([int(s) for s in sw_str_speeds.split(",")])
+                modified |= switch_speeds != playbook_speeds
+            else:
+                modified = True
+
+        if duplex:
+            _user_config["duplex"] = duplex
+            modified |= (
+                "duplex" not in interface.user_config
+                or interface.user_config["duplex"] != duplex
+            )
+
+        if "forced_speeds" not in status_int.hw_intf_info:
+            warning = (
+                "Interface {0} might not support the combination of "
+                "speeds/duplex configured, check your hardware specifications "
+                "and/or CLI to make sure."
+            ).format(name)
+            if "warnings" in result:
+                result["warnings"].append(warning)
+            else:
+                result["warnings"] = [warning]
+
+        try:
+            interface.configure_speed_duplex(**_user_config)
+        except Exception as exc:
+            ansible_module.fail_json(msg=str(exc))
+
     if qos:
         modified |= interface.update_interface_qos(qos)
     if no_qos:

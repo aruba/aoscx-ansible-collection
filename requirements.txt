@@ -1,3 +1,3 @@
 paramiko
 requests
-pyaoscx>=2.0.1
+pyaoscx>=2.3.0
