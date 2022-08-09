@@ -46,6 +46,12 @@ plugins/modules/aoscx_l2_interface.py compile-2.6!skip
 plugins/modules/aoscx_l2_interface.py import-2.6!skip
 plugins/modules/aoscx_l3_interface.py compile-2.6!skip
 plugins/modules/aoscx_l3_interface.py import-2.6!skip
+plugins/modules/aoscx_ospf_interface.py compile-2.6!skip
+plugins/modules/aoscx_ospf_interface.py import-2.6!skip
+plugins/modules/aoscx_ospf_vlink.py compile-2.6!skip
+plugins/modules/aoscx_ospf_vlink.py import-2.6!skip
+plugins/modules/aoscx_ospfv3_vlink.py compile-2.6!skip
+plugins/modules/aoscx_ospfv3_vlink.py import-2.6!skip
 plugins/modules/aoscx_static_route.py compile-2.6!skip
 plugins/modules/aoscx_static_route.py import-2.6!skip
 plugins/modules/aoscx_upload_config.py compile-2.6!skip
@@ -59,5 +65,3 @@ plugins/modules/aoscx_vlan_interface.py import-2.6!skip
 plugins/modules/aoscx_vrf.py compile-2.6!skip
 plugins/modules/aoscx_vrf.py import-2.6!skip
 plugins/modules/aoscx_command.py validate-modules:parameter-list-no-elements #commands
-plugins/terminal/aoscx.py compile-2.6!skip
-plugins/terminal/aoscx.py compile-2.7!skip
