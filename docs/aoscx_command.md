@@ -17,11 +17,11 @@ module designed to execute just configuration commands, `aoscx_config`.
         * `auto-confirm` does not allow copying AOS-CX images with TFTP
 ```yaml
 - hosts: all
-    roles:
-      - role: aoscx-ansible-role
+    collections:
+      - arubanetworks.aoscx
     tasks:
       - name: VSF Renumber-To with Autoconfirm
-        aoscx_config:
+        aoscx_command:
           lines:
             - auto-confirm
             - configure
