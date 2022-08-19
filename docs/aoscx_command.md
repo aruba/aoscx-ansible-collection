@@ -21,7 +21,7 @@ module designed to execute just configuration commands, `aoscx_config`.
       - role: aoscx-ansible-role
     tasks:
       - name: VSF Renumber-To with Autoconfirm
-        aoscx_command:
+        aoscx_config:
           lines:
             - auto-confirm
             - configure
