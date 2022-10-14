@@ -339,6 +339,7 @@ def main():
 
         # Iterate through given subset arguments in the gather_subset parameter
         # in argument_spec
+        use_data_planes = False
         for subset in subset_list:
 
             # Argument translation for management_interface and
@@ -346,6 +347,31 @@ def main():
             if subset == "management_interface":
                 subset = "mgmt_intf_status"
             elif subset == "physical_interfaces":
+                curr_firmware = iter(switch.get_firmware_version().split("."))
+                platform = next(curr_firmware)
+                main_version = int(next(curr_firmware))
+                sub_version = int(next(curr_firmware))
+
+                if platform in ["FL"] and (
+                    main_version > 10 or sub_version > 8
+                ):
+                    if str(session.api) in ["10.04", "10.08"]:
+                        w_message = (
+                            "Physical interfaces: "
+                            "REST v{0} is no longer supported "
+                            "for this version {1}-{2}.{3}. "
+                            "Add parameter 'ansible_aoscx_rest_version: 10.09'"
+                            " in your inventory file for this host. Or define "
+                            "environment variable ANSIBLE_AOSCX_REST_VERSION "
+                            "with value 10.09"
+                        ).format(
+                            session.api, platform, main_version, sub_version
+                        )
+                        warnings.append(w_message)
+                    else:
+                        use_data_planes = True
+                        switch.get_data_planes()
+
                 subset = "interfaces"
             elif subset == "host_name":
                 subset = "hostname"
@@ -368,9 +394,14 @@ def main():
 
                     # Get attribute value and update the Ansible facts
                     # dictionary
-                    ansible_facts[str_subset].update(
-                        {subsystem: switch.subsystems[subsystem][subset]}
-                    )
+                    if use_data_planes and subset == "interfaces":
+                        ss_dps = switch.data_planes[subsystem]["data_planes"]
+                        intfs = {}
+                        for dp in ss_dps:
+                            intfs.update(ss_dps[dp][subset])
+                    else:
+                        intfs = switch.subsystems[subsystem][subset]
+                    ansible_facts[str_subset].update({subsystem: intfs})
 
         ansible_module.exit_json(
             ansible_facts=ansible_facts, warnings=warnings

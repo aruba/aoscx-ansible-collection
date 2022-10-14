@@ -117,6 +117,17 @@ options:
       - name: ANSIBLE_PERSISTENT_LOG_MESSAGES
     vars:
       - name: ansible_persistent_log_messages
+  rest_version:
+    description: >
+      Configures REST version, default version is 10.04, but 10.08 or 10.09
+      can be used in a specific host or globaly if it is set as an environment
+      variable.
+    default: 10.04
+    env:
+      - name: ANSIBLE_AOSCX_REST_VERSION
+    vars:
+      - name: ansible_aoscx_rest_version
+    type: string
 """
 
 from ansible.errors import AnsibleConnectionFailure, AnsibleError
@@ -192,7 +203,11 @@ class Connection(NetworkConnectionBase):
             username = self.get_option("remote_user")
             password = self.get_option("password")
             self.use_proxy = self.get_option("use_proxy")
-            self.base_url = "https://{0}/rest/v10.04/".format(switchip)
+            rest_version = self.get_option("rest_version")
+            if rest_version not in ["10.04", "10.08", "10.09"]:
+                raise AnsibleConnectionFailure("Invalid REST version: %s"
+                                               % rest_version)
+            self.base_url = "https://{0}/rest/v{1}/".format(switchip, rest_version)
             # Set Credentials
             self.__username = username
             self.__password = password
