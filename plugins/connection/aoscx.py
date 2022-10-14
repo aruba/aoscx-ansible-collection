@@ -170,6 +170,9 @@ class Connection(NetworkConnectionBase):
         self.use_proxy = True
         self.__username = None
         self.__password = None
+        if hasattr(self, "_sub_plugin"):
+            self._sub_plugin["type"] = "external"
+            self._sub_plugin["name"] = "aoscx"
 
     def _connect(self):
         if not HAS_PYAOSCX:
