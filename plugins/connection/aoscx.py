@@ -213,9 +213,11 @@ class Connection(NetworkConnectionBase):
     @ensure_connect
     def get_session(self):
         cookies = dict_from_cookiejar(self.session.cookies)
+        headers = self.session.headers
         return dict(
             success=True,
             cookies=cookies,
+            headers=headers,
             url=self.base_url,
             use_proxy=self.use_proxy,
             credentials=dict(

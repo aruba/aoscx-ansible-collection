@@ -50,6 +50,7 @@ class Session(object):
             ansible_module.fail_json(msg="Connection Failed")
 
         add_dict_to_cookiejar(s.cookies, session_data["cookies"])
+        s.headers = session_data["headers"]
         if session_data["use_proxy"] is False:
             s.proxies = {"http": None, "https": None}
         self._session = dict(
