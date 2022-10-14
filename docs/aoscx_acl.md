@@ -220,7 +220,41 @@ be equal.
         action: permit
 ```
 
+## Remove an ACE
+
+```YAML
+- name: Delete an existing ACE
+  aoscx_acl:
+    name: simple_ports
+    type: ipv4
+    acl_entries:
+      1:
+        comment: Use a range of ports
+        src_ip: 100.10.25.2/255.255.255.0
+        dst_ip: 100.10.25.2/255.255.255.0
+        src_l4_port_max: 5002
+        src_l4_port_min: 5000
+        dst_l4_port_max: 3657
+        dst_l4_port_min: 3657
+        action: permit
+    state:delete
+```
+
+Also an empty ACE configuration can be used as parameter
+
+```YAML
+- name: Delete an existing ACE
+  aoscx_acl:
+    name: simple_ports
+    type: ipv4
+    acl_entries:
+      1:
+    state:delete
+```
+
 ## Remove an ACL
+
+If there are no ACEs are present in configuration, the ACL will be removed
 
 ```YAML
 - name: Delete ipv4 ACL from config
