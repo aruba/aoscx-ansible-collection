@@ -122,7 +122,7 @@ options:
       Configures REST version, default version is 10.04, but 10.08 or 10.09
       can be used in a specific host or globaly if it is set as an environment
       variable.
-    default: 10.04
+    default: '10.04'
     env:
       - name: ANSIBLE_AOSCX_REST_VERSION
     vars:
