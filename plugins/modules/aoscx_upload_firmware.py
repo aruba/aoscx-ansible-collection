@@ -105,6 +105,7 @@ def main():
         vrf = ansible_module.params["vrf"]
         partition_name = ansible_module.params["partition_name"]
         firmware_file_path = ansible_module.params["firmware_file_path"]
+        partition_idx = "{0}_version".format(partition_name)
 
         result = dict(changed=False)
 
@@ -113,16 +114,24 @@ def main():
 
         session = get_pyaoscx_session(ansible_module)
         device = Device(session)
+        prev_firmware = device.get_firmware_info()
 
-        success = device.upload_firmware(
-            partition_name=partition_name,
-            firmware_file_path=firmware_file_path,
-            remote_firmware_file_path=http_path,
-            vrf=vrf,
-        )
+        try:
+            success = device.upload_firmware(
+                partition_name=partition_name,
+                firmware_file_path=firmware_file_path,
+                remote_firmware_file_path=http_path,
+                vrf=vrf,
+            )
+        except Exception as e:
+            ansible_module.module.fail_json(msg="{0}".format(e))
+
+        curr_firmware = device.get_firmware_info()
 
         # Changed
-        result["changed"] = success
+        result["changed"] = success and (
+            prev_firmware[partition_idx] != curr_firmware[partition_idx]
+        )
 
         # Exit
         ansible_module.exit_json(**result)

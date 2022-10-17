@@ -296,27 +296,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.acl_entry import AclEntry
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_acl import (  # NOQA
-        ACL,
-    )
-
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 protocol_dict = {
     "ah": 51,
@@ -387,113 +370,70 @@ def get_argument_spec():
 def main():
     module_args = get_argument_spec()
 
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        result = dict(changed=False)
+    result = dict(changed=False)
 
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
-        # Get playbook's arguments
-        state = ansible_module.params["state"]
-        name = ansible_module.params["name"]
-        list_type = ansible_module.params["type"]
-        acl_entries = ansible_module.params["acl_entries"]
-
-        session = get_pyaoscx_session(ansible_module)
-
-        device = Device(session)
-        if state == "delete":
-            # Create ACL Object
-            acl = device.acl(name, list_type)
-            # Delete it
-            acl.delete()
-            # Changed
-            result["changed"] = True
-
-        if state in ("create", "update"):
-            # Create ACL Object
-            acl = device.acl(name, list_type)
-            # Verify if interface was create
-            if acl.was_modified():
-                # Changed
-                result["changed"] = True
-
-            # Modified variable
-            modified_op = False
-
-            if acl_entries:
-                for sequence_number, config in acl_entries.items():
-                    acl_entry = AclEntry(
-                        acl.session,
-                        sequence_number=int(sequence_number),
-                        parent_acl=acl,
-                        **_remove_invalid_addresses(config)
-                    )
-                    modified_op |= acl_entry.apply()
-
-            # Changed
-            if modified_op:
-                result["changed"] = True
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older version
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
-        acl = ACL()
-        state = aruba_ansible_module.module.params["state"]
-        name = aruba_ansible_module.module.params["name"]
-        list_type = aruba_ansible_module.module.params["type"]
-        acl_entries = aruba_ansible_module.module.params["acl_entries"]
+    # Get playbook's arguments
+    state = ansible_module.params["state"]
+    name = ansible_module.params["name"]
+    list_type = ansible_module.params["type"]
+    acl_entries = ansible_module.params["acl_entries"]
 
-        if (state == "create") or (state == "update"):
-            aruba_ansible_module = acl.create_acl(
-                aruba_ansible_module, name, list_type
-            )
-            if acl_entries is not None:
-                for sequence_number in acl_entries.keys():
-                    acl_entry = acl_entries[sequence_number]
-                    if "protocol" in acl_entry.keys():
-                        translated_protocol_name = (
-                            translate_acl_entries_protocol(
-                                acl_entry["protocol"]
-                            )
-                        )
-                        if (translated_protocol_name is not None) and (
-                            translated_protocol_name != ""
-                        ):
-                            acl_entry["protocol"] = translated_protocol_name
-                        elif (translated_protocol_name is not None) and (
-                            translated_protocol_name == ""
-                        ):
-                            acl_entry.pop("protocol")
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-                    if "count" in acl_entry.keys():
-                        if acl_entry["count"] is False:
-                            acl_entry.pop("count")
+    acl = session.api.get_module(session, "ACL", name, list_type=list_type)
 
-                    acl_entries[sequence_number] = acl_entry
-                for sequence_number in acl_entries.keys():
-                    aruba_ansible_module = acl.update_acl_entry(
-                        aruba_ansible_module,
-                        name,
-                        list_type,
-                        sequence_number,
-                        acl_entries[sequence_number],
-                        update_type="insert",
-                    )
+    try:
+        acl.get()
+        acl_exists = True
+    except Exception:
+        acl_exists = False
 
-        if state == "delete":
-            aruba_ansible_module = acl.delete_acl(
-                aruba_ansible_module, name, list_type
-            )
+    if state == "delete" and acl_exists:
+        #  If there are entries in configuration, delete them
+        if acl_entries:
+            aces = acl.cfg_aces[:]
+            for acl_entry in aces:
+                if acl_entry.sequence_number in acl_entries:
+                    acl_entry.delete()
+                    result["changed"] = True
+        else:
+            # Delete ACL
+            acl.delete()
+            result["changed"] = True
+    elif state in ["create", "update"]:
+        modified_op = False
+        if not acl_exists:
+            acl.create()
+            modified_op = True
 
-        aruba_ansible_module.update_switch_config()
+        if acl_entries:
+            AclEntry = session.api.get_module_class(session, "AclEntry")
+            for sequence_number, config in acl_entries.items():
+                acl_entry = AclEntry(
+                    acl.session,
+                    sequence_number=int(sequence_number),
+                    parent_acl=acl,
+                    **_remove_invalid_addresses(config)
+                )
+                modified_op |= acl_entry.apply()
+        # Changed
+        if modified_op:
+            result["changed"] = modified_op
+
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":
