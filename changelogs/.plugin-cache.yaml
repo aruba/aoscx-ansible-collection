@@ -1,0 +1,259 @@
+objects:
+  role: {}
+plugins:
+  become: {}
+  cache: {}
+  callback: {}
+  cliconf:
+    aoscx:
+      description: Perform CLI operations in AOS-CX devices.
+      name: aoscx
+      version_added: 2.8.0
+  connection:
+    aoscx:
+      description: Use pyaocx to run commands on AOS-CX switches
+      name: aoscx
+      version_added: null
+  httpapi:
+    aoscx:
+      description: Use REST to push configs to CX devices
+      name: aoscx
+      version_added: 2.8.0
+  inventory: {}
+  lookup: {}
+  module:
+    aoscx_acl:
+      description: 'Module for configuration of Access Control Lists in AOSCX switches.
+
+        '
+      name: aoscx_acl
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_acl_interface:
+      description: Apply/Remove ACL configuration on interfaces for AOS-CX.
+      name: aoscx_acl_interface
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_acl_vlan:
+      description: Apply/Remove ACL configuration on VLANs for AOS-CX.
+      name: aoscx_acl_vlan
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_backup_config:
+      description: Download an existing configuration from AOS-CX switch.
+      name: aoscx_backup_config
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_banner:
+      description: Create or Delete Banner configuration on AOS-CX
+      name: aoscx_banner
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_bgp_router:
+      description: Create, Update or Delete BGP configuration on AOS-CX
+      name: aoscx_bgp_router
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_boot_firmware:
+      description: 'Boots the AOS-CX switch with image present to the specified partition.
+
+        '
+      name: aoscx_boot_firmware
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_checkpoint:
+      description: 'Creates a new checkpoint or copies an existing checkpoint to AOS-CX
+        switch config.
+
+        '
+      name: aoscx_checkpoint
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_command:
+      description: 'Logs in and executes CLI commands on AOS-CX device via SSH connection.
+
+        '
+      name: aoscx_command
+      namespace: ''
+      version_added: 2.9.0
+    aoscx_config:
+      description: 'Logs in and executes configuration commands on AOS-CX device via
+        SSH connection.
+
+        '
+      name: aoscx_config
+      namespace: ''
+      version_added: 2.9.0
+    aoscx_dns:
+      description: Create or Delete DNS Client configuration on AOS-CX
+      name: aoscx_dns
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_facts:
+      description: Collects facts from remote AOS-CX device
+      name: aoscx_facts
+      namespace: ''
+      version_added: 2.9.0
+    aoscx_interface:
+      description: Module for configuring Interfaces in AOS-CX switches.
+      name: aoscx_interface
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_l2_interface:
+      description: 'Create or Update or Delete Layer2 Interface configuration on AOS-CX.
+
+        '
+      name: aoscx_l2_interface
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_l3_interface:
+      description: 'Create or Update or Delete Layer3 Interface configuration on AOS-CX.
+
+        '
+      name: aoscx_l3_interface
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_lag_interface:
+      description: Module for configuring LAG Interfaces in AOS-CX switches.
+      name: aoscx_lag_interface
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_mac:
+      description: Collects information on MAC configuration.
+      name: aoscx_mac
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospf_area:
+      description: Create or Delete OSPF configuration on AOS-CX
+      name: aoscx_ospf_area
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospf_interface:
+      description: Create, update or delete an OSPF interface configuration.
+      name: aoscx_ospf_interface
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospf_router:
+      description: Create, Update or Delete OSPF configuration on AOS-CX
+      name: aoscx_ospf_router
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospf_vlink:
+      description: Create or Delete OSPF configuration on AOS-CX
+      name: aoscx_ospf_vlink
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospfv3_area:
+      description: Create or Delete OSPF configuration on AOS-CX
+      name: aoscx_ospfv3_area
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospfv3_router:
+      description: Create, Update or Delete OSPFv3 configuration on AOS-CX
+      name: aoscx_ospfv3_router
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_ospfv3_vlink:
+      description: Create or Delete OSPFv3 configuration on AOS-CX
+      name: aoscx_ospfv3_vlink
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_poe:
+      description: 'Manages the configuration of an Interface''s Power over Ethernet.
+
+        '
+      name: aoscx_poe
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_qos:
+      description: Create or Delete QoS Schedule Profiles on AOS-CX
+      name: aoscx_qos
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_qos_cos:
+      description: Create or Delete QoS COS trust modes on AOS-CX.
+      name: aoscx_qos_cos
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_qos_dscp:
+      description: Create or Delete QoS DSCP trust modes on AOS-CX.
+      name: aoscx_qos_dscp
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_queue:
+      description: Create, Update or Delete a Queue on AOS-CX devices.
+      name: aoscx_queue
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_queue_profile:
+      description: Create, Update or Delete a Queue Profile on AOS-CX devices.
+      name: aoscx_queue_profile
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_queue_profile_entry:
+      description: 'Create, Update or Delete a Queue Profile Entry on AOS-CX devices.
+
+        '
+      name: aoscx_queue_profile_entry
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_static_mac:
+      description: Create, Update, or Delete Static MACs on AOS-CX devices.
+      name: aoscx_static_mac
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_static_route:
+      description: Create or Delete static route configuration on AOS-CX
+      name: aoscx_static_route
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_system:
+      description: Set global configuration in AOS-CX devices
+      name: aoscx_system
+      namespace: ''
+      version_added: 4.0.0
+    aoscx_upload_config:
+      description: Uploads a configuration onto the AOS-CX switch.
+      name: aoscx_upload_config
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_upload_firmware:
+      description: Uploads a firmware image onto the AOS-CX switch.
+      name: aoscx_upload_firmware
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_vlan:
+      description: Create or Delete VLAN configuration on AOS-CX
+      name: aoscx_vlan
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_vlan_interface:
+      description: Create or Delete VLAN Interface configuration on AOS-CX
+      name: aoscx_vlan_interface
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_vrf:
+      description: Create or Delete VRF configuration on AOS-CX
+      name: aoscx_vrf
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_vsx:
+      description: Create or Delete VSX configuration on AOS-CX.
+      name: aoscx_vsx
+      namespace: ''
+      version_added: 2.8.0
+    aoscx_vxlan:
+      description: Create/Remove a VxLAN interface for AOS-CX.
+      name: aoscx_vxlan
+      namespace: ''
+      version_added: 4.1.0
+    aoscx_vxlan_vni:
+      description: Create/Remove a VxLAN VNI resource for AOS-CX.
+      name: aoscx_vxlan_vni
+      namespace: ''
+      version_added: 4.1.0
+  netconf: {}
+  shell: {}
+  strategy: {}
+  vars: {}
+version: 4.1.1

@@ -1,0 +1,23 @@
+ancestor: null
+releases:
+  4.1.0:
+    changes:
+      major_changes:
+      - Bug fixes
+      - Feature not yet supported, Port Security and Speed Duplex
+      - New feature supported, OSPFv2 and OSPFv3
+      release_summary: Feature OSPF and bug fixes
+    release_date: '2022-08-04'
+  4.1.1:
+    changes:
+      major_changes:
+      - Fix Checkpoint module that was showing 404 error (https://github.com/aruba/aoscx-ansible-collection/issues/33)
+      - Fix Facts module for 6xxx platforms (https://github.com/aruba/aoscx-ansible-collection/issues/27)
+      - Fix Static MAC module
+      - Fix compatibility issue with Ansible version 2.13 (https://github.com/aruba/aoscx-ansible-collection/issues/39)
+      - Fix for ACL module, delete ACE
+      - Support for anti-CSRF tokens for REST API
+      minor_changes:
+      - Added option to set REST version (10.04, 10.08, 10.09)
+      release_summary: Bug fixes release
+    release_date: '2022-10-19'
