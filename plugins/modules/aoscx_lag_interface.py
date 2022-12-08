@@ -50,6 +50,17 @@ options:
       - passive
       - disabled
     required: false
+  lacp_rate:
+    description: >
+      Configures Link Aggregation Control Protocol (LACP) rate on this
+      Interface, by default LACP rate is `slow` and LAPCDUs will be sent
+      every 30 seconds; if LACP rate is `fast` LACPDUs will be sent every
+      second.
+      This value can not be set if lacp mode is disabled.
+    type: str
+    choices:
+      - slow
+      - fast
   multi_chassis:
     description: >
       Option to specify whether the LAG is an MCLAG. This option is mutually
@@ -57,13 +68,11 @@ options:
       to `active`.
     type: bool
     required: false
-    default: false
   lacp_fallback:
     description: >
       Enable LACP fallback mode, specified only for multi-chassis LAG.
     type: bool
     required: false
-    default: false
   static_multi_chassis:
     description: >
       Whether the MCLAG is static. Ignored if `multi_chassis` is not specified.
@@ -76,7 +85,6 @@ options:
     choices:
       - create
       - update
-      - override
       - delete
     required: false
 """
@@ -85,6 +93,12 @@ EXAMPLES = """
 - name: Create LAG Interface 1.
   aoscx_lag_interface:
     name: lag1
+
+- name: Set LAG 1 as dynamic.
+  aoscx_lag_interface:
+    name: lag1
+    lacp_mode: active
+    lacp_rate: fast
 
 - name: Set 6 interfaces to LAG Interface 1.
   aoscx_lag_interface:
@@ -174,17 +188,9 @@ RETURN = r""" # """
 
 from ansible.module_utils.basic import AnsibleModule
 
-try:
-    from pyaoscx.vlan import Vlan
-
-    HAS_PYAOSCX = True
-except ImportError:
-    HAS_PYAOSCX = False
-
-if HAS_PYAOSCX:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def get_argument_spec():
@@ -193,7 +199,7 @@ def get_argument_spec():
             "type": "str",
             "required": False,
             "default": "create",
-            "choices": ["create", "update", "override", "delete"],
+            "choices": ["create", "update", "delete"],
         },
         "name": {
             "type": "str",
@@ -203,47 +209,31 @@ def get_argument_spec():
             "type": "list",
             "elements": "str",
             "required": False,
-            "default": None,
         },
         "lacp_mode": {
             "type": "str",
             "choices": ["active", "passive", "disabled"],
             "required": False,
-            "default": None,
+        },
+        "lacp_rate": {
+            "type": "str",
+            "choices": ["slow", "fast"],
+            "required": False,
         },
         "multi_chassis": {
             "type": "bool",
             "required": False,
-            "default": False,
         },
         "lacp_fallback": {
             "type": "bool",
             "required": False,
-            "default": False,
         },
         "static_multi_chassis": {
             "type": "bool",
             "required": False,
-            "default": None,
         },
     }
     return argument_spec
-
-
-def get_lacp_mode(lacp_mode):
-    if lacp_mode == "disabled":
-        return None
-    return lacp_mode
-
-
-def remove_interfaces_from_lag(_ints):
-    for _int in _ints:
-        if (
-            hasattr(_int, "other_config")
-            and "lacp-aggregation-key" in _int.other_config
-        ):
-            del _int.other_config["lacp-aggregation-key"]
-            _int.update()
 
 
 def main():
@@ -258,67 +248,67 @@ def main():
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    if not HAS_PYAOSCX:
-        ansible_module.fail_json(
-            msg="Could not find the PYAOSCX SDK. Make sure it is installed."
-        )
-
     _params = ansible_module.params.copy()
     name = _params["name"]
     interfaces = _params["interfaces"]
     lacp_mode = _params["lacp_mode"]
+    lacp_rate = _params["lacp_rate"]
     multi_chassis = _params["multi_chassis"]
     lacp_fallback = _params["lacp_fallback"]
     static_multi_chassis = _params["static_multi_chassis"]
     state = _params["state"]
 
-    session = get_pyaoscx_session(ansible_module)
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(msg="Session error: {0}".format(e))
 
     Interface = session.api.get_module_class(session, "Interface")
-    existing_interfaces = Interface.get_all(session)
-    # Checking that it exists must be done this way to avoid creating when
-    # using state == "delete"
-    exists = name in existing_interfaces
 
     lag = Interface(session, name)
+    try:
+        lag.get()
+        exists = True
+    except Exception:
+        exists = False
 
-    if state == "delete":
+    if state == "delete" and interfaces is None:
         if exists:
-            lag.get()
-            remove_interfaces_from_lag(lag.interfaces)
             lag.delete()
         result["changed"] |= exists
         ansible_module.exit_json(**result)
 
-    if exists:
-        lag.get()
-    else:
+    if not exists:
         try:
+            # MCLAG parameters must be set when the interface is created
+            mc_lag = multi_chassis is not None and multi_chassis
+            mclag_config = {"other_config": {"mclag_enabled": mc_lag}}
+            # MCLAG is L2
+            if mc_lag:
+                mclag_config["routing"] = False
+                mclag_config["vlan_mode"] = "access"
+                vlan_id = session.api.get_module(session, "Vlan", 1)
+                mclag_config["vlan_tag"] = vlan_id.get_info_format()
+                if not static_multi_chassis:
+                    mclag_config["lacp"] = "active"
+
+            lag = Interface(session, name, **mclag_config)
             lag.create()
+            result["changed"] = True
         except Exception as exc:
             ansible_module.fail_json(
                 msg="Could not create LAG Interface, exc: {0}".format(exc)
             )
 
-    result["changed"] |= not exists
-
+    _is_mclag = lag.other_config["mclag_enabled"] is True
+    _is_static_mclag = _is_mclag and lag.lacp_mode == "disabled"
     if exists:
-        _is_mclag = (
-            "mclag_enabled" in lag.other_config
-            and lag.other_config["mclag_enabled"] is True
-        )
-        _is_not_mclag = (
-            "mclag_enabled" not in lag.other_config
-            or lag.other_config["mclag_enabled"] is False
-        )
-        _is_static_mclag = _is_mclag and lag.lacp is None
-        _is_mclag_negated = not _is_mclag
-
-        _msg = None
-        if multi_chassis and (_is_not_mclag or _is_mclag_negated):
+        if multi_chassis and not _is_mclag:
             _msg = "LAG exists, cannot be configured as multi-chassis"
+            ansible_module.fail_json(msg=_msg)
         if (
-            multi_chassis != _is_mclag
+            multi_chassis is not None
+            and multi_chassis != _is_mclag
             or static_multi_chassis is not None
             and static_multi_chassis != _is_static_mclag
         ):
@@ -326,80 +316,55 @@ def main():
                 "The specified multi-chassis LAG exists with a different type"
                 ", to change the type, the MCLAG must first be removed."
             )
-        result["msg"] = _msg
-        if _msg:
-            ansible_module.fail_json(**result)
+            ansible_module.fail_json(msg=_msg)
 
-    if lacp_mode:
-        _new_lacp_mode = get_lacp_mode(lacp_mode)
-        lacp_mode_change = _new_lacp_mode != lag.lacp
-        result["changed"] = lacp_mode_change
-        lag.lacp = _new_lacp_mode
+    if lacp_mode and not _is_mclag:
+        result["changed"] |= lacp_mode != lag.lacp_mode
+        lag.lacp_mode = lacp_mode
 
-    if multi_chassis:
-        lag.other_config["mclag_enabled"] = True
-        # boolean must be explicitly compared to None
-        if lacp_fallback is not None:
+    if lacp_rate:
+        result["changed"] |= lacp_rate != lag.lacp_rate
+        lag.lacp_rate = lacp_rate
+
+    if lacp_fallback is not None:
+        if lacp_fallback and _is_static_mclag:
+            _msg = "Cannot enable LACP fallback on static MCLAG"
+            ansible_module.fail_json(msg=_msg)
+        elif lacp_fallback and not _is_mclag and lag.lacp_mode == "disabled":
+            _msg = "Cannot enable LACP fallback on static LAG"
+            ansible_module.fail_json(msg=_msg)
+        elif _is_mclag:
             result["changed"] |= (
                 "lacp-fallback" not in lag.other_config
-                or lag.other_config["lacp-fallback"] != lacp_fallback
+                and lacp_fallback
+                or "lacp-fallback" in lag.other_config
+                and not lacp_fallback
             )
-            lag.other_config["lacp-fallback"] = lacp_fallback
-
-        if not exists:
-            # Taken from CLI's default behavior
-            lag.routing = False
-
-            status_lag = Interface(session, name)
-            status_lag.get(selector="status")
-
-            lag.vlan_mode = "access"
-
-            _prev_vlan_tag = status_lag.applied_vlan_tag
-            # possibly unneeded fallback
-            _vlan_tag_id = 1
-            if _prev_vlan_tag:
-                _vlan_tag_id = next(iter(status_lag.applied_vlan_tag))
-            lag.vlan_tag = Vlan(session, _vlan_tag_id)
-
-            if not static_multi_chassis:
-                _new_lacp_mode = "active"
-                _new_lacp_mode = get_lacp_mode(_new_lacp_mode)
-                if exists and lag.lacp != _new_lacp_mode:
-                    _msg = "Cannot change LACP mode for a static MCLAG"
-                    result["msg"] = _msg
-                    ansible_module.fail_json(**result)
-                # Taken from CLI's default behavior
-                lag.lacp = _new_lacp_mode
+            if lacp_fallback:
+                lag.other_config["lacp-fallback"] = lacp_fallback
+            else:
+                lag.other_config.pop("lacp-fallback", None)
+        else:
+            result["changed"] |= (
+                "lacp-fallback-static" not in lag.other_config
+                and lacp_fallback
+                or "lacp-fallback-static" in lag.other_config
+                and not lacp_fallback
+            )
+            if lacp_fallback:
+                lag.other_config["lacp-fallback-static"] = lacp_fallback
+            else:
+                lag.other_config.pop("lacp-fallback-static", None)
 
     # explicitly check None because an empty list is a valid argument value
     if interfaces is not None:
-        _prev_ints = {i.name: i for i in lag.interfaces}
-        _prev_ints_idx = list(_prev_ints)
-        _incoming_ints_idx = interfaces
-        _kept_ints_idx = set(_prev_ints_idx) & set(_incoming_ints_idx)
-        _kept_ints = {k: _prev_ints[k] for k in _kept_ints_idx}
-        _deleted_ints_idx = sorted(
-            list(set(_prev_ints_idx) - set(_incoming_ints_idx))
-        )
-        _deleted_ints = {k: _prev_ints[k] for k in _deleted_ints_idx}
-
-        _new_ints_idx = set(_incoming_ints_idx) - set(_kept_ints_idx)
-
-        _new_ints = _kept_ints
-        for i in _new_ints_idx:
-            _int = Interface(session, i)
-            _int.get()
-            _new_ints.update({i: _int})
-
-        if state == "override":
-            remove_interfaces_from_lag(_deleted_ints.values())
+        present = [i.name for i in lag.interfaces]
+        if state == "delete":
+            new_interfaces = list(set(present) - set(interfaces))
         else:
-            _new_ints.update(_deleted_ints)
-
-        _final_interfaces = [] if not _new_ints else list(_new_ints.values())
-        lag.interfaces = _final_interfaces
-        result["changed"] |= set(_prev_ints_idx) != set(_new_ints)
+            new_interfaces = list(set(interfaces) | set(present))
+        result["changed"] |= set(new_interfaces) != set(present)
+        lag.interfaces = new_interfaces
 
     if result["changed"]:
         lag.apply()
