@@ -42,7 +42,7 @@ jobs:
           - devel
     runs-on: >-
       ${{ contains(fromJson(
-          '["stable-2.9", "stable-2.10", "stable-2.11", "stable-2.12", "stable-2.13", "stable-2.14", "milestone"]'
+          '["stable-2.9", "stable-2.10", "stable-2.11", "stable-2.12", "milestone"]'
       ), matrix.ansible) && 'ubuntu-20.04' || 'ubuntu-latest' }}
     steps:
 
