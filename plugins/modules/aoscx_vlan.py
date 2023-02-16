@@ -82,7 +82,6 @@ EXAMPLES = """
     vlan_id: 300
     name: UPLINK_VLAN
     description: This is VLAN 300
-    voice: True
 
 - name: Create VLAN 400 with name, voice, vsx_sync and ip igmp snooping
   aoscx_vlan:
