@@ -28,6 +28,10 @@ options:
     description: The name of the VRF
     required: true
     type: str
+  rd:
+    description: The Route Distinguisher (RD) of the VRF (use XXXXX:YYYYY for the format)
+    required: false
+    type: str
   state:
     description: Create or delete the VRF.
     required: false
@@ -42,6 +46,12 @@ EXAMPLES = """
 - name: Create a VRF
   aoscx_vrf:
     name: red
+    state: create
+
+- name: Create a VRF with RD
+  aoscx_vrf:
+    name: red
+    rd: 100:1
     state: create
 
 - name: Delete a VRF
