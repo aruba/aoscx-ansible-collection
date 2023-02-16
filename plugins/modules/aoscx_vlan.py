@@ -55,6 +55,11 @@ options:
     required: false
     default: false
     type: bool
+  ip_igmp_snooping:
+    description: Enable IP IGMP Snooping
+    required: false
+    default: false
+    type: bool
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -79,12 +84,13 @@ EXAMPLES = """
     description: This is VLAN 300
     voice: True
 
-- name: Create VLAN 400 with name, voice and vsx_sync
+- name: Create VLAN 400 with name, voice, vsx_sync and ip igmp snooping
   aoscx_vlan:
     vlan_id: 400
     name: VOICE_VLAN
     voice: True
     vsx_sync: True
+    ip_igmp_snooping: True
 
 - name: Delete VLAN 300
   aoscx_vlan:
@@ -108,6 +114,7 @@ def main():
         admin_state=dict(type="str", default=None, choices=["up", "down"]),
         voice=dict(type='bool', required=False, default=False),
         vsx_sync=dict(type='bool', required=False, default=False),
+        ip_igmp_snooping=dict(type='bool', required=False, default=False),
         state=dict(
             type="str",
             default="create",
@@ -127,7 +134,7 @@ def main():
     admin_state = ansible_module.params["admin_state"]
     voice = ansible_module.params["voice"]
     vsx_sync = ansible_module.params["vsx_sync"]
-
+    ip_igmp_snooping = ansible_module.params["ip_igmp_snooping"]
     state = ansible_module.params["state"]
 
     result = dict(changed=False)
@@ -171,6 +178,12 @@ def main():
             vlan.vsx_sync = ["all_attributes_and_dependents"]
         else:
             vlan.vsx_sync = []
+
+        if ip_igmp_snooping is True:
+            vlan.mgmd_enable['igmp'] = True
+        else:
+            vlan.mgmd_enable['igmp'] = False
+
         vlan.apply()
         modified |= vlan.was_modified()
 
