@@ -105,7 +105,9 @@ def main():
     # device = Device(session)
     Vrf = session.api.get_module_class(session, "Vrf")
     vrf = Vrf(session, vrf_name)
-    vrf.rd = rd
+    # Configure RD (Route Distinguisher)
+    if rd:
+        vrf.rd = rd
     modified = False
 
     try:
