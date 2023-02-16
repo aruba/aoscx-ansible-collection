@@ -87,6 +87,8 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
+
 try:
     from pyaoscx.device import Device
 
@@ -95,11 +97,10 @@ except ImportError:
     USE_PYAOSCX_SDK = False
 
 if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-
     from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
         get_pyaoscx_session,
     )
+
 
 def main():
     module_args = dict(
@@ -109,14 +110,14 @@ def main():
         description=dict(type="str", default=None),
         vrf=dict(type="str", default=None),
     )
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
     if USE_PYAOSCX_SDK is False:
         ansible_module.fail_json(
             msg="Could not find the PYAOSCX SDK. Make sure it is installed."
         )
     else:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
 
         loopback_id = ansible_module.params["loopback_id"]
         ipv4 = ansible_module.params["ipv4"]
