@@ -64,6 +64,11 @@ def get_argument_spec():
             "type": "str",
             "required": True,
         },
+        "rd": {
+            "type": "str",
+            "required": False,
+        },
+
         "state": {
             "type": "str",
             "default": "create",
@@ -85,6 +90,7 @@ def main():
     # Get playbook's arguments
     vrf_name = ansible_module.params["name"]
     state = ansible_module.params["state"]
+    rd = ansible_module.params["rd"]
 
     result = dict(changed=False)
 
@@ -99,6 +105,7 @@ def main():
     # device = Device(session)
     Vrf = session.api.get_module_class(session, "Vrf")
     vrf = Vrf(session, vrf_name)
+    vrf.rd = rd
     modified = False
 
     try:
