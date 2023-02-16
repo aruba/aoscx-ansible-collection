@@ -100,17 +100,6 @@ if USE_PYAOSCX_SDK:
     from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
         get_pyaoscx_session,
     )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import (  # NOQA
-        Interface,
-        L3_Interface,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import (  # NOQA
-        Port,
-    )
 
 def main():
     module_args = dict(
@@ -120,7 +109,11 @@ def main():
         description=dict(type="str", default=None),
         vrf=dict(type="str", default=None),
     )
-    if USE_PYAOSCX_SDK:
+    if USE_PYAOSCX_SDK is False:
+        ansible_module.fail_json(
+            msg="Could not find the PYAOSCX SDK. Make sure it is installed."
+        )
+    else:
         ansible_module = AnsibleModule(
             argument_spec=module_args, supports_check_mode=True
         )
