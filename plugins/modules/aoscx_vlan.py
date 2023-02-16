@@ -45,6 +45,11 @@ options:
       - up
       - down
     type: str
+  voice:
+    description: Enable Voice VLAN
+    required: false
+    default: false
+    type: bool
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -62,11 +67,12 @@ EXAMPLES = """
     vlan_id: 200
     description: This is VLAN 200
 
-- name: Create VLAN 300 with description and name
+- name: Create VLAN 300 with description, name and voice
   aoscx_vlan:
     vlan_id: 300
     name: UPLINK_VLAN
     description: This is VLAN 300
+    voice: True
 
 - name: Delete VLAN 300
   aoscx_vlan:
@@ -103,6 +109,7 @@ def main():
         name=dict(type="str", default=None),
         description=dict(type="str", default=None),
         admin_state=dict(type="str", default=None, choices=["up", "down"]),
+        voice=dict(type='bool', required=False, default=False),
         state=dict(
             type="str",
             default="create",
@@ -121,6 +128,7 @@ def main():
             vlan_name = "VLAN{0}".format(vlan_id)
         description = ansible_module.params["description"]
         admin_state = ansible_module.params["admin_state"]
+        voice = ansible_module.params["voice"]
         state = ansible_module.params["state"]
 
         result = dict(changed=False)
@@ -145,6 +153,8 @@ def main():
             vlan = device.vlan(
                 vlan_id, vlan_name, description, "static", admin_state
             )
+            vlan.voice = voice
+            vlan.apply()
 
             if vlan.was_modified():
                 # Changed
