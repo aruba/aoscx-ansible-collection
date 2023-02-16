@@ -162,16 +162,20 @@ def main():
         vlan = device.vlan(
             vlan_id, vlan_name, description, "static", admin_state
         )
+        modified = vlan.was_modified()
+
+        # Update Voice, vsx_sync... parameters
         vlan.voice = voice
+
         if vsx_sync is True:
             vlan.vsx_sync = ["all_attributes_and_dependents"]
         else:
             vlan.vsx_sync = []
         vlan.apply()
+        modified |= vlan.was_modified()
 
-        if vlan.was_modified():
-            # Changed
-            result["changed"] = True
+        # Changed
+        result["changed"] = modified
 
     # Exit
     ansible_module.exit_json(**result)
