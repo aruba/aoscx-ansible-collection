@@ -50,6 +50,11 @@ options:
     required: false
     default: false
     type: bool
+  vsx_sync:
+    description: Enable vsx_sync (Only for VSX device)
+    required: false
+    default: false
+    type: bool
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -67,12 +72,19 @@ EXAMPLES = """
     vlan_id: 200
     description: This is VLAN 200
 
-- name: Create VLAN 300 with description, name and voice
+- name: Create VLAN 300 with description and name
   aoscx_vlan:
     vlan_id: 300
     name: UPLINK_VLAN
     description: This is VLAN 300
     voice: True
+
+- name: Create VLAN 400 with name, voice and vsx_sync
+  aoscx_vlan:
+    vlan_id: 400
+    name: VOICE_VLAN
+    voice: True
+    vsx_sync: True
 
 - name: Delete VLAN 300
   aoscx_vlan:
