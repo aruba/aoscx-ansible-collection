@@ -95,6 +95,7 @@ def main():
         description=dict(type="str", default=None),
         admin_state=dict(type="str", default=None, choices=["up", "down"]),
         voice=dict(type='bool', required=False, default=False),
+        vsx_sync=dict(type='bool', required=False, default=False),
         state=dict(
             type="str",
             default="create",
@@ -113,6 +114,8 @@ def main():
     description = ansible_module.params["description"]
     admin_state = ansible_module.params["admin_state"]
     voice = ansible_module.params["voice"]
+    vsx_sync = ansible_module.params["vsx_sync"]
+
     state = ansible_module.params["state"]
 
     result = dict(changed=False)
@@ -148,6 +151,10 @@ def main():
             vlan_id, vlan_name, description, "static", admin_state
         )
         vlan.voice = voice
+        if vsx_sync is True:
+            vlan.vsx_sync = ["all_attributes_and_dependents"]
+        else:
+            vlan.vsx_sync = ""
         vlan.apply()
 
         if vlan.was_modified():
