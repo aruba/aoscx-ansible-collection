@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -85,24 +85,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-import json
-
-try:
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -113,93 +99,53 @@ def main():
         remote_config_file_tftp_path=dict(type="str", default=None),
         vrf=dict(type="str"),
     )
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        # Set Variables
-        tftp_path = ansible_module.params["remote_config_file_tftp_path"]
-        vrf = ansible_module.params["vrf"]
-        config_name = ansible_module.params["config_name"]
-        config_json = ansible_module.params["config_json"]
-        config_file = ansible_module.params["config_file"]
+    # Set Variables
+    tftp_path = ansible_module.params["remote_config_file_tftp_path"]
+    vrf = ansible_module.params["vrf"]
+    config_name = ansible_module.params["config_name"]
+    config_json = ansible_module.params["config_json"]
+    config_file = ansible_module.params["config_file"]
 
-        result = dict(changed=False)
+    result = dict(changed=False)
 
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
-        session = get_pyaoscx_session(ansible_module)
-
-        device = Device(session)
-
-        # Create an instance of the Configuration class from Device
-        config = device.configuration()  # Contains action methods
-
-        # Upload configuration file/json to switch
-        success = config.upload_switch_config(
-            config_name=config_name,
-            config_file=config_file,
-            config_json=config_json,
-            vrf=vrf,
-            remote_file_tftp_path=tftp_path,
-        )
-
-        # Changed
-        result["changed"] = success
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older Version
-    else:
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        aruba_ansible_module = ArubaAnsibleModule(
-            module_args=module_args, store_config=False
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-        tftp_path = aruba_ansible_module.module.params[
-            "remote_config_file_tftp_path"
-        ]
-        vrf = aruba_ansible_module.module.params["vrf"]
-        config_name = aruba_ansible_module.module.params["config_name"]
-        config_json = aruba_ansible_module.module.params["config_json"]
-        config_file = aruba_ansible_module.module.params["config_file"]
+    device = Device(session)
 
-        if tftp_path is not None:
-            if vrf is None:
-                aruba_ansible_module.module.fail_json(
-                    msg="VRF needs to be provided in order to TFTP"
-                    " the configuration onto the switch"
-                )
-            tftp_path_replace = tftp_path.replace("/", "%2F")
-            tftp_path_encoded = tftp_path_replace.replace(":", "%3A")
-            if config_name not in ("running-config", "startup-config"):
-                aruba_ansible_module.module.fail_json(
-                    msg="Only running-config or startup-config "
-                    "can be uploaded using TFTP"
-                )
-            aruba_ansible_module.tftp_switch_config_from_remote_location(
-                tftp_path_encoded, config_name, vrf
-            )
-        else:
-            if config_json:
-                with open(config_json) as json_file:
-                    config_json = json.load(json_file)
+    # Create an instance of the Configuration class from Device
+    config = device.configuration()  # Contains action methods
 
-            if config_file:
-                with open(config_file) as json_file:
-                    config_json = json.load(json_file)
+    # Upload configuration file/json to switch
+    success = config.upload_switch_config(
+        config_name=config_name,
+        config_file=config_file,
+        config_json=config_json,
+        vrf=vrf,
+        remote_file_tftp_path=tftp_path,
+    )
 
-            aruba_ansible_module.upload_switch_config(config_json, config_name)
+    # Changed
+    result["changed"] = success
 
-        result = dict(
-            changed=aruba_ansible_module.changed,
-            warnings=aruba_ansible_module.warnings,
-        )
-        result["changed"] = True
-        aruba_ansible_module.module.exit_json(**result)
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

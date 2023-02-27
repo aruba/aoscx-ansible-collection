@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -63,22 +63,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -89,107 +77,46 @@ def main():
         banner=dict(type="str", required=False),
         state=dict(default="create", choices=["create", "delete"]),
     )
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
 
-        # Get playbook's arguments
-        state = ansible_module.params["state"]
-        banner_type = ansible_module.params["banner_type"]
-        banner = ansible_module.params["banner"]
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        result = dict(changed=False)
+    # Get playbook's arguments
+    state = ansible_module.params["state"]
+    banner_type = ansible_module.params["banner_type"]
+    banner = ansible_module.params["banner"]
 
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
+    result = dict(changed=False)
 
-        session = get_pyaoscx_session(ansible_module)
-
-        device = Device(session)
-
-        if state == "delete":
-            modified_op = device.delete_banner(banner_type)
-
-        if state in ("create", "update"):
-            modified_op = device.update_banner(banner, banner_type)
-
-        # Changed
-        result["changed"] = modified_op
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older version
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(module_args)
-        state = aruba_ansible_module.module.params["state"]
-        banner_type = aruba_ansible_module.module.params["banner_type"]
-        banner = aruba_ansible_module.module.params["banner"]
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        if state == "delete":
-            if (
-                "other_config"
-                in aruba_ansible_module.running_config["System"].keys()
-            ):
-                if (
-                    banner_type
-                    in aruba_ansible_module.running_config["System"][
-                        "other_config"
-                    ].keys()
-                ):
-                    aruba_ansible_module.running_config["System"][
-                        "other_config"
-                    ].pop(banner_type)
-                else:
-                    aruba_ansible_module.warnings.append(
-                        "{0} has already been removed".format(banner_type)
-                    )
-            else:
-                aruba_ansible_module.warnings.append(
-                    "{0} has already been removed".format(banner_type)
-                )
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-            aruba_ansible_module.module.log(
-                "Banner is removed from the switch."
-            )
+    device = Device(session)
 
-        if state == "create":
+    if state == "delete":
+        modified_op = device.delete_banner(banner_type)
 
-            if banner is None:
-                banner = ""
+    if state in ("create", "update"):
+        modified_op = device.update_banner(banner, banner_type)
 
-            if (
-                "other_config"
-                not in aruba_ansible_module.running_config["System"].keys()
-            ):
-                aruba_ansible_module.running_config["System"][
-                    "other_config"
-                ] = {}
+    # Changed
+    result["changed"] = modified_op
 
-            if (
-                banner_type
-                not in aruba_ansible_module.running_config["System"][
-                    "other_config"
-                ].keys()
-            ):
-                aruba_ansible_module.running_config["System"]["other_config"][
-                    banner_type
-                ] = banner
-
-            elif (
-                banner
-                != aruba_ansible_module.running_config["System"][
-                    "other_config"
-                ][banner_type]
-            ):
-                aruba_ansible_module.running_config["System"]["other_config"][
-                    banner_type
-                ] = banner
-
-            aruba_ansible_module.module.log("Banner is added to the switch.")
-
-        aruba_ansible_module.update_switch_config()
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

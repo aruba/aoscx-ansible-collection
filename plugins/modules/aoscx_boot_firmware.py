@@ -48,23 +48,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-        post,
-    )
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -73,46 +60,39 @@ def main():
             type="str", default="primary", choices=["primary", "secondary"]
         ),
     )
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        # Get playbook's arguments
-        partition_name = ansible_module.params["partition_name"]
+    # Get playbook's arguments
+    partition_name = ansible_module.params["partition_name"]
 
-        result = dict(changed=False)
+    result = dict(changed=False)
 
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
-        session = get_pyaoscx_session(ansible_module)
-        device = Device(session)
-
-        success = device.boot_firmware(partition_name)
-
-        # Changed
-        result["changed"] = success
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older version
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(
-            module_args=module_args, store_config=False
-        )
-        partition_name = aruba_ansible_module.module.params["partition_name"]
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        url = "/rest/v1/boot?image={0}".format(partition_name)
-        post(aruba_ansible_module.module, url)
-
-        result = dict(
-            changed=aruba_ansible_module.changed,
-            warnings=aruba_ansible_module.warnings,
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
-        result["changed"] = True
-        aruba_ansible_module.module.exit_json(**result)
+
+    device = Device(session)
+
+    success = device.boot_firmware(partition_name)
+
+    # Changed
+    result["changed"] = success
+
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

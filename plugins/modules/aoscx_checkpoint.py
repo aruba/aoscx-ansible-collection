@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -60,23 +60,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-        put,
-    )
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -84,53 +71,42 @@ def main():
         source_config=dict(type="str", default="running-config"),
         destination_config=dict(type="str", default="startup-config"),
     )
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        # Get playbook's arguments
-        source_config = ansible_module.params["source_config"]
-        destination_config = ansible_module.params["destination_config"]
+    # Get playbook's arguments
+    source_config = ansible_module.params["source_config"]
+    destination_config = ansible_module.params["destination_config"]
 
-        result = dict(changed=False)
+    result = dict(changed=False)
 
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
-        session = get_pyaoscx_session(ansible_module)
-
-        device = Device(session)
-
-        # Create a Configuration Object
-        config = device.configuration()
-        success = config.create_checkpoint(source_config, destination_config)
-
-        # Changed
-        result["changed"] = success
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older version
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(module_args=module_args)
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        source_config = aruba_ansible_module.module.params["source_config"]
-        destination_config = aruba_ansible_module.module.params[
-            "destination_config"
-        ]
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-        url = "/rest/v1/fullconfigs/{0}?from=/rest/v1/fullconfigs/{1}".format(
-            destination_config, source_config
-        )
-        put(aruba_ansible_module.module, url)
-        result = dict(
-            changed=aruba_ansible_module.changed,
-            warnings=aruba_ansible_module.warnings,
-        )
-        result["changed"] = True
-        aruba_ansible_module.module.exit_json(**result)
+    device = Device(session)
+
+    # Create a Configuration Object
+    config = device.configuration()
+    success = config.create_checkpoint(source_config, destination_config)
+
+    # Changed
+    result["changed"] = success
+
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

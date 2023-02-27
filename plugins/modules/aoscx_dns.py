@@ -126,25 +126,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import (  # NOQA
-        VRF,
-    )
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -164,247 +149,104 @@ def main():
             choices=["create", "delete", "update"],
         ),
     )
-    if USE_PYAOSCX_SDK:
+    # ArubaModule
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        # ArubaModule
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
+    # Set Variables
+    mgmt_nameservers = ansible_module.params["mgmt_nameservers"]
+    dns_domain_name = ansible_module.params["dns_domain_name"]
+    dns_domain_list = ansible_module.params["dns_domain_list"]
+    vrf_name = ansible_module.params["vrf"]
+    dns_name_servers = ansible_module.params["dns_name_servers"]
+    dns_host_v4_address_mapping = ansible_module.params[
+        "dns_host_v4_address_mapping"
+    ]
+    state = ansible_module.params["state"]
 
-        # Set Variables
-        mgmt_nameservers = ansible_module.params["mgmt_nameservers"]
-        dns_domain_name = ansible_module.params["dns_domain_name"]
-        dns_domain_list = ansible_module.params["dns_domain_list"]
-        vrf_name = ansible_module.params["vrf"]
-        dns_name_servers = ansible_module.params["dns_name_servers"]
-        dns_host_v4_address_mapping = ansible_module.params[
-            "dns_host_v4_address_mapping"
-        ]
-        state = ansible_module.params["state"]
+    result = dict(changed=False)
 
-        result = dict(changed=False)
-
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
-        session = get_pyaoscx_session(ansible_module)
-
-        device = Device(session)
-
-        if state == "delete":
-            # Modifed Variables
-            modified_op = False
-            modified_op2 = False
-
-            # Create DNS object
-            dns = device.dns(vrf=vrf_name)
-
-            # Delete MGMT nameservers
-            if mgmt_nameservers is not None:
-                # Delete it
-                modified_op = dns.delete_mgmt_nameservers()
-
-            # Delete DNS
-            dns.delete_dns(
-                dns_domain_name,
-                dns_domain_list,
-                dns_name_servers,
-                dns_host_v4_address_mapping,
-            )
-            # Check if dns was modified
-            modified_op2 = dns.was_modified()
-
-            # Changed
-            result["changed"] = modified_op or modified_op2
-
-        if state == "create" or state == "update":
-            # Modifed Variables
-            modified_op = False
-            modified_op2 = False
-
-            # Create DNS object
-            dns = device.dns(
-                vrf=vrf_name,
-                domain_name=dns_domain_name,
-                domain_list=dns_domain_list,
-                domain_servers=dns_name_servers,
-                host_v4_address_mapping=dns_host_v4_address_mapping,
-            )
-
-            # Check if dns was modified
-            modified_op = dns.was_modified()
-
-            # Set MGMT name servers
-            if mgmt_nameservers is not None:
-                primary = None
-                secondary = None
-                # Get Primary and Secondary
-                for key, value in mgmt_nameservers.items():
-                    if key.lower() == "primary":
-                        primary = value
-                    elif key.lower() == "secondary":
-                        secondary = value
-                # Set up
-                modified_op2 = dns.setup_mgmt_nameservers(
-                    primary=primary, secondary=secondary
-                )
-
-            # Changed
-            result["changed"] = modified_op or modified_op2
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older version
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(module_args)
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        mgmt_nameservers = aruba_ansible_module.module.params[
-            "mgmt_nameservers"
-        ]
-        dns_domain_name = aruba_ansible_module.module.params["dns_domain_name"]
-        dns_domain_list = aruba_ansible_module.module.params["dns_domain_list"]
-        vrf_name = aruba_ansible_module.module.params["vrf"]
-        dns_name_servers = aruba_ansible_module.module.params[
-            "dns_name_servers"
-        ]
-        dns_host_v4_address_mapping = aruba_ansible_module.module.params[
-            "dns_host_v4_address_mapping"
-        ]
-        state = aruba_ansible_module.module.params["state"]
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-        vrf = VRF()
+    device = Device(session)
 
-        if state == "create" or state == "update":
-            if mgmt_nameservers is not None:
-                if (
-                    "mode"
-                    in aruba_ansible_module.running_config["System"][
-                        "mgmt_intf"
-                    ]
-                ):
-                    mgmt_if_mode = aruba_ansible_module.running_config[
-                        "System"
-                    ]["mgmt_intf"]["mode"]
-                else:
-                    mgmt_if_mode = "dhcp"
+    if state == "delete":
+        # Modifed Variables
+        modified_op = False
+        modified_op2 = False
 
-                if mgmt_if_mode != "static":
-                    message_part1 = "The management interface must have static"
-                    message_part2 = (
-                        "IP to configure management interface name servers"
-                    )
-                    aruba_ansible_module.module.fail_json(
-                        msg=message_part1 + message_part2
-                    )
+        # Create DNS object
+        dns = device.dns(vrf=vrf_name)
 
-                for key, value in mgmt_nameservers.items():
-                    if key.lower() == "primary":
-                        aruba_ansible_module.running_config["System"][
-                            "mgmt_intf"
-                        ]["dns_server_1"] = value
-                    elif key.lower() == "secondary":
-                        aruba_ansible_module.running_config["System"][
-                            "mgmt_intf"
-                        ]["dns_server_2"] = value
+        # Delete MGMT nameservers
+        if mgmt_nameservers is not None:
+            # Delete it
+            modified_op = dns.delete_mgmt_nameservers()
 
-            if vrf_name is None:
-                vrf_name = "default"
+        # Delete DNS
+        dns.delete_dns(
+            dns_domain_name,
+            dns_domain_list,
+            dns_name_servers,
+            dns_host_v4_address_mapping,
+        )
+        # Check if dns was modified
+        modified_op2 = dns.was_modified()
 
-            if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
-                aruba_ansible_module.module.fail_json(
-                    msg="VRF {0} is not configured".format(vrf_name)
-                )
-                return aruba_ansible_module
+        # Changed
+        result["changed"] = modified_op or modified_op2
 
-            if dns_domain_name is not None:
-                aruba_ansible_module = vrf.update_vrf_fields(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_domain_name",
-                    dns_domain_name,
-                )
+    if state == "create" or state == "update":
+        # Modifed Variables
+        modified_op = False
+        modified_op2 = False
 
-            if dns_domain_list is not None:
-                aruba_ansible_module = vrf.update_vrf_fields(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_domain_list",
-                    dns_domain_list,
-                )
+        # Create DNS object
+        dns = device.dns(
+            vrf=vrf_name,
+            domain_name=dns_domain_name,
+            domain_list=dns_domain_list,
+            domain_servers=dns_name_servers,
+            host_v4_address_mapping=dns_host_v4_address_mapping,
+        )
 
-            if dns_name_servers is not None:
-                aruba_ansible_module = vrf.update_vrf_fields(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_name_servers",
-                    dns_name_servers,
-                )
+        # Check if dns was modified
+        modified_op = dns.was_modified()
 
-            if dns_host_v4_address_mapping is not None:
-                aruba_ansible_module = vrf.update_vrf_fields(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_host_v4_address_mapping",
-                    dns_host_v4_address_mapping,
-                )
+        # Set MGMT name servers
+        if mgmt_nameservers is not None:
+            primary = None
+            secondary = None
+            # Get Primary and Secondary
+            for key, value in mgmt_nameservers.items():
+                if key.lower() == "primary":
+                    primary = value
+                elif key.lower() == "secondary":
+                    secondary = value
+            # Set up
+            modified_op2 = dns.setup_mgmt_nameservers(
+                primary=primary, secondary=secondary
+            )
 
-        if state == "delete":
+        # Changed
+        result["changed"] = modified_op or modified_op2
 
-            if vrf_name is None:
-                vrf_name = "default"
-
-            if not vrf.check_vrf_exists(aruba_ansible_module, vrf_name):
-                aruba_ansible_module.warnings.append(
-                    "VRF {0} is not configured".format(vrf_name)
-                )
-                return aruba_ansible_module
-
-            if mgmt_nameservers is not None:
-
-                for k in mgmt_nameservers.keys():
-                    if k.lower() == "primary":
-                        aruba_ansible_module.running_config["System"][
-                            "mgmt_intf"
-                        ].pop("dns_server_1")
-                    elif k.lower() == "secondary":
-                        aruba_ansible_module.running_config["System"][
-                            "mgmt_intf"
-                        ].pop("dns_server_2")
-
-            if dns_domain_name is not None:
-                aruba_ansible_module = vrf.delete_vrf_field(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_domain_name",
-                    dns_domain_name,
-                )
-
-            if dns_domain_list is not None:
-                aruba_ansible_module = vrf.delete_vrf_field(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_domain_list",
-                    dns_domain_list,
-                )
-
-            if dns_name_servers is not None:
-                aruba_ansible_module = vrf.delete_vrf_field(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_name_servers",
-                    dns_name_servers,
-                )
-
-            if dns_host_v4_address_mapping is not None:
-                aruba_ansible_module = vrf.delete_vrf_field(
-                    aruba_ansible_module,
-                    vrf_name,
-                    "dns_host_v4_address_mapping",
-                    dns_host_v4_address_mapping,
-                )
-
-        aruba_ansible_module.update_switch_config()
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

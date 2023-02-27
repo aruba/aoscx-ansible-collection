@@ -73,36 +73,6 @@ options:
       - vlans
       - vrfs
     required: false
-  provider:
-    description: A dict object containing connection details.
-    suboptions:
-      host:
-        description: >
-          Specifies the DNS host name or address for connecting to the remote
-          device over the specified transport. The value of host is used as the
-          destination address for the transport.
-        required: true
-        type: str
-      password:
-        description: >
-          Specifies the password to use to authenticate the connection to the
-          remote device. This value is used to authenticate the SSH session.
-          If the value is not specified in the task, the value of environment
-          variable ANSIBLE_NET_PASSWORD will be used instead.
-        type: str
-      port:
-        description: >
-          Specifies the port to use when building the connection to the remote
-          device.
-        type: int
-      username:
-        description: >
-          Configures the username to use to authenticate the connection to the
-          remote device. This value is used to authenticate the SSH session.
-          If the value is not specified in the task, the value of environment
-          variable ANSIBLE_NET_USERNAME will be used instead.
-        type: str
-    type: dict
 """
 
 EXAMPLES = """
@@ -192,29 +162,9 @@ ansible_net_mgmt_intf_status:
 
 from ansible.module_utils.basic import AnsibleModule
 
-try:
-    from pyaoscx.interface import Interface
-    from pyaoscx.vlan import Vlan
-    from pyaoscx.device import Device
-    from pyaoscx.vrf import Vrf
-
-    USE_PYAOSCX_SDK = True
-
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        aoscx_http_argument_spec,
-        get_connection,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.facts.facts import (  # NOQA
-        Facts,
-    )
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -262,174 +212,162 @@ def main():
             choices=["interfaces", "vlans", "vrfs"],
         ),
     }
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=argument_spec, supports_check_mode=True
-        )
+    ansible_module = AnsibleModule(
+        argument_spec=argument_spec, supports_check_mode=True
+    )
 
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
+
+    try:
         session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-        warnings = []
-        if ansible_module.params["gather_subset"] == "!config":
-            warnings.append(
-                "default value for `gather_subset` will be changed "
-                "to `min` from `!config` v2.11 onwards"
-            )
+    warnings = []
+    if ansible_module.params["gather_subset"] == "!config":
+        warnings.append(
+            "default value for `gather_subset` will be changed "
+            "to `min` from `!config` v2.11 onwards"
+        )
 
-        # Declare the Ansible facts
-        ansible_facts = {}
+    # Declare the Ansible facts
+    ansible_facts = {}
 
-        # Retrieve variables from module parameters
-        network_resource_list = ansible_module.params[
-            "gather_network_resources"
-        ]
-        subset_list = ansible_module.params["gather_subset"]
+    # Retrieve variables from module parameters
+    network_resource_list = ansible_module.params[
+        "gather_network_resources"
+    ]
+    subset_list = ansible_module.params["gather_subset"]
 
-        # Retrieve ansible_network_resources
-        ansible_network_resources = {}
-        if network_resource_list is not None:
-            for resource in network_resource_list:
-                if resource == "interfaces":
-                    ansible_network_resources.update(
-                        {"interfaces": Interface.get_facts(session)}
+    # Retrieve ansible_network_resources
+    ansible_network_resources = {}
+    if network_resource_list is not None:
+        for resource in network_resource_list:
+            if resource == "interfaces":
+                Interface = session.api.get_module_class(session, "Interface")
+                ansible_network_resources.update(
+                    {"interfaces": Interface.get_facts(session)}
+                )
+            elif resource == "vlans":
+                Vlan = session.api.get_module_class(session, "Vlan")
+                ansible_network_resources.update(
+                    {"vlans": Vlan.get_facts(session)}
+                )
+            elif resource == "vrfs":
+                Vrf = session.api.get_module_class(session, "Vrf")
+                ansible_network_resources.update(
+                    {"vrfs": Vrf.get_facts(session)}
+                )
+
+    ansible_facts.update(
+        {"ansible_network_resources": ansible_network_resources}
+    )
+
+    # Retrieve ansible_net_gather_network_resources
+    ansible_facts.update(
+        {"ansible_net_gather_network_resources": network_resource_list}
+    )
+
+    # Retrieve ansible_net_gather_subset
+    ansible_facts.update({"ansible_net_gather_subset": subset_list})
+
+    # Retrieve device facts
+    switch = Device(session)
+    switch.get()
+    switch.get_subsystems()  # subsystem
+
+    # Set the subsystem attributes allowed to retrieve as facts
+    allowed_subsystem_attributes = [
+        "product_info",
+        "power_supplies",
+        "interfaces",
+        "fans",
+        "resource_utilization",
+    ]
+
+    # Set the default subsets that are always retreived as facts
+    default_subset_list = ["management_interface", "software_version"]
+
+    # Extend subset_list with default subsets
+    subset_list.extend(default_subset_list)
+
+    # Delete duplicates
+    subset_list = list(dict.fromkeys(subset_list))
+
+    # Iterate through given subset arguments in the gather_subset parameter
+    # in argument_spec
+    use_data_planes = False
+    for subset in subset_list:
+
+        # Argument translation for management_interface and
+        # physical_interfaces
+        if subset == "management_interface":
+            subset = "mgmt_intf_status"
+        elif subset == "physical_interfaces":
+            curr_firmware = iter(switch.get_firmware_version().split("."))
+            platform = next(curr_firmware)
+            main_version = int(next(curr_firmware))
+            sub_version = int(next(curr_firmware))
+
+            if platform in ["FL", "ML", "CL", "LL"] and (
+                main_version > 10 or sub_version > 8
+            ):
+                if str(session.api) in ["10.04", "10.08"]:
+                    w_message = (
+                        "Physical interfaces: "
+                        "REST v{0} is no longer supported "
+                        "for this version {1}-{2}.{3}. "
+                        "Add parameter 'ansible_aoscx_rest_version: 10.09'"
+                        " in your inventory file for this host. Or define "
+                        "environment variable ANSIBLE_AOSCX_REST_VERSION "
+                        "with value 10.09"
+                    ).format(
+                        session.api, platform, main_version, sub_version
                     )
-                elif resource == "vlans":
-                    ansible_network_resources.update(
-                        {"vlans": Vlan.get_facts(session)}
-                    )
-                elif resource == "vrfs":
-                    ansible_network_resources.update(
-                        {"vrfs": Vrf.get_facts(session)}
-                    )
+                    warnings.append(w_message)
+                else:
+                    use_data_planes = True
+                    switch.get_data_planes()
 
-        ansible_facts.update(
-            {"ansible_network_resources": ansible_network_resources}
-        )
+            subset = "interfaces"
+        elif subset == "host_name":
+            subset = "hostname"
 
-        # Retrieve ansible_net_gather_network_resources
-        ansible_facts.update(
-            {"ansible_net_gather_network_resources": network_resource_list}
-        )
+        str_subset = "ansible_net_" + subset
 
-        # Retrieve ansible_net_gather_subset
-        ansible_facts.update({"ansible_net_gather_subset": subset_list})
+        # Check if current subset is inside the Device object
+        if hasattr(switch, subset):
 
-        # Retrieve device facts
-        switch = Device(session)
-        switch.get()
-        switch.get_subsystems()  # subsystem
+            # Get attribute value and add it to Ansible facts dictionary
+            ansible_facts[str_subset] = getattr(switch, subset)
 
-        # Set the subsystem attributes allowed to retrieve as facts
-        allowed_subsystem_attributes = [
-            "product_info",
-            "power_supplies",
-            "interfaces",
-            "fans",
-            "resource_utilization",
-        ]
+        # Check if current subset is inside the allowed subsystem
+        # attributes
+        elif subset in allowed_subsystem_attributes:
+            ansible_facts.update({str_subset: {}})
 
-        # Set the default subsets that are always retreived as facts
-        default_subset_list = ["management_interface", "software_version"]
+            # Iterate through Device subsystems
+            for subsystem, value in switch.subsystems.items():
 
-        # Extend subset_list with default subsets
-        subset_list.extend(default_subset_list)
+                # Get attribute value and update the Ansible facts
+                # dictionary
+                if use_data_planes and subset == "interfaces":
+                    ss_dps = switch.data_planes[subsystem]["data_planes"]
+                    intfs = {}
+                    for dp in ss_dps:
+                        intfs.update(ss_dps[dp][subset])
+                else:
+                    intfs = switch.subsystems[subsystem][subset]
+                ansible_facts[str_subset].update({subsystem: intfs})
 
-        # Delete duplicates
-        subset_list = list(dict.fromkeys(subset_list))
-
-        # Iterate through given subset arguments in the gather_subset parameter
-        # in argument_spec
-        use_data_planes = False
-        for subset in subset_list:
-
-            # Argument translation for management_interface and
-            # physical_interfaces
-            if subset == "management_interface":
-                subset = "mgmt_intf_status"
-            elif subset == "physical_interfaces":
-                curr_firmware = iter(switch.get_firmware_version().split("."))
-                platform = next(curr_firmware)
-                main_version = int(next(curr_firmware))
-                sub_version = int(next(curr_firmware))
-
-                if platform in ["FL", "ML", "CL", "LL"] and (
-                    main_version > 10 or sub_version > 8
-                ):
-                    if str(session.api) in ["10.04", "10.08"]:
-                        w_message = (
-                            "Physical interfaces: "
-                            "REST v{0} is no longer supported "
-                            "for this version {1}-{2}.{3}. "
-                            "Add parameter 'ansible_aoscx_rest_version: 10.09'"
-                            " in your inventory file for this host. Or define "
-                            "environment variable ANSIBLE_AOSCX_REST_VERSION "
-                            "with value 10.09"
-                        ).format(
-                            session.api, platform, main_version, sub_version
-                        )
-                        warnings.append(w_message)
-                    else:
-                        use_data_planes = True
-                        switch.get_data_planes()
-
-                subset = "interfaces"
-            elif subset == "host_name":
-                subset = "hostname"
-
-            str_subset = "ansible_net_" + subset
-
-            # Check if current subset is inside the Device object
-            if hasattr(switch, subset):
-
-                # Get attribute value and add it to Ansible facts dictionary
-                ansible_facts[str_subset] = getattr(switch, subset)
-
-            # Check if current subset is inside the allowed subsystem
-            # attributes
-            elif subset in allowed_subsystem_attributes:
-                ansible_facts.update({str_subset: {}})
-
-                # Iterate through Device subsystems
-                for subsystem, value in switch.subsystems.items():
-
-                    # Get attribute value and update the Ansible facts
-                    # dictionary
-                    if use_data_planes and subset == "interfaces":
-                        ss_dps = switch.data_planes[subsystem]["data_planes"]
-                        intfs = {}
-                        for dp in ss_dps:
-                            intfs.update(ss_dps[dp][subset])
-                    else:
-                        intfs = switch.subsystems[subsystem][subset]
-                    ansible_facts[str_subset].update({subsystem: intfs})
-
-        ansible_module.exit_json(
-            ansible_facts=ansible_facts, warnings=warnings
-        )
-
-    # USE OLD VERSION
-    else:
-        argument_spec.update(aoscx_http_argument_spec)
-
-        module = AnsibleModule(
-            argument_spec=argument_spec, supports_check_mode=True
-        )
-
-        module._connection = get_connection(module)
-
-        warnings = []
-        if module.params["gather_subset"] == "!config":
-            warnings.append(
-                "default value for `gather_subset` will be changed "
-                "to `min` from `!config` v2.11 onwards"
-            )
-
-        result = Facts(module).get_facts()
-
-        ansible_facts, additional_warnings = result
-        warnings.extend(additional_warnings)
-
-        module.exit_json(ansible_facts=ansible_facts, warnings=warnings)
+    ansible_module.exit_json(
+        ansible_facts=ansible_facts, warnings=warnings
+    )
 
 
 if __name__ == "__main__":

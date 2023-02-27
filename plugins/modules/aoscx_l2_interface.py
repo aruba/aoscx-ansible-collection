@@ -323,29 +323,10 @@ EXAMPLES = """
 RETURN = r""" # """
 
 
-try:
-    from pyaoscx.device import Device
-    from ansible.module_utils.basic import AnsibleModule
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import (  # NOQA
-        VLAN,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import (  # NOQA
-        L2_Interface,
-        Interface,
-    )
+from ansible.module_utils.basic import AnsibleModule
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def get_argument_spec():
@@ -457,300 +438,169 @@ def get_argument_spec():
 
 
 def main():
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=get_argument_spec(), supports_check_mode=True
-        )
+    ansible_module = AnsibleModule(
+        argument_spec=get_argument_spec(), supports_check_mode=True
+    )
 
-        result = dict(changed=False)
+    interface_name = ansible_module.params["interface"]
+    description = ansible_module.params["description"]
+    vlan_mode = ansible_module.params["vlan_mode"]
+    vlan_access = ansible_module.params["vlan_access"]
+    vlan_trunks = ansible_module.params["vlan_trunks"]
+    trunk_allowed_all = ansible_module.params["trunk_allowed_all"]
+    native_vlan_id = ansible_module.params["native_vlan_id"]
+    native_vlan_tag = ansible_module.params["native_vlan_tag"]
+    state = ansible_module.params["state"]
+    port_security_enable = ansible_module.params["port_security_enable"]
+    port_security_client_limit = ansible_module.params[
+        "port_security_client_limit"
+    ]
+    port_security_sticky_learning = ansible_module.params[
+        "port_security_sticky_learning"
+    ]
+    port_security_macs = ansible_module.params["port_security_macs"]
+    port_security_sticky_macs = ansible_module.params[
+        "port_security_sticky_macs"
+    ]
+    port_security_violation_action = ansible_module.params[
+        "port_security_violation_action"
+    ]
+    port_security_recovery_time = ansible_module.params[
+        "port_security_recovery_time"
+    ]
 
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
+    result = dict(changed=False)
 
-        interface_name = ansible_module.params["interface"]
-        description = ansible_module.params["description"]
-        vlan_mode = ansible_module.params["vlan_mode"]
-        vlan_access = ansible_module.params["vlan_access"]
-        vlan_trunks = ansible_module.params["vlan_trunks"]
-        trunk_allowed_all = ansible_module.params["trunk_allowed_all"]
-        native_vlan_id = ansible_module.params["native_vlan_id"]
-        native_vlan_tag = ansible_module.params["native_vlan_tag"]
-        state = ansible_module.params["state"]
-        port_security_enable = ansible_module.params["port_security_enable"]
-        port_security_client_limit = ansible_module.params[
-            "port_security_client_limit"
-        ]
-        port_security_sticky_learning = ansible_module.params[
-            "port_security_sticky_learning"
-        ]
-        port_security_macs = ansible_module.params["port_security_macs"]
-        port_security_sticky_macs = ansible_module.params[
-            "port_security_sticky_macs"
-        ]
-        port_security_violation_action = ansible_module.params[
-            "port_security_violation_action"
-        ]
-        port_security_recovery_time = ansible_module.params[
-            "port_security_recovery_time"
-        ]
-
-        session = get_pyaoscx_session(ansible_module)
-        device = Device(session)
-        if state == "delete" and port_security_enable is None:
-            interface = device.interface(interface_name)
-            interface.delete()
-
-            result["changed"] = True
-            ansible_module.exit_json(**result)
-        vlan_tag = None
-        if vlan_access is not None:
-            vlan_tag = vlan_access
-        elif native_vlan_id is not None:
-            vlan_tag = native_vlan_id
-
-        if isinstance(vlan_tag, str):
-            vlan_tag = int(vlan_tag)
-
-        interface = device.interface(interface_name)
-        if interface.was_modified():
-            result["changed"] = True
-        modified_op = interface.configure_l2(
-            description=description,
-            vlan_mode=vlan_mode,
-            vlan_tag=vlan_tag,
-            vlan_ids_list=vlan_trunks,
-            trunk_allowed_all=trunk_allowed_all,
-            native_vlan_tag=native_vlan_tag,
-        )
-
-        if port_security_enable is not None and not port_security_enable:
-            modified_op |= interface.port_security_disable()
-        if port_security_enable or (
-            hasattr(interface, "port_security")
-            and interface.port_security["enable"]
-        ):
-            port_sec_kw = {}
-            if state == "delete":
-                if port_security_client_limit:
-                    port_sec_kw["client_limit"] = 1
-                if port_security_sticky_learning is not None:
-                    port_sec_kw["sticky_mac_learning"] = False
-                if port_security_macs:
-                    for mac in port_security_macs:
-                        mac = mac.upper()
-                        sw_static_macs = (
-                            interface.port_security_static_client_mac_addr
-                        )
-                        if mac in sw_static_macs:
-                            sw_static_macs.remove(mac)
-                            modified_op |= interface.apply()
-                        else:
-                            ansible_module.fail_json(
-                                msg="MAC address {0} is not configured".format(
-                                    mac
-                                )
-                            )
-                if port_security_sticky_macs:
-                    for sticky_mac in port_security_sticky_macs:
-                        mac = sticky_mac["mac"]
-                        sw_sticky_macs = (
-                            interface.port_security_static_sticky_client_mac_addr
-                        )
-                        sw_sticky_mac_vlans = sw_sticky_macs[mac]
-                        if mac in sw_sticky_macs:
-                            for vlan in sticky_mac["vlans"]:
-                                if vlan in sw_sticky_mac_vlans:
-                                    sw_sticky_mac_vlans.remove(vlan)
-                            if sw_sticky_mac_vlans == []:
-                                del sw_sticky_macs[mac]
-                        else:
-                            ansible_module.fail_json(
-                                msg="MAC address {0} is not configured".format(
-                                    mac
-                                )
-                            )
-                    modified_op |= interface.apply()
-                if port_security_violation_action:
-                    port_sec_kw["violation_action"] = "notify"
-                if port_security_recovery_time:
-                    port_sec_kw["violation_recovery_time"] = 10
-            else:
-                if port_security_client_limit:
-                    port_sec_kw["client_limit"] = port_security_client_limit
-                if port_security_sticky_learning is not None:
-                    port_sec_kw[
-                        "sticky_mac_learning"
-                    ] = port_security_sticky_learning
-                if port_security_macs:
-                    port_sec_kw["allowed_mac_addr"] = port_security_macs
-                if port_security_sticky_macs:
-                    converted_sticky_macs = {
-                        el["mac"]: el["vlans"]
-                        for el in port_security_sticky_macs
-                    }
-                    port_sec_kw[
-                        "allowed_sticky_mac_addr"
-                    ] = converted_sticky_macs
-                if port_security_violation_action:
-                    port_sec_kw[
-                        "violation_action"
-                    ] = port_security_violation_action
-                if port_security_recovery_time:
-                    port_sec_kw[
-                        "violation_recovery_time"
-                    ] = port_security_recovery_time
-            _result = False
-            try:
-                _result = interface.port_security_enable(**port_sec_kw)
-            except Exception as exc:
-                ansible_module.fail_json(msg=str(exc))
-
-            modified_op |= _result
-        if modified_op:
-            result["changed"] = True
-
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(get_argument_spec())
 
-        params = {}
-        for param in aruba_ansible_module.module.params.keys():
-            params[param] = aruba_ansible_module.module.params[param]
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        state = aruba_ansible_module.module.params["state"]
-        admin_state = aruba_ansible_module.module.params["admin_state"]
-        interface_name = aruba_ansible_module.module.params["interface"]
-        description = aruba_ansible_module.module.params["description"]
-        interface_qos_rate = aruba_ansible_module.module.params[
-            "interface_qos_rate"
-        ]
-        interface_qos_schedule_profile = aruba_ansible_module.module.params[
-            "interface_qos_schedule_profile"
-        ]
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-        l2_interface = L2_Interface()
-        interface = Interface()
-        vlan = VLAN()
+    device = Device(session)
+    if state == "delete" and port_security_enable is None:
+        interface = device.interface(interface_name)
+        interface.delete()
 
-        interface_vlan_dict = {}
+        result["changed"] = True
+        ansible_module.exit_json(**result)
+    vlan_tag = None
+    if vlan_access is not None:
+        vlan_tag = vlan_access
+    elif native_vlan_id is not None:
+        vlan_tag = native_vlan_id
 
-        if params["state"] == "create":
-            aruba_ansible_module = l2_interface.create_l2_interface(
-                aruba_ansible_module, interface_name
-            )
+    if isinstance(vlan_tag, str):
+        vlan_tag = int(vlan_tag)
 
-            if params["vlan_mode"] == "access":
-                interface_vlan_dict["vlan_mode"] = "access"
+    interface = device.interface(interface_name)
+    if interface.was_modified():
+        result["changed"] = True
+    modified_op = interface.configure_l2(
+        description=description,
+        vlan_mode=vlan_mode,
+        vlan_tag=vlan_tag,
+        vlan_ids_list=vlan_trunks,
+        trunk_allowed_all=trunk_allowed_all,
+        native_vlan_tag=native_vlan_tag,
+    )
 
-                if params["vlan_access"] is None:
-                    interface_vlan_dict["vlan_tag"] = 1
-
-                elif vlan.check_vlan_exist(
-                    aruba_ansible_module, params["vlan_access"]
-                ):
-                    interface_vlan_dict["vlan_tag"] = params["vlan_access"]
-
-                else:
-                    aruba_ansible_module.module.fail_json(
-                        msg="VLAN {0} is not configured".format(
-                            params["vlan_access"]
-                        )
+    if port_security_enable is not None and not port_security_enable:
+        modified_op |= interface.port_security_disable()
+    if port_security_enable or (
+        hasattr(interface, "port_security")
+        and interface.port_security["enable"]
+    ):
+        port_sec_kw = {}
+        if state == "delete":
+            if port_security_client_limit:
+                port_sec_kw["client_limit"] = 1
+            if port_security_sticky_learning is not None:
+                port_sec_kw["sticky_mac_learning"] = False
+            if port_security_macs:
+                for mac in port_security_macs:
+                    mac = mac.upper()
+                    sw_static_macs = (
+                        interface.port_security_static_client_mac_addr
                     )
-
-            elif params["vlan_mode"] == "trunk":
-
-                if params["native_vlan_id"]:
-                    if params["native_vlan_id"] == "1":
-                        interface_vlan_dict["vlan_tag"] = "1"
-                        if params["native_vlan_tag"]:
-                            interface_vlan_dict["vlan_mode"] = "native-tagged"
-                        else:
-                            interface_vlan_dict[
-                                "vlan_mode"
-                            ] = "native-untagged"
-                    elif vlan.check_vlan_exist(
-                        aruba_ansible_module, params["native_vlan_id"]
-                    ):
-                        if params["native_vlan_tag"]:
-                            interface_vlan_dict["vlan_mode"] = "native-tagged"
-                        else:
-                            interface_vlan_dict[
-                                "vlan_mode"
-                            ] = "native-untagged"
-                        interface_vlan_dict["vlan_tag"] = params[
-                            "native_vlan_id"
-                        ]
+                    if mac in sw_static_macs:
+                        sw_static_macs.remove(mac)
+                        modified_op |= interface.apply()
                     else:
-                        aruba_ansible_module.module.fail_json(
-                            msg="VLAN {0} is not configured".format(
-                                params["native_vlan_id"]
+                        ansible_module.fail_json(
+                            msg="MAC address {0} is not configured".format(
+                                mac
                             )
                         )
-
-                elif params["native_vlan_tag"]:
-                    interface_vlan_dict["vlan_mode"] = "native-tagged"
-                    interface_vlan_dict["vlan_tag"] = "1"
-
-                else:
-                    interface_vlan_dict["vlan_mode"] = "native-untagged"
-                    interface_vlan_dict["vlan_tag"] = "1"
-
-                if not params["trunk_allowed_all"] and params["vlan_trunks"]:
-                    if "vlan_mode" not in interface_vlan_dict.keys():
-                        interface_vlan_dict["vlan_mode"] = "native-untagged"
-                    interface_vlan_dict["vlan_trunks"] = []
-                    for id in params["vlan_trunks"]:
-                        if vlan.check_vlan_exist(aruba_ansible_module, id):
-                            interface_vlan_dict["vlan_trunks"].append(str(id))
-                        else:
-                            aruba_ansible_module.module.fail_json(
-                                msg="VLAN {0} is not configured".format(id)
-                            )
-
-                elif params["trunk_allowed_all"]:
-                    if "vlan_mode" not in interface_vlan_dict.keys():
-                        interface_vlan_dict["vlan_mode"] = "native-untagged"
-
-            else:
-                interface_vlan_dict["vlan_mode"] = "access"
-                interface_vlan_dict["vlan_tag"] = 1
-
-            aruba_ansible_module = l2_interface.update_interface_vlan_details(
-                aruba_ansible_module, interface_name, interface_vlan_dict
-            )
-
-        if state == "delete" and port_security_enable is None:
-            aruba_ansible_module = l2_interface.delete_l2_interface(
-                aruba_ansible_module, interface_name
-            )
-
-        if (state == "update") or (state == "create"):
-
-            if admin_state is not None:
-                aruba_ansible_module = interface.update_interface_admin_state(
-                    aruba_ansible_module, interface_name, admin_state
-                )
-
-            if description is not None:
-                aruba_ansible_module = interface.update_interface_description(
-                    aruba_ansible_module, interface_name, description
-                )
-
-            if interface_qos_rate is not None:
-                aruba_ansible_module = l2_interface.update_interface_qos_rate(
-                    aruba_ansible_module, interface_name, interface_qos_rate
-                )
-
-            if interface_qos_schedule_profile is not None:
-                aruba_ansible_module = (
-                    l2_interface.update_interface_qos_profile(
-                        aruba_ansible_module,
-                        interface_name,
-                        interface_qos_schedule_profile,
+            if port_security_sticky_macs:
+                for sticky_mac in port_security_sticky_macs:
+                    mac = sticky_mac["mac"]
+                    sw_sticky_macs = (
+                        interface.port_security_static_sticky_client_mac_addr
                     )
-                )
+                    sw_sticky_mac_vlans = sw_sticky_macs[mac]
+                    if mac in sw_sticky_macs:
+                        for vlan in sticky_mac["vlans"]:
+                            if vlan in sw_sticky_mac_vlans:
+                                sw_sticky_mac_vlans.remove(vlan)
+                        if sw_sticky_mac_vlans == []:
+                            del sw_sticky_macs[mac]
+                    else:
+                        ansible_module.fail_json(
+                            msg="MAC address {0} is not configured".format(
+                                mac
+                            )
+                        )
+                modified_op |= interface.apply()
+            if port_security_violation_action:
+                port_sec_kw["violation_action"] = "notify"
+            if port_security_recovery_time:
+                port_sec_kw["violation_recovery_time"] = 10
+        else:
+            if port_security_client_limit:
+                port_sec_kw["client_limit"] = port_security_client_limit
+            if port_security_sticky_learning is not None:
+                port_sec_kw[
+                    "sticky_mac_learning"
+                ] = port_security_sticky_learning
+            if port_security_macs:
+                port_sec_kw["allowed_mac_addr"] = port_security_macs
+            if port_security_sticky_macs:
+                converted_sticky_macs = {
+                    el["mac"]: el["vlans"]
+                    for el in port_security_sticky_macs
+                }
+                port_sec_kw[
+                    "allowed_sticky_mac_addr"
+                ] = converted_sticky_macs
+            if port_security_violation_action:
+                port_sec_kw[
+                    "violation_action"
+                ] = port_security_violation_action
+            if port_security_recovery_time:
+                port_sec_kw[
+                    "violation_recovery_time"
+                ] = port_security_recovery_time
+        _result = False
+        try:
+            _result = interface.port_security_enable(**port_sec_kw)
+        except Exception as exc:
+            ansible_module.fail_json(msg=str(exc))
 
-        aruba_ansible_module.update_switch_config()
+        modified_op |= _result
+    if modified_op:
+        result["changed"] = True
+
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

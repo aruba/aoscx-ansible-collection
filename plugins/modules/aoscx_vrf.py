@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -52,25 +52,10 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
-
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-    from ansible.module_utils.basic import AnsibleModule
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.vrfs.aoscx_vrf import (  # NOQA
-        VRF,
-    )
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
+from ansible.module_utils.basic import AnsibleModule
 
 
 def main():
@@ -78,64 +63,50 @@ def main():
         name=dict(type="str", required=True),
         state=dict(default="create", choices=["create", "delete"]),
     )
-    if USE_PYAOSCX_SDK:
+    # ArubaModule
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
 
-        # ArubaModule
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
-        )
+    # Set Variables
+    vrf_name = ansible_module.params["name"]
+    state = ansible_module.params["state"]
 
-        # Set Variables
-        vrf_name = ansible_module.params["name"]
-        state = ansible_module.params["state"]
+    result = dict(changed=False)
 
-        result = dict(changed=False)
-
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-
-        session = get_pyaoscx_session(ansible_module)
-
-        device = Device(session)
-
-        if state == "delete":
-            # Create VRF Object
-            vrf = device.vrf(vrf_name)
-            # Delete it
-            vrf.delete()
-            # Changed
-            result["changed"] = vrf.was_modified()
-
-        if state == "create":
-            # Create VRF with incoming attributes
-            vrf = device.vrf(vrf_name)
-            # Changed
-            result["changed"] = vrf.was_modified()
-
-        # Exit
+    if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    # Use Older version
-    else:
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
 
-        aruba_ansible_module = ArubaAnsibleModule(module_args)
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
-        vrf_name = aruba_ansible_module.module.params["name"]
-        state = aruba_ansible_module.module.params["state"]
+    device = Device(session)
 
-        vrf = VRF()
+    if state == "delete":
+        # Create VRF Object
+        vrf = device.vrf(vrf_name)
+        # Delete it
+        vrf.delete()
+        # Changed
+        result["changed"] = vrf.was_modified()
 
-        if state == "create":
-            aruba_ansible_module = vrf.create_vrf(
-                aruba_ansible_module, vrf_name
-            )
+    if state == "create":
+        # Create VRF with incoming attributes
+        vrf = device.vrf(vrf_name)
+        # Changed
+        result["changed"] = vrf.was_modified()
 
-        if state == "delete":
-            aruba_ansible_module = vrf.delete_vrf(
-                aruba_ansible_module, vrf_name
-            )
-
-        aruba_ansible_module.update_switch_config()
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

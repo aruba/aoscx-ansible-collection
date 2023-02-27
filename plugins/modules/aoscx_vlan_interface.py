@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -129,33 +129,11 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-try:
-    from pyaoscx.device import Device
+from ansible.module_utils.basic import AnsibleModule
 
-    USE_PYAOSCX_SDK = True
-except ImportError:
-    USE_PYAOSCX_SDK = False
-
-if USE_PYAOSCX_SDK:
-    from ansible.module_utils.basic import AnsibleModule
-
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
-        get_pyaoscx_session,
-    )
-else:
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-        ArubaAnsibleModule,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_interface import (  # NOQA
-        Interface,
-        L3_Interface,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_port import (  # NOQA
-        Port,
-    )
-    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_vlan import (  # NOQA
-        VLAN,
-    )
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
+    get_pyaoscx_session,
+)
 
 
 def main():
@@ -171,262 +149,100 @@ def main():
         active_gateway_ip=dict(type="str", default=None),
         active_gateway_mac_v4=dict(type="str", default=None),
     )
-    if USE_PYAOSCX_SDK:
-        ansible_module = AnsibleModule(
-            argument_spec=module_args, supports_check_mode=True
+    ansible_module = AnsibleModule(
+        argument_spec=module_args, supports_check_mode=True
+    )
+
+    vlan_id = ansible_module.params["vlan_id"]
+    admin_state = ansible_module.params["admin_state"]
+    ipv4 = ansible_module.params["ipv4"]
+    ipv6 = ansible_module.params["ipv6"]
+    vrf = ansible_module.params["vrf"]
+    description = ansible_module.params["description"]
+    ip_helper_address = ansible_module.params["ip_helper_address"]
+    active_gateway_ip = ansible_module.params["active_gateway_ip"]
+    active_gateway_mac_v4 = ansible_module.params["active_gateway_mac_v4"]
+    state = ansible_module.params["state"]
+
+    # Set IP variable as empty arrays
+    if ipv4 == [""]:
+        ipv4 = []
+    if ipv6 == [""]:
+        ipv6 = []
+
+    # Set variables
+    vlan_interface_id = "vlan" + vlan_id
+
+    # Set result var
+    result = dict(changed=False)
+
+    if ansible_module.check_mode:
+        ansible_module.exit_json(**result)
+
+    try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
+
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-        vlan_id = ansible_module.params["vlan_id"]
-        admin_state = ansible_module.params["admin_state"]
-        ipv4 = ansible_module.params["ipv4"]
-        ipv6 = ansible_module.params["ipv6"]
-        vrf = ansible_module.params["vrf"]
-        description = ansible_module.params["description"]
-        ip_helper_address = ansible_module.params["ip_helper_address"]
-        active_gateway_ip = ansible_module.params["active_gateway_ip"]
-        active_gateway_mac_v4 = ansible_module.params["active_gateway_mac_v4"]
-        state = ansible_module.params["state"]
+    device = Device(session)
 
-        # Set IP variable as empty arrays
-        if ipv4 == [""]:
-            ipv4 = []
-        if ipv6 == [""]:
-            ipv6 = []
+    if state == "delete":
+        # Create Interface Object
+        vlan_interface = device.interface(vlan_interface_id)
+        # Delete it
+        vlan_interface.delete()
+        # Changed
+        result["changed"] = True
 
-        # Set variables
-        vlan_interface_id = "vlan" + vlan_id
-
-        # Set result var
-        result = dict(changed=False)
-
-        if ansible_module.check_mode:
-            ansible_module.exit_json(**result)
-        session = get_pyaoscx_session(ansible_module)
-        device = Device(session)
-
-        if state == "delete":
-            # Create Interface Object
-            vlan_interface = device.interface(vlan_interface_id)
-            # Delete it
-            vlan_interface.delete()
+    if state == "create" or state == "update":
+        # Create Interface with incoming attributes
+        vlan_interface = device.interface(vlan_interface_id)
+        # Verify if interface was create
+        if vlan_interface.was_modified():
             # Changed
             result["changed"] = True
 
-        if state == "create" or state == "update":
-            # Create Interface with incoming attributes
-            vlan_interface = device.interface(vlan_interface_id)
-            # Verify if interface was create
-            if vlan_interface.was_modified():
-                # Changed
-                result["changed"] = True
+        if admin_state:
+            vlan_interface.admin_state = admin_state
 
-            if admin_state:
-                vlan_interface.admin_state = admin_state
+        # Configure SVI
+        # Verify if object was changed
+        modified_op = vlan_interface.configure_svi(
+            vlan=int(vlan_id),
+            ipv4=ipv4,
+            ipv6=ipv6,
+            vrf=vrf,
+            description=description,
+        )
 
-            # Configure SVI
-            # Verify if object was changed
-            modified_op = vlan_interface.configure_svi(
-                vlan=int(vlan_id),
-                ipv4=ipv4,
-                ipv6=ipv6,
-                vrf=vrf,
-                description=description,
+        if active_gateway_ip and active_gateway_mac_v4:
+            modified_op2 = vlan_interface.set_active_gateway(
+                active_gateway_ip, active_gateway_mac_v4
             )
+            modified_op = modified_op2 or modified_op
 
-            if active_gateway_ip and active_gateway_mac_v4:
-                modified_op2 = vlan_interface.set_active_gateway(
-                    active_gateway_ip, active_gateway_mac_v4
-                )
-                modified_op = modified_op2 or modified_op
-
-            if ip_helper_address:
-                # Create DHCP_Relay object
-                dhcp_relay = device.dhcp_relay(vrf=vrf, port=vlan_interface_id)
-                # Add helper addresses
-                modified_dhcp_relay = dhcp_relay.add_ipv4_addresses(
-                    ip_helper_address
-                )
-                modified_op = modified_op or modified_dhcp_relay
-
-            if modified_op:
-                # Changed
-                result["changed"] = True
-
-        # Exit
-        ansible_module.exit_json(**result)
-
-    # Use Older version
-    else:
-        aruba_ansible_module = ArubaAnsibleModule(module_args)
-
-        vlan_id = aruba_ansible_module.module.params["vlan_id"]
-        admin_state = aruba_ansible_module.module.params["admin_state"]
-        ipv4 = aruba_ansible_module.module.params["ipv4"]
-        ipv6 = aruba_ansible_module.module.params["ipv6"]
-        vrf = aruba_ansible_module.module.params["vrf"]
-        description = aruba_ansible_module.module.params["description"]
-        ip_helper_address = aruba_ansible_module.module.params[
-            "ip_helper_address"
-        ]
-        active_gateway_ip = aruba_ansible_module.module.params[
-            "active_gateway_ip"
-        ]
-        active_gateway_mac_v4 = aruba_ansible_module.module.params[
-            "active_gateway_mac_v4"
-        ]
-        state = aruba_ansible_module.module.params["state"]
-
-        vlan = VLAN()
-        port = Port()
-        interface = Interface()
-        vlan_interface_id = "vlan" + vlan_id
-        if not vlan.check_vlan_exist(aruba_ansible_module, vlan_id):
-            aruba_ansible_module.module.fail_json(
-                msg="VLAN {0} does not exist. VLAN needs to be created "
-                "before adding or deleting interfaces".format(vlan_id)
+        if ip_helper_address:
+            # Create DHCP_Relay object
+            dhcp_relay = device.dhcp_relay(vrf=vrf, port=vlan_interface_id)
+            # Add helper addresses
+            modified_dhcp_relay = dhcp_relay.add_ipv4_addresses(
+                ip_helper_address
             )
+            modified_op = modified_op or modified_dhcp_relay
 
-        if state == "create":
-            aruba_ansible_module = port.create_port(
-                aruba_ansible_module, vlan_interface_id
-            )
-            aruba_ansible_module = interface.create_interface(
-                aruba_ansible_module, vlan_interface_id, type="vlan"
-            )
+        if modified_op:
+            # Changed
+            result["changed"] = True
 
-            if admin_state is None:
-                admin_state = "up"
-
-            user_config = {
-                "admin": admin_state,
-            }
-
-            interface_fields = {
-                "name": vlan_interface_id,
-                "type": "vlan",
-                "user_config": user_config,
-            }
-            aruba_ansible_module = interface.update_interface_fields(
-                aruba_ansible_module, vlan_interface_id, interface_fields
-            )
-
-            if vrf is not None:
-                vrf_name = vrf
-            else:
-                vrf_name = "default"
-
-            port_fields = {
-                "interfaces": [vlan_interface_id],
-                "vlan_tag": vlan_id,
-                "vrf": vrf_name,
-                "admin": admin_state,
-            }
-            aruba_ansible_module = port.update_port_fields(
-                aruba_ansible_module, vlan_interface_id, port_fields
-            )
-
-        if (state == "create") or (state == "update"):
-
-            if not port.check_port_exists(
-                aruba_ansible_module, vlan_interface_id
-            ):
-                aruba_ansible_module.module.fail_json(
-                    msg="VLAN interface does not exist"
-                )
-
-            if admin_state is not None:
-                port_fields = {"admin": admin_state}
-                user_config = {"admin": admin_state}
-                interface_fields = {"user_config": user_config}
-
-            aruba_ansible_module = port.update_port_fields(
-                aruba_ansible_module, vlan_interface_id, port_fields
-            )
-            aruba_ansible_module = interface.update_interface_fields(
-                aruba_ansible_module, vlan_interface_id, interface_fields
-            )
-
-            if description is not None:
-                port_fields = {"description": description}
-
-                aruba_ansible_module = port.update_port_fields(
-                    aruba_ansible_module, vlan_interface_id, port_fields
-                )
-
-            if ipv4 is not None:
-                l3_interface = L3_Interface()
-                aruba_ansible_module = (
-                    l3_interface.update_interface_ipv4_address(
-                        aruba_ansible_module, vlan_interface_id, ipv4
-                    )
-                )
-
-            if ipv6 is not None:
-                l3_interface = L3_Interface()
-                aruba_ansible_module = (
-                    l3_interface.update_interface_ipv6_address(
-                        aruba_ansible_module, vlan_interface_id, ipv6
-                    )
-                )
-
-            if ip_helper_address is not None:
-                l3_interface = L3_Interface()
-                if vrf is None:
-                    vrf = "default"
-                aruba_ansible_module = (
-                    l3_interface.update_interface_ip_helper_address(
-                        aruba_ansible_module,
-                        vrf,
-                        vlan_interface_id,
-                        ip_helper_address,
-                    )
-                )
-
-            if vrf is not None:
-                l3_interface = L3_Interface()
-                aruba_ansible_module = (
-                    l3_interface.update_interface_vrf_details_from_l3(
-                        aruba_ansible_module,
-                        vrf,
-                        vlan_interface_id,
-                        update_type="insert",
-                    )
-                )
-
-            if (active_gateway_ip is not None) and (
-                active_gateway_mac_v4 is None
-            ):
-                aruba_ansible_module.module.fail_json(
-                    msg=" Both active_gateway_ip and active_gateway_mac_v4 "
-                    "are required for configure active gateway."
-                )
-            elif (active_gateway_ip is None) and (
-                active_gateway_mac_v4 is not None
-            ):
-                aruba_ansible_module.module.fail_json(
-                    msg=" Both active_gateway_ip and active_gateway_mac_v4 "
-                    "are required for configure active gateway."
-                )
-            elif (active_gateway_ip is not None) and (
-                active_gateway_mac_v4 is not None
-            ):
-                port_fields = {
-                    "vsx_virtual_ip4": active_gateway_ip,
-                    "vsx_virtual_gw_mac_v4": active_gateway_mac_v4,
-                }
-                aruba_ansible_module = port.update_port_fields(
-                    aruba_ansible_module, vlan_interface_id, port_fields
-                )
-
-        if state == "delete":
-            aruba_ansible_module = port.delete_port(
-                aruba_ansible_module, vlan_interface_id
-            )
-            aruba_ansible_module = interface.delete_interface(
-                aruba_ansible_module, vlan_interface_id, type="vlan"
-            )
-
-        aruba_ansible_module.update_switch_config()
+    # Exit
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":
