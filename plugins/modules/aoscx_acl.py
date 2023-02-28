@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -110,11 +110,19 @@ options:
       src_l4_port_max:
         type: int
         required: false
-        description: Maximum L4 port to match on the packet
+        description: Maximum L4 port to match on the packet. Use only if
+        `src_l4_port` is not specified.
       src_l4_port_min:
         type: int
         required: false
-        description: Minimum L4 port to match on the packet
+        description: Minimum L4 port to match on the packet. Use only if
+        `src_l4_port` is not specified.
+      src_l4_port:
+        type: str
+        required: false
+        description: Range of L4 ports or L4 source port to match on the
+        packet. Use only if `src_l4_port_min` and `src_l4_port_max` are not
+        specified.
       dst_l4_port_group:
         type: str
         required: false
@@ -131,13 +139,21 @@ options:
         required: false
         description: >
           Maximum IP destination port matching attribute. Used in conjunction
-          with `dst_l4_port_min` and `dst_l4_port_range_reverse`.
+          with `dst_l4_port_min` and `dst_l4_port_range_reverse`. Use only if
+          `dst_l4_port` is not specified.
       dst_l4_port_min:
         type: int
         required: false
         description: >
           Minimum IP destination port matching attribute. Used in conjunction
-          with `dst_l4_port_max` and `dst_l4_port_range_reverse`.
+          with `dst_l4_port_max` and `dst_l4_port_range_reverse`. Use only if
+          `dst_l4_port` is not specified.
+      dst_l4_port:
+        type: str
+        required: false
+        description: Range of L4 ports or L4 destination port to match on the
+        packet. Use only if `dst_l4_port_min` and `dst_l4_port_max` are not
+        specified.
       src_ip_group:
         type: str
         required: false
@@ -335,6 +351,32 @@ EXAMPLES = """
         dst_l4_port_min: 3567
         action: permit
 
+- name: Configure port range
+  aoscx_acl:
+    name: simple_ports
+    type: ipv4
+    acl_entries:
+      1:
+        comment: "Use a range of ports"
+        src_ip: 100.10.25.2/24
+        dst_ip: 100.10.25.2/24
+        src_l4_port: 5000-5002
+        dst_l4_port: 3567-3657
+        action: permit
+
+- name: Configure port
+  aoscx_acl:
+    name: simple_ports
+    type: ipv4
+    acl_entries:
+      1:
+        comment: " Use a port"
+        src_ip: 100.10.25.2/24
+        dst_ip: 100.10.25.2/24
+        src_l4_port: 5000
+        dst_l4_port: 3567
+        action: permit
+
 - name: Delete ACL entry
   aoscx_acl:
     name: simple_ports
@@ -498,11 +540,59 @@ def main():
                         acl_entry.get(selector="configuration")
                     except Exception as e:
                         ansible_module.fail_json(msg=str(e))
+                    source = ["src_l4_port_min", "src_l4_port_max"]
+                    if "src_l4_port" in config:
+                        for s in source:
+                            if s in config:
+                                ansible_module.fail_json(
+                                    msg="Source L4 Port cannot be configured "
+                                    "with multiple parameters. Choose one of "
+                                    "these options: 1) {0} or 2) {1} and "
+                                    "{2}.".format(
+                                        "src_l4_port",
+                                        "src_l4_port_min",
+                                        "src_l4_port_max",
+                                    )
+                                )
+                    dest = ["dst_l4_port_min", "dst_l4_port_max"]
+                    if "dst_l4_port" in config:
+                        for s in dest:
+                            if s in config:
+                                ansible_module.fail_json(
+                                    msg="Destination L4 Port cannot be "
+                                    "configured with multiple parameters. "
+                                    "Choose one of these options: 1) {0} or "
+                                    "2) {1} and {2}.".format(
+                                        "dst_l4_port",
+                                        "dst_l4_port_min",
+                                        "dst_l4_port_max",
+                                    )
+                                )
+                    if "src_l4_port" in config:
+                        l4_port = str(config["src_l4_port"])
+                        if "-" in l4_port:
+                            l4_port = l4_port.split("-")
+                            config["src_l4_port_min"] = int(l4_port[0])
+                            config["src_l4_port_max"] = int(l4_port[1])
+                        else:
+                            config["src_l4_port_min"] = int(l4_port)
+                            config["src_l4_port_max"] = int(l4_port)
+                        del config["src_l4_port"]
+                    if "dst_l4_port" in config:
+                        l4_port = str(config["dst_l4_port"])
+                        if "-" in l4_port:
+                            l4_port = l4_port.split("-")
+                            config["dst_l4_port_min"] = int(l4_port[0])
+                            config["dst_l4_port_max"] = int(l4_port[1])
+                        else:
+                            config["dst_l4_port_min"] = int(l4_port)
+                            config["dst_l4_port_max"] = int(l4_port)
+                        del config["dst_l4_port"]
                     if "protocol" in config:
                         protocol = config["protocol"]
-                        config[
-                            "protocol"
-                        ] = translate_acl_entries_protocol(protocol)
+                        config["protocol"] = translate_acl_entries_protocol(
+                            protocol
+                        )
                     for conf in config:
                         present = getattr(acl_entry, conf)
                         if present != config[conf]:
