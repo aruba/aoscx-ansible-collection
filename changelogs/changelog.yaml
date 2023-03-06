@@ -24,3 +24,17 @@ releases:
       - Fix default string value (https://github.com/aruba/aoscx-ansible-collection/issues/42).
       release_summary: Bug fixes release
     release_date: '2022-10-19'
+  4.2.0:
+    changes:
+      major_changes:
+      - Add speed and duplex support (aoscx_interface).
+      - Add port security support (aoscx_l2_interface).
+      - Add new modules for PoE (aoscx_poe), MAC (aoscx_mac) and Static MAC (aoscx_static_mac)
+      - Fix module aoscx_upload_firmware for local path (https://github.com/aruba/aoscx-ansible-collection/issues/28).
+      - Fix module aoscx_upload firmware using HTTP.
+      - Include fixes for issues found internally.
+      minor_changes:
+      - Fix Interface MTU support (https://github.com/aruba/aoscx-ansible-collection/issues/38).
+      - Fix idempotency in ACL module.
+      release_summary: New features (port security, PoE, MAC, static MAC and speed/duplex) and bugfixes
+    release_date: '2023-03-06'

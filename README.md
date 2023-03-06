@@ -17,6 +17,7 @@ Requirements
     switch(config)# https-server rest access-mode read-write
     switch(config)# https-server vrf mgmt
     ```
+* Pycurl (When using aoscx_firmware_upload with platforms 4100i and 6100)
 
 Installation
 ------------
@@ -69,6 +70,19 @@ Skipping 'ansible.utils:2.3.1' as it is already installed
 	```
 	ansible-control-machine$cd /users/chiapuzi/Desktop/sandbox/
 	```
+* Optional: Install pycurl
+    Debian based distros:
+    ```
+    apt-get install curl openssl libcurl4-openssl-dev libssl-dev python3-dev
+    ```
+    Red Hat based distros:
+    ```
+    yum install curl openssl openssl-devel libcurl libcurl-devel python3-devel
+    ```
+    And install pycurl:
+    ```
+    python3 -m pip install pycurl
+    ```
 
 SSH/CLI Modules
 ---------------
