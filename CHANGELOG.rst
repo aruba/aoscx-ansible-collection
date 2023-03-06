@@ -5,6 +5,30 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.2.0
+======
+
+Release Summary
+---------------
+
+New features (port security, PoE, MAC, static MAC and speed/duplex) and bugfixes
+
+Major Changes
+-------------
+
+- Add new modules for PoE (aoscx_poe), MAC (aoscx_mac) and Static MAC (aoscx_static_mac)
+- Add port security support (aoscx_l2_interface).
+- Add speed and duplex support (aoscx_interface).
+- Fix module aoscx_upload firmware using HTTP.
+- Fix module aoscx_upload_firmware for local path (https://github.com/aruba/aoscx-ansible-collection/issues/28).
+- Include fixes for issues found internally.
+
+Minor Changes
+-------------
+
+- Fix Interface MTU support (https://github.com/aruba/aoscx-ansible-collection/issues/38).
+- Fix idempotency in ACL module.
+
 v4.1.1
 ======
 
