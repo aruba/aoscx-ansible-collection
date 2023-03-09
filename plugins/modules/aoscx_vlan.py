@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -45,6 +45,21 @@ options:
       - up
       - down
     type: str
+  voice:
+    description: Enable Voice VLAN
+    required: false
+    default: None
+    type: bool
+  vsx_sync:
+    description: Enable vsx_sync (Only for VSX device)
+    required: false
+    default: None
+    type: bool
+  ip_igmp_snooping:
+    description: Enable IP IGMP Snooping
+    required: false
+    default: None
+    type: bool
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -68,6 +83,14 @@ EXAMPLES = """
     name: UPLINK_VLAN
     description: This is VLAN 300
 
+- name: Create VLAN 400 with name, voice, vsx_sync and ip igmp snooping
+  aoscx_vlan:
+    vlan_id: 400
+    name: VOICE_VLAN
+    voice: True
+    vsx_sync: True
+    ip_igmp_snooping: True
+
 - name: Delete VLAN 300
   aoscx_vlan:
     vlan_id: 300
@@ -82,67 +105,149 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
 )
 
 
-def main():
-    module_args = dict(
-        vlan_id=dict(type="int", required=True),
-        name=dict(type="str", default=None),
-        description=dict(type="str", default=None),
-        admin_state=dict(type="str", default=None, choices=["up", "down"]),
-        state=dict(
-            type="str",
-            default="create",
-            choices=["create", "delete", "update"],
-        ),
-    )
-    ansible_module = AnsibleModule(
-        argument_spec=module_args, supports_check_mode=True
-    )
+def get_argument_spec():
+    argument_spec = {
+        "vlan_id": {
+            "type": "int",
+            "required": True,
+        },
+        "name": {
+            "type": "str",
+            "default": None,
+        },
+        "description": {
+            "type": "str",
+            "default": None,
+        },
+        "admin_state": {
+            "type": "str",
+            "default": None,
+            "choices": [
+                "up",
+                "down",
+            ],
+        },
+        "voice": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "vsx_sync": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "ip_igmp_snooping": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "state": {
+            "type": "str",
+            "default": "create",
+            "choices": [
+                "create",
+                "delete",
+                "update",
+            ],
+        },
+    }
+    return argument_spec
 
-    # Set Variables
-    vlan_id = ansible_module.params["vlan_id"]
-    vlan_name = ansible_module.params["name"]
-    if vlan_name is None:
-        vlan_name = "VLAN{0}".format(vlan_id)
-    description = ansible_module.params["description"]
-    admin_state = ansible_module.params["admin_state"]
-    state = ansible_module.params["state"]
+
+def main():
+    ansible_module = AnsibleModule(
+        argument_spec=get_argument_spec(),
+        supports_check_mode=True,
+    )
 
     result = dict(changed=False)
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
-    try:
-        from pyaoscx.device import Device
-    except Exception as e:
-        ansible_module.fail_json(msg=str(e))
-
+    # Get playbook's arguments
+    vlan_id = ansible_module.params["vlan_id"]
+    vlan_name = ansible_module.params["name"]
+    description = ansible_module.params["description"]
+    admin_state = ansible_module.params["admin_state"]
+    voice = ansible_module.params["voice"]
+    vsx_sync = ansible_module.params["vsx_sync"]
+    ip_igmp_snooping = ansible_module.params["ip_igmp_snooping"]
+    state = ansible_module.params["state"]
     try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
         ansible_module.fail_json(
-            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+            msg="Could not get PYAOSCX Session: {}".format(str(e))
         )
-    device = Device(session)
+    # device = Device(session)
+    Vlan = session.api.get_module_class(session, "Vlan")
+    vlan = Vlan(session, vlan_id, vlan_name)
+    modified = False
+
+    try:
+        vlan.get()
+        vlan_exists = True
+    except Exception:
+        vlan_exists = False
 
     if state == "delete":
-        # Create Vlan Object
-        vlan = device.vlan(vlan_id)
-        # Delete it
-        vlan.delete()
-        # Changed
-        result["changed"] = True
+        if vlan_exists:
+            vlan.delete()
+            modified = True
 
     elif state == "update" or state == "create":
-        # Create Vlan with incoming attributes, in case VLAN does not exist
-        # inside device
-        vlan = device.vlan(
-            vlan_id, vlan_name, description, "static", admin_state
-        )
+        if not vlan_exists:
+            try:
+                if vlan_name is None:
+                    vlan.name = "VLAN{0}".format(vlan_id)
+                vlan.create()
+                modified = True
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
 
-        if vlan.was_modified():
-            # Changed
-            result["changed"] = True
+        if vlan_name is not None:
+            modified |= vlan.name != vlan_name
+            vlan.name = vlan_name
+
+        if description is not None:
+            modified |= vlan.description != description
+            vlan.description = description
+
+        if admin_state is not None:
+            modified |= vlan.admin != admin_state
+            vlan.admin = admin_state
+
+        if voice is not None:
+            modified |= vlan.voice != voice
+            vlan.voice = voice
+
+        if vsx_sync is not None:
+            vsx_sync_all = ["all_attributes_and_dependents"]
+            if vsx_sync:
+                modified |= vlan.vsx_sync != vsx_sync_all
+                try:
+                    vlan.vsx_sync = vsx_sync_all
+                except Exception as e:
+                    ansible_module.fail_json(msg=str(e))
+            else:
+                modified |= vlan.vsx_sync != []
+                vlan.vsx_sync = []
+
+        if ip_igmp_snooping is not None:
+            modified |= (
+                "igmp" not in vlan.mgmd_enable
+                or vlan.mgmd_enable["igmp"] != ip_igmp_snooping
+            )
+            vlan.mgmd_enable["igmp"] = ip_igmp_snooping
+
+        try:
+            vlan.apply()
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
+
+    result["changed"] = modified
 
     # Exit
     ansible_module.exit_json(**result)
