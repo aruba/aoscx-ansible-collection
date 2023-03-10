@@ -149,7 +149,7 @@ def main():
                 # Create ACL Object
                 interface = device.interface(interface_name)
                 # Delete it
-                interface.clear_acl(acl_type)
+                interface.clear_acl(acl_type, acl_direction)
                 # Changed
                 result["changed"] = True
 

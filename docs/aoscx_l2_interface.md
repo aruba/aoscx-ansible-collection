@@ -11,7 +11,9 @@ Version added: 2.8
 ## Synopsis
 
 This modules provides configuration management of Layer2 Interfaces on AOS-CX
-devices, including Port Security features.
+devices, including Port Security features. For platform 8360, Port Security is
+supported from REST v10.09 upwards.
+
 
 ## Parameters
 
@@ -30,8 +32,8 @@ devices, including Port Security features.
 | `port_security_enable`           | bool |                                         | [ ]      | Enable port security in this interface (aoscx connection)                                                                                                                                                                                                                                                 |
 | `port_security_client_limit`     | int  |                                         | [ ]      | Maximum amount of MACs allowed in the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
 | `port_security_sticky_learning`  | bool |                                         | [ ]      | Enable sticky MAC learning (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                                                   |
-| `port_security_macs`             | list |                                         | [ ]      | List of allowed MAC addresses (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                                                |
-| `port_security_sticky_macs`      | list |                                         | [ ]      | Configure the sticky MAC addresses for the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                         |
+| `port_security_macs`             | list |                                         | [ ]      | List of allowed MAC addresses (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                     |
+| `port_security_sticky_macs`      | list |                                         | [ ]      | Configure the sticky MAC addresses for the interface (aoscx connection). Only valid when port_security is enabled                                                                                                                                                              |
 | `port_security_violation_action` | str  | [`notify`, `shutdown`]                  | [ ]      | Action to perform  when a violation is detected (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                              |
 | `port_security_recovery_time`    | int  |                                         | [ ]      | Time in seconds to wait for recovery after a violation (aoscx connection). Only valid when port_security is enabled                                                                                                                                                                                       |
 | `state`                          | str  | [`create`, `delete`, `update`]/`create` | [ ]      | Create, Update, or Delete Layer2 Interface                                                                                                                                                                                                                                                                |
@@ -65,49 +67,145 @@ See an example [here](#allow-mac-addresses-to-a-port)
 
 Below you can find task examples of this module's implementation:
 
+### Allow VLAN access
+
+Before Device Configuration:
+```
+interface 1/1/4
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/4 - vlan access 200
+  aoscx_l2_interface:
+    interface: 1/1/4
+    vlan_mode: access
+    vlan_access: 200
+```
+
+After Device Configuration:
+```
+interface 1/1/4
+    no shutdown
+    vlan access 200
+```
+
+### Allow VLAN trunk
+
+Before Device Configuration:
+```
+interface 1/1/1
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/1 - vlan trunk allowed 200
+  aoscx_l2_interface:
+    interface: 1/1/1
+    vlan_mode: trunk
+    vlan_trunks: 200
+```
+
+After Device Configuration:
+```
+interface 1/1/1
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed 200
+```
+
+Before Device Configuration:
+```
+interface 1/1/1
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/1 - vlan trunk allowed 200,300
+  aoscx_l2_interface:
+    interface: 1/1/1
+    vlan_mode: trunk
+    vlan_trunks:
+      - 200
+      - 300
+```
+
+After Device Configuration:
+```
+interface 1/1/1
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed 200,300
+```
+
+Before Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: >
+    Configure Interface 1/1/3 - vlan trunk allowed 200,300 and vlan trunk
+    native 200.
+  aoscx_l2_interface:
+    interface: 1/1/3
+    vlan_mode: trunk
+    vlan_trunks:
+      - 200
+      - 300
+    native_vlan_id: 200
+```
+
+After Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan trunk native 200
+    vlan trunk allowed 200,300
+```
+
+Before Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
 ```YAML
 - name: Configure Interface 1/1/3 - vlan trunk allowed all
   aoscx_l2_interface:
     interface: 1/1/3
     vlan_mode: trunk
     trunk_allowed_all: True
+```
 
-- name: Delete Interface 1/1/3
-  aoscx_l2_interface:
-    interface: 1/1/3
-    state: delete
+After Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+```
 
-- name: Configure Interface 1/1/1 - vlan trunk allowed 200
-  aoscx_l2_interface:
-    interface: 1/1/1
-    vlan_mode: trunk
-    vlan_trunks: '200'
+Before Device Configuration:
+```
+interface 1/1/5
+    no shutdown
+    vlan access 1
+```
 
-- name: Configure Interface 1/1/1 - vlan trunk allowed 200,300
-  aoscx_l2_interface:
-    interface: 1/1/1
-    vlan_mode: trunk
-    vlan_trunks:
-      - '200'
-      - '300'
-
-- name: >
-    Configure Interface 1/1/1 - vlan trunk allowed 200,300 and vlan trunk
-    native 200.
-  aoscx_l2_interface:
-    interface: 1/1/3
-    vlan_mode: trunk
-    vlan_trunks:
-      - '200'
-      - '300'
-    native_vlan_id: '200'
-
-- name: Configure Interface 1/1/4 - vlan access 200
-  aoscx_l2_interface:
-    interface: 1/1/4
-    vlan_mode: access
-    vlan_access: '200'
-
+Playbook:
+```YAML
 - name: >
     Configure Interface 1/1/5 - vlan trunk allowed all, vlan trunk native 200
     tag.
@@ -115,45 +213,601 @@ Below you can find task examples of this module's implementation:
     interface: 1/1/5
     vlan_mode: trunk
     trunk_allowed_all: True
-    native_vlan_id: '200'
+    native_vlan_id: 200
     native_vlan_tag: True
+```
 
+After Device Configuration:
+```
+interface 1/1/5
+    no shutdown
+    vlan trunk native 200 tag
+    vlan trunk allowed all
+```
+
+Before Device Configuration:
+```
+interface 1/1/6
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
 - name: >
     Configure Interface 1/1/6 - vlan trunk allowed all, vlan trunk native 200.
   aoscx_l2_interface:
     interface: 1/1/6
     vlan_mode: trunk
     trunk_allowed_all: True
-    native_vlan_id: '200'
+    native_vlan_id: 200
+```
 
-- name: >
-    Configure Interface 1/1/3 - enable port security for a total of 10 MAC
-    addresses with sticky MAC learning, and two user set MAC addresses.
+After Device Configuration:
+```
+interface 1/1/6
+    no shutdown
+    vlan trunk native 200
+    vlan trunk allowed all
+```
+
+### Enable Port Security
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - enable port security
   aoscx_l2_interface:
-    interface: 1/1/3
+    interface: 1/1/13
     port_security_enable: true
-    port_security_client_limit: 10
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+### Set client limit
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set client limit
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_client_limit: 2
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        client-limit 2
+```
+
+### Enable sticky learning
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - enable sticky learning
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
     port_security_sticky_learning: true
-    port_security_macs:
-      - 11:22:33:44:55:66
-      - AA:BB:CC:DD:EE:FF
+```
 
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        sticky-learn enable
+```
+
+### Set allowed MAC address
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set allowed MAC address
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_macs:
+      - 12:34:56:78:90:00
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        mac-address 12:34:56:78:90:00
+```
+
+### Set sticky MAC address
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set sticky mac
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_sticky_macs:
+      - mac: 12:34:56:78:90:00
+        vlans:
+          - 1
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 1
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set sticky mac
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_sticky_macs:
+      - mac: 12:34:56:78:90:00
+        vlans:
+          - 1
+          - 2
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 1
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 2
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set sticky mac
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_sticky_macs:
+      - mac: 12:34:56:78:90:00
+        vlans: []
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 1
+```
+
+### Set violation action
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access security violation action shutdown
+    port-access port-security
+        enable
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set intrusion action
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_violation_action: notify
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set intrusion action
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_violation_action: shutdown
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access security violation action shutdown
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set intrusion action with recovery time
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_recovery_time: 60
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access security violation action shutdown recovery-timer 60
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - set intrusion action with recovery time
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_violation_action: shutdown
+    port_security_recovery_time: 60
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access security violation action shutdown
+    port-access security violation action shutdown recovery-timer 60
+    port-access port-security
+        enable
+```
+
+### Delete configuration of Port Security
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        client-limit 2
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - delete configuration of client limit
+  aoscx_l2_interface:
+    name: 1/1/13
+    port_security_enable: true
+    port_security_client_limit: 2
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        sticky-learn enable
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - delete configuration of sticky learning
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_sticky_learning: true
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access security violation action shutdown
+    port-access port-security
+        enable
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - delete intrusion action
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_violation_action: shutdown
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access security violation action shutdown recovery-timer 60
+    port-access port-security
+        enable
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - delete recovery time
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_recovery_time: 60
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port_security_violation_action: shutdown
+    port-access security violation action shutdown recovery-timer 60
+    port-access port-security
+        enable
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - delete violation action and recovery time
+  aoscx_l2_interface:
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_violation_action: shutdown
+    port_security_recovery_time: 60
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+### Remove allowed MAC address
+
+Before Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        mac-address 12:34:56:78:90:00
+        mac-address 12:34:56:78:90:01
+```
+
+Playbook:
+```YAML
 - name: >
-    Configure Interface 1/1/3 -  remove allowed MAC address AA:BB:CC:DD:EE:FF
-    Previous allowed MAC addresses:
-    - 12:34:56:78:90:01
-    - AA:BB:CC:DD:EE:FF
+    Configure Interface 1/1/3 -  remove allowed MAC address 12:34:56:78:90:00
   aoscx_l2_interface:
     interface: 1/1/3
     port_security_enable: true
     port_security_macs:
-      - 12:34:56:78:90:01
+      - 12:34:56:78:90:00
+    state: delete
+```
 
-- name: >
-    Configure Interface 1/1/3 - disable port security.
+After Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+        mac-address 12:34:56:78:90:01
+```
+
+### Remove allowed sticky MAC address
+
+Before Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+    port-access port-security
+        enable
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 1
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 2
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/3 - set sticky mac
   aoscx_l2_interface:
-    interface: 1/1/3
+    interface: 1/1/13
+    port_security_enable: true
+    port_security_sticky_macs:
+      - mac: 12:34:56:78:90:00
+        vlans:
+          - 1
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed all
+    port-access port-security
+        enable
+        sticky-learn mac-address 12:34:56:78:90:00 vlan 2
+```
+
+### Disable Port Security
+
+Before Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
+    port-access port-security
+        enable
+```
+
+Playbook:
+```YAML
+- name: Configure Interface 1/1/13 - disable port security
+  aoscx_l2_interface:
+    name: 1/1/13
     port_security_enable: false
+```
+
+After Device Configuration:
+```
+interface 1/1/13
+    no shutdown
+    vlan access 1
 ```
 
 ### Interface QoS rate example:
@@ -161,6 +815,14 @@ Below you can find task examples of this module's implementation:
 The following example shows how to configure an Interface's QoS broadcast,
 multicast, and unknown-unicast traffic rates.
 
+Before Device Configuration:
+```
+interface 1/1/2
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
 ```YAML
 - name: Set the interface QoS rate limits
   aoscx_l2_interface:
@@ -171,26 +833,34 @@ multicast, and unknown-unicast traffic rates.
       unknown-unicast: 150pps
 ```
 
-### Allow Mac addresses to a port
+After Device Configuration:
+```
+interface 1/1/2
+    no shutdown
+    vlan access 1
+```
 
-The following example shows how to configure an instrusion action to disable
-the interface if it sees a MAC address that is not on the allowed list.
+### Delete Interface
 
+Before Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan trunk native 200
+    vlan trunk allowed all
+```
+
+Playbook:
 ```YAML
-- name: >
-    Configure Interface 1/1/13 sticky macs
+- name: Delete Interface 1/1/3
   aoscx_l2_interface:
-    interface: 1/1/13
-    port_security_sticky_macs:
-      - mac: AA:BB:CC:DD:EE:FF
-        vlans:
-          - 1
-          - 2
-          - 3
-      - mac: AB:CD:EF:12:34:56
-        vlans:
-          - 1
-          - 2
-    port_security_violation_action: shutdown
-    port_security_recovery_time: 60
+    interface: 1/1/3
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/3
+    no shutdown
+    vlan access 1
 ```

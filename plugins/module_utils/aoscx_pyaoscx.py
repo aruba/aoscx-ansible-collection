@@ -84,4 +84,5 @@ def get_pyaoscx_session(ansible_module):
     # Create pyaoscx session object
     requests_session = ansible_module_session_info["s"]
     base_url = ansible_module_session_info["url"]
-    return PyaoscxSession.from_session(requests_session, base_url)
+    auth = ansible_module_session_info["credentials"]
+    return PyaoscxSession.from_session(requests_session, base_url, credentials=auth)

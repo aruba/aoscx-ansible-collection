@@ -117,9 +117,9 @@ portal](https://developer.arubanetworks.com/aruba-aoscx/reference#acl_entry).
 | `dst_l4_port_max`   | int  | Maximum IP destination port matching attribute. Used in conjunction with `dst_l4_port_min` and `dst_l4_port_range_reverse`                                                                                                                                                                                                                                                                                                                    |
 | `dst_l4_port_min`   | int  | Minimum IP destination port matching attribute. Used in conjunction with `dst_l4_port_max` and `dst_l4_port_range_reverse`                                                                                                                                                                                                                                                                                                                    |
 | `src_ip_group`      | str  | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`.                                                        |
-| `src_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z). To match any address the field can be left empty or use the 'any' keyword                                                                                                                        |
+| `src_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W). To match any address the field can be left empty or use the 'any' keyword                                                                                |
 | `dst_ip_group`      | str  | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`.                                                   |
-| `dst_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z). To match any address the field can be left empty or use the 'any' keyword                                                                                                           |
+| `dst_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W). To match any address the field can be left empty or use the 'any' keyword                                                                   |
 | `src_mac`           | str  | String with source MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword                                                                                                                                                                                                                                               |
 | `dst_mac`           | str  | String with destination MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword                                                                                                                                                                                                                                          |
 | `action`            | str  | Define the action to take on an ACL match. There are two options: `permit`, and `deny`. `permit`: packets will be forwarded. `deny`: packets will be dropped. ACE will only be activated when an associated action is provided.                                                                                                                                                                                                               |
@@ -151,6 +151,13 @@ the rest of the network. Note that in both cases the entries match all
 destination addresses, because `dst_ip` is empty. In that case, all destination
 traffic is denied because the first entry takes precedence.
 
+Before Device Configuration:
+```
+ssh server vrf mgmt
+vlan 1,124
+```
+
+Playbook:
 ```YAML
 - name: >
     Configure IPv4 ACL that allows traffic from a network except a single host.
@@ -162,13 +169,24 @@ traffic is denied because the first entry takes precedence.
         comment: Deny the host
         action: deny
         count: true
-        src_ip: 158.10.12.57/255.255.255.255
+        src_ip: 158.10.12.57/32
         protocol: tcp
       2:
         comment: Allow the network
         action: permit
-        src_ip: 158.10.12.1/255.255.0.0
+        src_ip: 158.10.12.1/16
         protocol: tcp
+```
+
+After Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip allow_network_deny_host
+    1 comment Deny the host
+    1 deny tcp 158.10.12.57/32 any count
+    2 comment Allow the network
+    2 permit tcp 158.10.12.1/16 any
+vlan 1,124
 ```
 
 ## Deny a host and log urgent packets
@@ -176,24 +194,76 @@ traffic is denied because the first entry takes precedence.
 The following example shows how to deny all incoming and outgoing traffic from
 a single host, and log only when packet was urgent.
 
+Before Device Configuration:
+```
+ssh server vrf mgmt
+vlan 1,124
+```
+
+Playbook:
 ```YAML
 - name: Configure IPv6 ACL that denies all traffic and logs urgent packets
   aoscx_acl:
     name: deny_host_log_urgent
+    type: ipv6
     acl_entries:
       9:
         comment: match urgent packets for log
         tcp_urg: true
         log: true
-        src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
-        dst_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        src_ip: 2001:db8::12/48
+        dst_ip: 2001:db8::12/48
         action: deny
       10:
         comment: match the rest of the packets
         log: false
-        src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
-        dst_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        src_ip: 2001:db8::12/48
+        dst_ip: 2001:db8::12/48
         action: deny
+```
+
+After Device Configuration:
+```
+ssh server vrf mgmt
+access-list ipv6 deny_host_log_urgent
+    9 comment match urgent packets for log
+    9 deny any 2001:db8::12/48 2001:db8::12/48 urg log
+    10 comment match the rest of the packets
+    10 deny any 2001:db8::12/48 2001:db8::12/48 log
+vlan 1,124
+```
+
+## Deny a network
+
+The following example shows how to deny all incoming and outgoing traffic from
+a network.
+
+Before Device Configuration:
+```
+ssh server vrf mgmt
+vlan 1,124
+```
+
+Playbook:
+```YAML
+- name: Configure IPv6 ACL that denies all traffic
+  aoscx_acl:
+    name: deny_network
+    type: ipv6
+    acl_entries:
+      10:
+        action: deny
+        count: True
+        protocol: tcp
+        src_ip: 2001:db8::/48
+```
+
+After Device Configuration:
+```
+ssh server vrf mgmt
+access-list ipv6 deny_network
+    10 deny tcp 2001:db8::/48 any count
+vlan 1,124
 ```
 
 ## Simple L4 example
@@ -203,6 +273,13 @@ traffic form ports 5000, 5001 and 5002 to port 3657. Note that when a match for
 only one port is intended, `src/dst_l4_port_max` and `src/dst_l4_port_min` must
 be equal.
 
+Before Device Configuration:
+```
+ssh server vrf mgmt
+vlan 1,124
+```
+
+Playbook:
 ```YAML
 - name: Configure port range
   aoscx_acl:
@@ -211,8 +288,8 @@ be equal.
     acl_entries:
       1:
         comment: Use a range of ports
-        src_ip: 100.10.25.2/255.255.255.0
-        dst_ip: 100.10.25.2/255.255.255.0
+        src_ip: 100.10.25.2/24
+        dst_ip: 100.10.25.2/24
         src_l4_port_max: 5002
         src_l4_port_min: 5000
         dst_l4_port_max: 3657
@@ -220,8 +297,27 @@ be equal.
         action: permit
 ```
 
+After Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip simple_ports
+    1 comment Use a range of ports
+    1 permit any 100.10.25.2/24 range 5000 5002 100.10.25.2/24 eq 3657
+vlan 1,124
+```
+
 ## Remove an ACE
 
+Before Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip simple_ports
+    1 comment Use a range of ports
+    1 permit any 100.10.25.2/255.255.255.0 range 5000 5002 100.10.25.2/255.255.255.0 eq 3657
+vlan 1,124
+```
+
+Playbook:
 ```YAML
 - name: Delete an existing ACE
   aoscx_acl:
@@ -230,18 +326,35 @@ be equal.
     acl_entries:
       1:
         comment: Use a range of ports
-        src_ip: 100.10.25.2/255.255.255.0
-        dst_ip: 100.10.25.2/255.255.255.0
+        src_ip: 100.10.25.2/24
+        dst_ip: 100.10.25.2/24
         src_l4_port_max: 5002
         src_l4_port_min: 5000
         dst_l4_port_max: 3657
         dst_l4_port_min: 3657
         action: permit
-    state:delete
+    state: delete
+```
+
+After Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip simple_ports
+vlan 1,124
 ```
 
 Also an empty ACE configuration can be used as parameter
 
+Before Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip simple_ports
+    1 comment Use a range of ports
+    1 permit any 100.10.25.2/255.255.255.0 range 5000 5002 100.10.25.2/255.255.255.0 eq 3657
+vlan 1,124
+```
+
+Playbook:
 ```YAML
 - name: Delete an existing ACE
   aoscx_acl:
@@ -252,14 +365,35 @@ Also an empty ACE configuration can be used as parameter
     state:delete
 ```
 
+After Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip simple_ports
+vlan 1,124
+```
+
 ## Remove an ACL
 
 If there are no ACEs are present in configuration, the ACL will be removed
 
+Before Device Configuration:
+```
+ssh server vrf mgmt
+access-list ip simple_ports
+vlan 1,124
+```
+
+Playbook:
 ```YAML
 - name: Delete ipv4 ACL from config
   aoscx_acl:
     name: ipv4_acl
     type: ipv4
     state: delete
+```
+
+After Device Configuration:
+```
+ssh server vrf mgmt
+vlan 1,124
 ```

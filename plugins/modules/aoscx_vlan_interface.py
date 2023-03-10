@@ -64,6 +64,7 @@ options:
       must delete the VLAN interface then recreate the VLAN interface in the
       desired VRF.
     type: str
+    default: default
     required: false
   ip_helper_address:
     description: >
@@ -165,7 +166,7 @@ def main():
         ipv4=dict(type="list", elements="str", default=None),
         description=dict(type="str", default=None),
         ipv6=dict(type="list", elements="str", default=None),
-        vrf=dict(type="str", default=None),
+        vrf=dict(type="str", default="default"),
         ip_helper_address=dict(type="list", elements="str", default=None),
         active_gateway_ip=dict(type="str", default=None),
         active_gateway_mac_v4=dict(type="str", default=None),
@@ -194,12 +195,6 @@ def main():
 
         # Set variables
         vlan_interface_id = "vlan" + vlan_id
-        if admin_state is None:
-            admin_state = "up"
-        if vrf is not None:
-            vrf_name = vrf
-        else:
-            vrf_name = "default"
 
         # Set result var
         result = dict(changed=False)
@@ -225,6 +220,9 @@ def main():
                 # Changed
                 result["changed"] = True
 
+            if admin_state:
+                vlan_interface.admin_state = admin_state
+
             # Configure SVI
             # Verify if object was changed
             modified_op = vlan_interface.configure_svi(
@@ -233,7 +231,6 @@ def main():
                 ipv6=ipv6,
                 vrf=vrf,
                 description=description,
-                user_config=admin_state,
             )
 
             if active_gateway_ip and active_gateway_mac_v4:

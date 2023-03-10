@@ -49,6 +49,13 @@ options:
       remote_firmware_file_path is provided.
     type: str
     required: false
+  wait_firmware_upload:
+    description: >
+      If true, the result will be displayed after the firmware upload process
+      is done. If false, the result must be checked on the switch by the user.
+    type: bool
+    required: false
+    default: false
 """
 
 EXAMPLES = """
@@ -65,6 +72,8 @@ EXAMPLES = """
 """
 
 RETURN = r""" # """
+
+from time import sleep
 
 try:
     from pyaoscx.device import Device
@@ -86,15 +95,41 @@ else:
     )
 
 
+def get_argument_spec():
+    argument_spec = {
+        "partition_name": {
+            "type": "str",
+            "required": False,
+            "default": "primary",
+            "choices": ["primary", "secondary"],
+        },
+        "firmware_file_path": {
+            "type": "str",
+            "required": False,
+            "default": None,
+        },
+        "remote_firmware_file_path": {
+            "type": "str",
+            "required": False,
+            "default": None,
+        },
+        "vrf": {
+            "type": "str",
+            "required": False,
+            "default": None,
+        },
+        "wait_firmware_upload": {
+            "type": "bool",
+            "required": False,
+            "default": False,
+        },
+    }
+    return argument_spec
+
+
 def main():
-    module_args = dict(
-        partition_name=dict(
-            type="str", default="primary", choices=["primary", "secondary"]
-        ),
-        firmware_file_path=dict(type="str", default=None),
-        remote_firmware_file_path=dict(type="str", default=None),
-        vrf=dict(type="str", default=None),
-    )
+    module_args = get_argument_spec()
+
     if USE_PYAOSCX_SDK:
         ansible_module = AnsibleModule(
             argument_spec=module_args, supports_check_mode=True
@@ -106,6 +141,7 @@ def main():
         partition_name = ansible_module.params["partition_name"]
         firmware_file_path = ansible_module.params["firmware_file_path"]
         partition_idx = "{0}_version".format(partition_name)
+        wait = ansible_module.params["wait_firmware_upload"]
 
         result = dict(changed=False)
 
@@ -116,17 +152,61 @@ def main():
         device = Device(session)
         prev_firmware = device.get_firmware_info()
 
+        # Bristol and Lemans have problems with library requests
+        # PYAOSCX will try to user pycurl if available
+        platform = prev_firmware[partition_idx].split(".")[0]
+        needs_pycurl = platform in ["PL", "RL"]
+        w_message = ""
+        if needs_pycurl:
+            import importlib.util
+
+            pycurl_info = importlib.util.find_spec("pycurl")
+            if pycurl_info is None:
+                w_message = (
+                    " (This platform has issues with firmware upload, "
+                    "please install pycurl)"
+                )
+
         try:
             success = device.upload_firmware(
                 partition_name=partition_name,
                 firmware_file_path=firmware_file_path,
                 remote_firmware_file_path=http_path,
                 vrf=vrf,
+                try_pycurl=needs_pycurl,
             )
         except Exception as e:
-            ansible_module.module.fail_json(msg="{0}".format(e))
+            ansible_module.fail_json(msg="{0}{1}".format(e, w_message))
 
-        curr_firmware = device.get_firmware_info()
+        if wait:
+            for retry in range(10):
+                try:
+                    _result = device.get_firmware_status()
+                except Exception:
+                    # Reconnect and retry
+                    session.open(
+                        username=session.username(),
+                        password=session.password(),
+                        use_proxy=False,
+                    )
+                    _result = device.get_firmware_status()
+                status = _result["status"]
+                if status == "in_progress":
+                    sleep(60)
+            if status == "failure":
+                ansible_module.fail_json(msg="Firmware upload failed")
+            result["firmware_upload_result"] = status
+
+        try:
+            curr_firmware = device.get_firmware_info()
+        except Exception:
+            # Reconnect and retry
+            session.open(
+                username=session.username(),
+                password=session.password(),
+                use_proxy=False,
+            )
+            curr_firmware = device.get_firmware_info()
 
         # Changed
         result["changed"] = success and (

@@ -649,15 +649,17 @@ def main():
 
     overridable_lists = ("passive_interfaces", "redistribute")
     for olist in overridable_lists:
-        _olist = params.pop(olist, [])
-        if not _olist:
+        if olist not in params:
             continue
+        _olist = params.pop(olist)
         present = getattr(ospf_router, olist)
         if olist == "passive_interfaces":
             present = [i.name for i in present]
-        result["changed"] |= bool(set(_olist) - set(present))
-        if state not in ["override"]:
+        if state in ["override"]:
+            result["changed"] |= (set(_olist) != set(present))
+        else:
             _olist = list(set(_olist) | set(present))
+            result["changed"] |= bool(set(_olist) - set(present))
         setattr(ospf_router, olist, _olist)
 
     for key, value in params.items():

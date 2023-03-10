@@ -48,6 +48,10 @@ options:
     type: bool
     required: false
     default: false
+  mtu:
+    description: Configure MTU value of the interface
+    type: int
+    required: false
   autoneg:
     description: >
       Configure the auto-negotiation state of the interface. If `off` both
@@ -263,10 +267,6 @@ EXAMPLES = """
 - name: Configure Interface 1/1/2 - enable vsx-sync features
   aoscx_interface:
     name: 1/1/2
-    configure_speed: true
-    duplex: full
-    speeds:
-      - 1000
     vsx_sync:
       - acl
       - irdp
@@ -274,6 +274,11 @@ EXAMPLES = """
       - rate_limits
       - vlan
       - vsx_virtual
+
+- name: Set the MTU rate to the 1/1/1 Interface
+  aoscx_interface:
+    name: 1/1/17
+    mtu: 1300
 """
 
 RETURN = r""" # """
@@ -319,6 +324,10 @@ def get_argument_spec():
             "type": "bool",
             "required": False,
             "default": None,
+        },
+        "mtu": {
+            "type": "int",
+            "required": False,
         },
         "duplex": {
             "type": "str",
@@ -479,6 +488,7 @@ def main():
     description = ansible_module.params["description"]
     vsx_sync = ansible_module.params["vsx_sync"]
     state = ansible_module.params["state"]
+    mtu = ansible_module.params["mtu"]
     qos = ansible_module.params["qos"]
     no_qos = ansible_module.params["no_qos"]
     queue_profile = ansible_module.params["queue_profile"]
@@ -499,7 +509,7 @@ def main():
     interface = device.interface(name)
     modified = interface.modified
 
-    if state == "delete":
+    if state == "delete" and not configure_speed:
         interface.delete()
         # report only if created before this run
         result["changed"] = not modified
@@ -509,11 +519,13 @@ def main():
         interface.description = description
     if enabled is not None:
         interface.admin_state = "up" if enabled else "down"
+    if mtu:
+        interface.mtu = mtu
     if vsx_sync:
         if not device.materialized:
             device.get()
         if not device.vsx_capable():
-            ansible_module.module.fail_json(msg="Device doesn't support VSX")
+            ansible_module.fail_json(msg="Device doesn't support VSX")
         clean_vsx_features = [
             vsx_sync_features_mapping(feature) for feature in vsx_sync
         ]
@@ -524,51 +536,61 @@ def main():
     if configure_speed:
         # Ansible detects on/off as True/False, so we accept the boolean, and
         # convert to the str, which is what the REST API accepts
-
-        autoneg = "on" if autoneg else "off"
-        _user_config = {"autoneg": autoneg}
-        if speeds and duplex:
-            _user_config["autoneg"] = "off"
-        modified |= (
-            "autoneg" not in interface.user_config
-            or interface.user_config["autoneg"] != autoneg
-        )
-
-        status_int = Interface(session, name)
-        status_int.get(selector="status")
-
-        if speeds:
-            _user_config["speeds"] = speeds
-            playbook_speeds = set(speeds)
-            if "speeds" in interface.user_config:
-                sw_str_speeds = interface.user_config["speeds"]
-                switch_speeds = set([int(s) for s in sw_str_speeds.split(",")])
-                modified |= switch_speeds != playbook_speeds
-            else:
-                modified = True
-
-        if duplex:
-            _user_config["duplex"] = duplex
+        if state == "delete":
+            if speeds:
+                del interface.user_config["speeds"]
+                modified |= interface.apply()
+            if duplex:
+                del interface.user_config["duplex"]
+                modified |= interface.apply()
+            if (speeds and duplex) or autoneg:
+                del interface.user_config["autoneg"]
+                modified |= interface.apply()
+        else:
+            autoneg = "on" if autoneg else "off"
+            _user_config = {"autoneg": autoneg}
+            if speeds and duplex:
+                _user_config["autoneg"] = "off"
             modified |= (
-                "duplex" not in interface.user_config
-                or interface.user_config["duplex"] != duplex
+                "autoneg" not in interface.user_config
+                or interface.user_config["autoneg"] != autoneg
             )
 
-        if "forced_speeds" not in status_int.hw_intf_info:
-            warning = (
-                "Interface {0} might not support the combination of "
-                "speeds/duplex configured, check your hardware specifications "
-                "and/or CLI to make sure."
-            ).format(name)
-            if "warnings" in result:
-                result["warnings"].append(warning)
-            else:
-                result["warnings"] = [warning]
+            status_int = Interface(session, name)
+            status_int.get(selector="status")
 
-        try:
-            interface.configure_speed_duplex(**_user_config)
-        except Exception as exc:
-            ansible_module.fail_json(msg=str(exc))
+            if speeds:
+                _user_config["speeds"] = speeds
+                playbook_speeds = set(speeds)
+                if "speeds" in interface.user_config:
+                    sw_str_speeds = interface.user_config["speeds"]
+                    switch_speeds = set([int(s) for s in sw_str_speeds.split(",")])
+                    modified |= switch_speeds != playbook_speeds
+                else:
+                    modified = True
+
+            if duplex:
+                _user_config["duplex"] = duplex
+                modified |= (
+                    "duplex" not in interface.user_config
+                    or interface.user_config["duplex"] != duplex
+                )
+
+            if "forced_speeds" not in status_int.hw_intf_info:
+                warning = (
+                    "Interface {0} might not support the combination of "
+                    "speeds/duplex configured, check your hardware specifications "
+                    "and/or CLI to make sure."
+                ).format(name)
+                if "warnings" in result:
+                    result["warnings"].append(warning)
+                else:
+                    result["warnings"] = [warning]
+
+            try:
+                interface.configure_speed_duplex(**_user_config)
+            except Exception as exc:
+                ansible_module.fail_json(msg=str(exc))
 
     if qos:
         modified |= interface.update_interface_qos(qos)

@@ -352,7 +352,7 @@ def main():
                 main_version = int(next(curr_firmware))
                 sub_version = int(next(curr_firmware))
 
-                if platform in ["FL"] and (
+                if platform in ["FL", "ML", "CL", "LL"] and (
                     main_version > 10 or sub_version > 8
                 ):
                     if str(session.api) in ["10.04", "10.08"]:

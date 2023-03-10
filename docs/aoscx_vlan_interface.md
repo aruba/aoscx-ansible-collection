@@ -45,6 +45,7 @@ on AOS-CX devices.
       must delete the VLAN interface then recreate the VLAN interface in the
       desired VRF.
     type: str
+    default: default
     required: false
   ip_helper_address:
     description: >

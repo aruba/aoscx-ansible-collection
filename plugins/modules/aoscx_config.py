@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -54,8 +54,8 @@ options:
       the playbook. This argument is mutually exclusive with the "lines" and
       "parents" arguments. This src file must have same indentation as a live
       switch config. The operation is purely additive, as it doesn't remove any
-        lines that are present in the existing running-config, but not in the
-        source config.
+      lines that are present in the existing running-config, but not in the
+      source config.
     required: false
     type: path
   before:
@@ -76,10 +76,10 @@ options:
     description: >
       Specifies the method of matching. Matching is the comparison against the
       existing running-config to determine whether changes need to be applied.
-      If "match" is set to "line," commands are matched line by line. If
-      "match" is set to "strict," command lines are matched with respect to
-      position. If "match" is set to "exact," command lines must be an equal
-      match. If "match" is set to "none," the module will not attempt to
+      If "match" is set to "line", commands are matched line by line. If
+      "match" is set to "strict", command lines are matched with respect to
+      position. If "match" is set to "exact", command lines must be an equal
+      match. If "match" is set to "none", the module will not attempt to
       compare the source configuration with the running-config on the remote
       device.
     default: line
@@ -93,9 +93,9 @@ options:
   replace:
     description:
       Specifies the approach the module will take when performing configuration
-      on the device. If "replace" is set to "line," then only the differing
+      on the device. If "replace" is set to "line", then only the differing
       and missing configuration lines are pushed to the device. If "replace"
-      is set to "block," then the entire command block is pushed to the device
+      is set to "block", then the entire command block is pushed to the device
       if there is any differing or missing line at all.
     default: line
     choices:
@@ -117,6 +117,7 @@ options:
     description: >
       File path and name options for backing up the existing running-config. To
       be used with "backup".
+    required: false
     type: dict
     suboptions:
       filename:
@@ -135,49 +136,48 @@ options:
       source. This argument is handy for times when it is not desirable to have
       the task get the current running-config, and instead use another config
       for matching.
-    aliases:
-      - config
     required: false
     type: str
-
+    aliases:
+      - config
   save_when:
     description: >
       Specifies when to copy the running-config to the startup-config. When
       changes are made to the device running-configuration, the changes are not
       copied to non-volatile storage by default. If "save_when" is set to
-      "always," the running-config will unconditionally be copied to
-      startup-config. If "save_when" is set to "never," the running-config
+      "always", the running-config will unconditionally be copied to
+      startup-config. If "save_when" is set to "never", the running-config
       will never be copied to startup-config. If "save_when" is set to
-      "modified," the running-config will be copied to startup-config if the
-      two differ. If "save_when" is set to "changed," the running-config will
+      "modified", the running-config will be copied to startup-config if the
+      two differ. If "save_when" is set to "changed", the running-config will
       be copied to startup-config if the task modified the running-config.
+    required: false
+    type: str
     default: never
     choices:
       - always
       - never
       - modified
       - changed
-    required: false
-    type: str
   diff_against:
     description: >
       When using the "ansible-playbook --diff" command line argument this
       module can generate diffs against different sources. This argument
       specifies the particular config against which a diff of the
-      running-config will be performed. If "diff_against" is set to "startup,"
+      running-config will be performed. If "diff_against" is set to "startup",
       the module will return the diff of the running-config against the startup
-      configuration. If "diff_against" is set to "intended," the module will
+      configuration. If "diff_against" is set to "intended", the module will
       return the diff of the running-config against the configuration provided
       in the "intended_config" argument. If "diff_against" is set to
-      "running," the module will return before and after diff of the
+      "running", the module will return before and after diff of the
       running-config with respect to any changes made to the device
       configuration.
+    required: false
+    type: str
     choices:
       - startup
       - intended
       - running
-    required: false
-    type: str
   diff_ignore_lines:
     description: >
       Specifies one or more lines that should be ignored during the diff. This
@@ -191,11 +191,13 @@ options:
     description: >
       Path to file containing the intended configuration that the device should
       conform to, and that is used to check the final running-config against.
-      To be used with "diff_against," which should be set to "intended".
+      To be used with "diff_against", which should be set to "intended".
     required: false
     type: str
   provider:
     description: A dict object containing connection details.
+    required: false
+    type: dict
     suboptions:
       auth_pass:
         description:
@@ -203,6 +205,7 @@ options:
           the remote device. If authorize is false, then this argument does
           nothing. If the value is not specified in the task, the value of
           environment variable ANSIBLE_NET_AUTH_PASS will be used instead.
+        required: false
         type: str
       authorize:
         description:
@@ -211,6 +214,7 @@ options:
           attempt to execute all commands in non-privileged mode. If the value
           is not specified in the task, the value of environment variable
           ANSIBLE_NET_AUTHORIZE will be used instead.
+        required: false
         type: bool
       host:
         description:
@@ -225,11 +229,13 @@ options:
           remote device. This value is used to authenticate the SSH session.
           If the value is not specified in the task, the value of environment
           variable ANSIBLE_NET_PASSWORD will be used instead.
+        required: false
         type: str
       port:
         description: >
           Specifies the port to use when building the connection to the remote
           device.
+        required: false
         type: int
       ssh_keyfile:
         description: >
@@ -238,12 +244,14 @@ options:
           authenticate the SSH session. If the value is not specified in the
           task, the value of environment variable ANSIBLE_NET_SSH_KEYFILE will
           be used instead.
+        required: false
         type: path
       timeout:
         description: >
           Specifies the timeout in seconds for communicating with the network
           device for either connecting or sending commands. If the timeout is
           exceeded before the operation is completed, the module will error.
+        required: false
         type: int
       username:
         description: >
@@ -251,8 +259,8 @@ options:
           remote device. This value is used to authenticate the SSH session.
           If the value is not specified in the task, the value of environment
           variable ANSIBLE_NET_USERNAME will be used instead.
+        required: false
         type: str
-    type: dict
 """
 
 EXAMPLES = """

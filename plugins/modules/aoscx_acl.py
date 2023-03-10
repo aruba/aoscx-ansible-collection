@@ -62,33 +62,43 @@ options:
     suboptions:
       comment:
         type: str
+        required: false
         description: Comment associated with the ACE
       tcp_ack:
         type: bool
+        required: false
         description: TCP Acknowledge flag matching attribute
       tcp_cwr:
         type: bool
+        required: false
         description: TCP CWR flag matching attribute
       tcp_ece:
         type: bool
+        required: false
         description: TCP ECE flag matching attribute
       tcp_established:
         type: bool
+        required: false
         description: TCP established state (ACK or RST flag is set)
       tcp_fin:
         type: bool
+        required: false
         description: TCP FIN flag matching attribute
       tcp_psh:
         type: bool
+        required: false
         description: TCP PSH flag matching attribute
       tcp_rst:
         type: bool
+        required: false
         description: TCP RST flag matching attribute
       tcp_urg:
         type: bool
+        required: false
         description: TCP URG flag matching attribute
       src_l4_port_group:
         type: str
+        required: false
         description: >
           URL in string format of the ACL object group resource. This URL
           refers to the REST API interface and has the following format:
@@ -99,12 +109,15 @@ options:
           group must be of type `l4port`.
       src_l4_port_max:
         type: int
+        required: false
         description: Maximum L4 port to match on the packet
       src_l4_port_min:
         type: int
+        required: false
         description: Minimum L4 port to match on the packet
       dst_l4_port_group:
         type: str
+        required: false
         description: >
           URL in string format of the ACL object group resource. This URL
           refers to the REST API interface and has the following format:
@@ -115,16 +128,19 @@ options:
           must be of type `l4port`.
       dst_l4_port_max:
         type: int
+        required: false
         description: >
           Maximum IP destination port matching attribute. Used in conjunction
           with `dst_l4_port_min` and `dst_l4_port_range_reverse`.
       dst_l4_port_min:
         type: int
+        required: false
         description: >
           Minimum IP destination port matching attribute. Used in conjunction
           with `dst_l4_port_max` and `dst_l4_port_range_reverse`.
       src_ip_group:
         type: str
+        required: false
         description: >
           URL in string format of the ACL object group resource. This URL
           refers to the REST API interface and has the following format:
@@ -134,13 +150,17 @@ options:
           referenced object group must be of type `ipv4` or `ipv6`.
       src_ip:
         type: str
+        required: false
         description: >
           String with source IP matching attribute. If no IP address is
           specified, the ACL Entry will not match on source IP address. The
-          following IPv4 and IPV6 formats are accepted. IPv4 format
-          (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z).
+          following IPv4 and IPV6 formats are accepted. IPv4 format with prefix
+          length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z). IPv6 format
+          (A:B::C:D/W). To match any address the field can be left empty or use
+          the 'any' keyword.
       dst_ip_group:
         type: str
+        required: false
         description: >
           URL in string format of the ACL object group resource. This URL
           refers to the REST API interface and has the following format:
@@ -150,23 +170,29 @@ options:
           referenced object group must be of type `ipv4` or `ipv6`.
       dst_ip:
         type: str
+        required: false
         description: >
           String with source IP matching attribute. If no IP address is
           specified, the ACL Entry will not match on destination IP address.
           The following IPv4 and IPv6 address formats are accepted. IPv4 format
-          (A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W:X::Y:Z).
+          with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z).
+          IPv6 format (A:B::C:D/W). To match any address the field can be left
+          empty or use the 'any' keyword.
       src_mac:
         type: str
+        required: false
         description: >
           String with source MAC matching attribute. Two formats are allowed
           (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ).
       dst_mac:
         type: str
+        required: false
         description: >
           String with destination MAC matching attribute. Two formats are
           allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ).
       action:
         type: str
+        required: false
         description: >
           Define the action to take on an ACL match. There are two options:
           `permit`, and `deny`. `permit`: packets will be forwarded. `deny`:
@@ -174,36 +200,46 @@ options:
           associated action is provided.
       count:
         type: bool
+        required: false
         description: >
           When true, increment hit count for packets that match this ACL.
       dscp:
         type: int
+        required: false
         description: Different Services Code Point matching attribute.
       ecn:
         type: int
+        required: false
         description: Explicit Congestion Notification matching attribute.
       ethertype:
         type: int
+        required: false
         description: Ethernet type matching attribute.
       fragment:
         type: bool
+        required: false
         description: Fragment matching attribute.
       icmp_code:
         type: int
+        required: false
         description: ICMP code matching attribute.
       icmp_type:
         type: int
+        required: false
         description: ICMP type matching attribute.
       ip_precedence:
         type: int
+        required: false
         description: IP Precedence matching attribute.
       log:
         type: bool
+        required: false
         description: >
           ACE attribute log action; when true, log information for packets that
           match ACL.
       pcp:
         type: int
+        required: false
         description: Priority Code Point matching attribute.
       protocol:
         type: int
@@ -237,12 +273,12 @@ EXAMPLES = """
         comment: "Deny the host"
         action: deny
         count: true
-        src_ip: 158.10.12.57/255.255.255.255
+        src_ip: 158.10.12.57/32
         protocol: tcp
       2:
         comment: "Allow the network"
         action: permit
-        src_ip: 158.10.12.1/255.255.0.0
+        src_ip: 158.10.12.1/16
         protocol: tcp
 
 # Deny a host and log urgent packets
@@ -256,15 +292,28 @@ EXAMPLES = """
         comment: "match urgent packets for log"
         tcp_urg: true
         log: true
-        src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
-        dst_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        src_ip: 2001:db8::12/32
+        dst_ip: 2001:db8::12/32
         action: deny
       10:
         comment: "match the rest of the packets"
         log: false
-        src_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
-        dst_ip: 2001:db8::12/ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        src_ip: 2001:db8::12/32
+        dst_ip: 2001:db8::12/32
         action: deny
+
+# Deny a network
+# The following example shows how to deny all incoming and outgoing traffic
+# from a network.
+- name: Configure IPv6 ACL that denies all traffic
+  aoscx_acl:
+    name: deny_network
+    acl_entries:
+      10:
+        action: deny
+        count: True
+        protocol: tcp
+        src_ip: 2001:db8::/32
 
 # Simple L4 example
 # The following example shows how to configure rules with L4 ports. It will
@@ -278,13 +327,29 @@ EXAMPLES = """
     acl_entries:
       1:
         comment: "Use a range of ports"
-        src_ip: 100.10.25.2/255.255.255.0
-        dst_ip: 100.10.25.2/255.255.255.0
+        src_ip: 100.10.25.2/24
+        dst_ip: 100.10.25.2/24
         src_l4_port_max: 5002
         src_l4_port_min: 5000
         dst_l4_port_max: 3657
         dst_l4_port_min: 3567
         action: permit
+
+- name: Delete ACL entry
+  aoscx_acl:
+    name: simple_ports
+    type: ipv4
+    acl_entries:
+      1:
+        comment: "Use a range of ports"
+        src_ip: 100.10.25.2/24
+        dst_ip: 100.10.25.2/24
+        src_l4_port_max: 5002
+        src_l4_port_min: 5000
+        dst_l4_port_max: 3657
+        dst_l4_port_min: 3567
+        action: permit
+    state: delete
 
 - name: Delete ipv4 ACL from config
   aoscx_acl:
@@ -329,7 +394,7 @@ def translate_acl_entries_protocol(protocol_name):
 def _remove_invalid_addresses(parameters):
     """
     For user ease 'any' is accepted as an address, but for REST, to match any
-        address the field as to be empty.
+        address the field has to be empty.
     """
     param_names = [
         "src_ip",
@@ -400,6 +465,7 @@ def main():
     except Exception:
         acl_exists = False
 
+    modified_op = False
     if state == "delete" and acl_exists:
         #  If there are entries in configuration, delete them
         if acl_entries:
@@ -407,30 +473,57 @@ def main():
             for acl_entry in aces:
                 if acl_entry.sequence_number in acl_entries:
                     acl_entry.delete()
-                    result["changed"] = True
+                    modified_op = True
         else:
             # Delete ACL
             acl.delete()
-            result["changed"] = True
+            modified_op = True
     elif state in ["create", "update"]:
-        modified_op = False
         if not acl_exists:
             acl.create()
             modified_op = True
 
         if acl_entries:
             AclEntry = session.api.get_module_class(session, "AclEntry")
+            sw_acl_entries = AclEntry.get_all(session, acl)
             for sequence_number, config in acl_entries.items():
-                acl_entry = AclEntry(
-                    acl.session,
-                    sequence_number=int(sequence_number),
-                    parent_acl=acl,
-                    **_remove_invalid_addresses(config)
-                )
-                modified_op |= acl_entry.apply()
-        # Changed
-        if modified_op:
-            result["changed"] = modified_op
+                if sequence_number in sw_acl_entries:
+                    try:
+                        acl_entry = AclEntry(
+                            session,
+                            sequence_number=int(sequence_number),
+                            parent_acl=acl,
+                            **_remove_invalid_addresses(config)
+                        )
+                        acl_entry.get(selector="configuration")
+                    except Exception as e:
+                        ansible_module.fail_json(msg=str(e))
+                    if "protocol" in config:
+                        protocol = config["protocol"]
+                        config[
+                            "protocol"
+                        ] = translate_acl_entries_protocol(protocol)
+                    for conf in config:
+                        present = getattr(acl_entry, conf)
+                        if present != config[conf]:
+                            modified_op = True
+                else:
+                    modified_op = True
+
+                try:
+                    acl_entry = AclEntry(
+                        session,
+                        sequence_number=int(sequence_number),
+                        parent_acl=acl,
+                        **_remove_invalid_addresses(config)
+                    )
+                    acl_entry.apply()
+                except Exception as e:
+                    ansible_module.fail_json(msg=str(e))
+
+    # Changed
+    if modified_op:
+        result["changed"] = modified_op
 
     # Exit
     ansible_module.exit_json(**result)
