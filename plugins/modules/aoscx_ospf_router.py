@@ -647,7 +647,11 @@ def main():
         result["changed"] = True
         ansible_module.exit_json(**result)
 
-    overridable_lists = ("passive_interfaces", "redistribute")
+    overridable_lists = (
+        "active_interfaces",
+        "passive_interfaces",
+        "redistribute",
+    )
     for olist in overridable_lists:
         if olist not in params:
             continue
@@ -656,7 +660,7 @@ def main():
         if olist == "passive_interfaces":
             present = [i.name for i in present]
         if state in ["override"]:
-            result["changed"] |= (set(_olist) != set(present))
+            result["changed"] |= set(_olist) != set(present)
         else:
             _olist = list(set(_olist) | set(present))
             result["changed"] |= bool(set(_olist) - set(present))
