@@ -7,26 +7,26 @@ or it can also upload the configuration from a TFTP server.
 
 ```YAML
   config_name:
-    description: "Config file or checkpoint to be uploaded to. When using TFTP
-      only running-config or startup-config can be used"
+    description: >
+      Switch config file to be uploaded to, only running-config or startup-config can be used
     type: str
     default: 'running-config'
     required: false
   config_json:
-    description: "JSON file name and path for locally uploading configuration,
-      only JSON version of configuration can be uploaded"
+    description: >
+      JSON file name and path for locally uploading configuration, only JSON version of configuration can be uploaded
     type: str
     required: false
   config_file:
-    description: "File name and path for locally uploading configuration,
-      will be converted to JSON,
-      only JSON version of configuration can be uploaded"
+    description: >
+      File name and path  of JSON formatted config for locally
+      uploading configuration, will be converted to JSON, CLI NOT SUPPORTED
     type: str
     required: false
   remote_config_file_tftp_path:
-    description: "TFTP server address and path for uploading configuration,
-      can be JSON or CLI format, must be reachable through provided vrf
-      ex) tftp://192.168.1.2/config.txt"
+    description: >
+      TFTP server address and path for uploading configuration,
+      can be JSON or CLI format, must be reachable through provided vrf ex) tftp://192.168.1.2/config.txt
     type: str
     required: false
   vrf:
@@ -43,7 +43,7 @@ or it can also upload the configuration from a TFTP server.
 - name: Copy Running Config from local JSON file as JSON
   aoscx_upload_config:
     config_name: 'running-config'
-    remote_config_file_tftp_path: '/user/admin/running.json'
+    config_file: '/user/admin/running.json'
 
 - name: Copy Running Config from TFTP server as JSON
   aoscx_upload_config:

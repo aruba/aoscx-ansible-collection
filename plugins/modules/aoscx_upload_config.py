@@ -27,8 +27,8 @@ author: Aruba Networks (@ArubaNetworks)
 options:
   config_name:
     description: >
-      Config file or checkpoint to be uploaded to. When using TFTP only
-      running-config or startup-config can be used.
+      Switch config file to be uploaded to, only running-config or
+      startup-config can be used
     type: str
     default: 'running-config'
     required: false
@@ -62,7 +62,7 @@ EXAMPLES = """
 - name: Copy Running Config from local JSON file as JSON
   aoscx_upload_config:
     config_name: 'running-config'
-    config_json: '/user/admin/running.json'
+    config_file: '/user/admin/running.json'
 
 - name: Copy Running Config from TFTP server as JSON
   aoscx_upload_config:
