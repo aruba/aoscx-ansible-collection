@@ -210,17 +210,22 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
     device = Device(session)
+    interface = device.interface(interface_name)
+    modified = interface.modified
+
     if state == "delete":
-        # Create Interface Object
-        interface = device.interface(interface_name)
+        special_type = interface.type in [
+            "lag",
+            "loopback",
+            "tunnel",
+            "vlan",
+            "vxlan",
+        ]
         # Delete it
         interface.delete()
+        result["changed"] = not modified and special_type
 
-        # Changed
-        result["changed"] = True
     else:
-        # Create Interface Object
-        interface = device.interface(interface_name)
         # Verify if interface was create
         if interface.was_modified():
             # Changed

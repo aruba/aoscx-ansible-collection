@@ -510,9 +510,16 @@ def main():
     modified = interface.modified
 
     if state == "delete" and not configure_speed:
+        special_type = interface.type in [
+            "lag",
+            "loopback",
+            "tunnel",
+            "vlan",
+            "vxlan",
+        ]
         interface.delete()
         # report only if created before this run
-        result["changed"] = not modified
+        result["changed"] = not modified and special_type
         ansible_module.exit_json(**result)
 
     if description:

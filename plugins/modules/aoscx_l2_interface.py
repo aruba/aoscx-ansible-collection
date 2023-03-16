@@ -485,13 +485,20 @@ def main():
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
-
     device = Device(session)
-    if state == "delete" and port_security_enable is None:
-        interface = device.interface(interface_name)
-        interface.delete()
+    interface = device.interface(interface_name)
+    modified = interface.modified
 
-        result["changed"] = True
+    if state == "delete" and port_security_enable is None:
+        special_type = interface.type in [
+            "lag",
+            "loopback",
+            "tunnel",
+            "vlan",
+            "vxlan",
+        ]
+        interface.delete()
+        result["changed"] = not modified and special_type
         ansible_module.exit_json(**result)
     vlan_tag = None
     if vlan_access is not None:
@@ -502,7 +509,6 @@ def main():
     if isinstance(vlan_tag, str):
         vlan_tag = int(vlan_tag)
 
-    interface = device.interface(interface_name)
     if interface.was_modified():
         result["changed"] = True
     modified_op = interface.configure_l2(
@@ -537,9 +543,7 @@ def main():
                         modified_op |= interface.apply()
                     else:
                         ansible_module.fail_json(
-                            msg="MAC address {0} is not configured".format(
-                                mac
-                            )
+                            msg="MAC address {0} is not configured".format(mac)
                         )
             if port_security_sticky_macs:
                 for sticky_mac in port_security_sticky_macs:
@@ -556,9 +560,7 @@ def main():
                             del sw_sticky_macs[mac]
                     else:
                         ansible_module.fail_json(
-                            msg="MAC address {0} is not configured".format(
-                                mac
-                            )
+                            msg="MAC address {0} is not configured".format(mac)
                         )
                 modified_op |= interface.apply()
             if port_security_violation_action:
@@ -576,12 +578,9 @@ def main():
                 port_sec_kw["allowed_mac_addr"] = port_security_macs
             if port_security_sticky_macs:
                 converted_sticky_macs = {
-                    el["mac"]: el["vlans"]
-                    for el in port_security_sticky_macs
+                    el["mac"]: el["vlans"] for el in port_security_sticky_macs
                 }
-                port_sec_kw[
-                    "allowed_sticky_mac_addr"
-                ] = converted_sticky_macs
+                port_sec_kw["allowed_sticky_mac_addr"] = converted_sticky_macs
             if port_security_violation_action:
                 port_sec_kw[
                     "violation_action"

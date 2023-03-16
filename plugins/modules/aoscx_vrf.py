@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -52,23 +52,37 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
-from ansible.module_utils.basic import AnsibleModule
+
+
+def get_argument_spec():
+    argument_spec = {
+        "name": {
+            "type": "str",
+            "required": True,
+        },
+        "state": {
+            "type": "str",
+            "default": "create",
+            "choices": [
+                "create",
+                "delete",
+            ],
+        },
+    }
+    return argument_spec
 
 
 def main():
-    module_args = dict(
-        name=dict(type="str", required=True),
-        state=dict(default="create", choices=["create", "delete"]),
-    )
-    # ArubaModule
     ansible_module = AnsibleModule(
-        argument_spec=module_args, supports_check_mode=True
+        argument_spec=get_argument_spec(),
+        supports_check_mode=True,
     )
 
-    # Set Variables
+    # Get playbook's arguments
     vrf_name = ansible_module.params["name"]
     state = ansible_module.params["state"]
 
@@ -76,36 +90,41 @@ def main():
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
-
-    try:
-        from pyaoscx.device import Device
-    except Exception as e:
-        ansible_module.fail_json(msg=str(e))
-
     try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
+    # device = Device(session)
+    Vrf = session.api.get_module_class(session, "Vrf")
+    vrf = Vrf(session, vrf_name)
+    modified = False
 
-    device = Device(session)
+    try:
+        vrf.get()
+        vrf_exists = True
+    except Exception:
+        vrf_exists = False
 
     if state == "delete":
-        # Create VRF Object
-        vrf = device.vrf(vrf_name)
-        # Delete it
-        vrf.delete()
-        # Changed
-        result["changed"] = vrf.was_modified()
+        if vrf_exists:
+            vrf.delete()
+            # Changed
+            modified = True
 
     if state == "create":
         # Create VRF with incoming attributes
-        vrf = device.vrf(vrf_name)
-        # Changed
-        result["changed"] = vrf.was_modified()
+        if not vrf_exists:
+            # Changed
+            vrf.create()
+            modified = True
+        try:
+            vrf.apply()
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
 
-    # Exit
+    result["changed"] = modified
     ansible_module.exit_json(**result)
 
 
