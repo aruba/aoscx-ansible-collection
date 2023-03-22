@@ -182,31 +182,33 @@ def main():
 
     session = get_pyaoscx_session(ansible_module)
 
+    vlan = None
     if all_vlans:
-        vlans = Vlan.get_all(session)
+        macs = Mac.get_all(session)
     elif vlan_id:
         vlan = Vlan(session, vlan_id)
         try:
             vlan.get()
         except Exception:
             ansible_module.fail_json("Vlan {0} does not exist".format(vlan_id))
-        vlans = {vlan_id: vlan}
+        macs = Mac.get_all(session, vlan)
 
     mac_addresses = {}
-    for vlan in vlans.values():
-        macs = Mac.get_all(session, vlan)
-        if macs:
-            key = "vlan_" + str(vlan.id)
+    for mac in macs.values():
+        if vlan:
+            _vlan = vlan
+        else:
+            _vlan = mac._parent_vlan
+        key = "vlan_" + str(_vlan.id)
+        if key not in mac_addresses:
             mac_addresses.update({key: {}})
-            for mac in macs.values():
-                if mac.from_id in sources:
-                    if mac.from_id not in mac_addresses[key]:
-                        mac_addresses[key].update({mac.from_id: []})
-                    mac.get()
-                    port = mac.port
-                    mac_addresses[key][mac.from_id].append(
-                        {"mac": str(mac), "port": port.name}
-                    )
+        if mac.from_id in sources:
+            if mac.from_id not in mac_addresses[key]:
+                mac_addresses[key].update({mac.from_id: []})
+            port = mac.port
+            mac_addresses[key][mac.from_id].append(
+                {"mac": str(mac), "port": port.name}
+            )
 
     result["ansible_mac_addresses"] = mac_addresses
     ansible_module.exit_json(**result)
