@@ -647,17 +647,17 @@ def main():
         result["changed"] = True
         ansible_module.exit_json(**result)
 
-    overridable_lists = (
+    overridable_lists = [
         "active_interfaces",
         "passive_interfaces",
         "redistribute",
-    )
+    ]
     for olist in overridable_lists:
         if olist not in params:
             continue
         _olist = params.pop(olist)
         present = getattr(ospf_router, olist)
-        if olist == "passive_interfaces":
+        if olist != "redistribute":
             present = [i.name for i in present]
         if state in ["override"]:
             result["changed"] |= set(_olist) != set(present)
