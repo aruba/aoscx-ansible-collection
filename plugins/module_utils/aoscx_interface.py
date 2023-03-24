@@ -327,8 +327,9 @@ class L2_Interface:
                 aruba_ansible_module, interface_name, vlan_details
             )
         elif update_type == "delete":
+            vlan_field = []
             vlan_fields = []
-            for key in vlan_fields:
+            for key in vlan_field:
                 vlan_fields.append(key)
             aruba_ansible_module = port.delete_port_fields(
                 aruba_ansible_module, interface_name, vlan_fields
