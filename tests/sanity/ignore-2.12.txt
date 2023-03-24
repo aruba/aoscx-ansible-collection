@@ -26,8 +26,6 @@ plugins/modules/aoscx_l2_interface.py compile-2.6!skip
 plugins/modules/aoscx_l2_interface.py import-2.6!skip
 plugins/modules/aoscx_l3_interface.py compile-2.6!skip
 plugins/modules/aoscx_l3_interface.py import-2.6!skip
-plugins/modules/aoscx_lag_interface.py compile-2.6!skip
-plugins/modules/aoscx_lag_interface.py import-2.6!skip
 plugins/modules/aoscx_ospf_interface.py compile-2.6!skip
 plugins/modules/aoscx_ospf_interface.py import-2.6!skip
 plugins/modules/aoscx_ospf_vlink.py compile-2.6!skip
