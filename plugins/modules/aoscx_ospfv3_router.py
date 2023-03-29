@@ -652,6 +652,34 @@ def main():
         "passive_interfaces",
         "redistribute",
     ]
+
+    warnings = []
+
+    passive_interface_default = params.get("passive_interface_default")
+    passive_as_default = (
+        passive_interface_default
+        if passive_interface_default is not None
+        else ospf_router.passive_interface_default
+    )
+    if passive_as_default:
+        passive_interfaces = params.get("passive_interfaces")
+        if passive_interfaces is not None and passive_interfaces != []:
+            warnings.append(
+                "Interfaces are passive by default, "
+                "'passive_interfaces' should be empty"
+            )
+            params.pop("passive_interfaces")
+            ospf_router.passive_interfaces = None
+    else:
+        active_interfaces = params.get("active_interfaces")
+        if active_interfaces is not None and active_interfaces != []:
+            warnings.append(
+                "Interfaces are active by default, "
+                "'active_interfaces' should be empty"
+            )
+            params.pop("active_interfaces")
+            ospf_router.active_interfaces = None
+
     for olist in overridable_lists:
         if olist not in params:
             continue
@@ -673,7 +701,8 @@ def main():
         setattr(ospf_router, key, value)
     if result["changed"]:
         ospf_router.apply()
-
+    if warnings:
+        result["warnings"] = warnings
     ansible_module.exit_json(**result)
 
 
