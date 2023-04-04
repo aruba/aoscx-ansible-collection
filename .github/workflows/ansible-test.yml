@@ -34,11 +34,13 @@ jobs:
           # It's important that Sanity is tested against all stable-X.Y branches
           # Testing against `devel` may fail as new tests are added.
         # - stable-2.9 # Only if your collection supports Ansible 2.9
-          - stable-2.10
-          - stable-2.11
+        #  - stable-2.10
+        #  - stable-2.11
           - stable-2.12
           - stable-2.13
           - stable-2.14
+          - stable-2.15
+          - stable-2.16
           - devel
     runs-on: >-
       ${{ contains(fromJson(
