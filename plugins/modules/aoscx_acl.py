@@ -110,19 +110,22 @@ options:
       src_l4_port_max:
         type: int
         required: false
-        description: Maximum L4 port to match on the packet. Use only if
-        `src_l4_port` is not specified.
+        description: >
+          Maximum L4 port to match on the packet. Use only if
+          `src_l4_port` is not specified.
       src_l4_port_min:
         type: int
         required: false
-        description: Minimum L4 port to match on the packet. Use only if
-        `src_l4_port` is not specified.
+        description: >
+          Minimum L4 port to match on the packet. Use only if
+          `src_l4_port` is not specified.
       src_l4_port:
         type: str
         required: false
-        description: Range of L4 ports or L4 source port to match on the
-        packet. Use only if `src_l4_port_min` and `src_l4_port_max` are not
-        specified.
+        description: >
+          Range of L4 ports or L4 source port to match on the
+          packet. Use only if `src_l4_port_min` and `src_l4_port_max` are not
+          specified.
       dst_l4_port_group:
         type: str
         required: false
@@ -151,9 +154,10 @@ options:
       dst_l4_port:
         type: str
         required: false
-        description: Range of L4 ports or L4 destination port to match on the
-        packet. Use only if `dst_l4_port_min` and `dst_l4_port_max` are not
-        specified.
+        description: >
+          Range of L4 ports or L4 destination port to match on the
+          packet. Use only if `dst_l4_port_min` and `dst_l4_port_max` are not
+          specified.
       src_ip_group:
         type: str
         required: false
