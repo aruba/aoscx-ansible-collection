@@ -48,17 +48,14 @@ options:
   voice:
     description: Enable Voice VLAN
     required: false
-    default: None
     type: bool
   vsx_sync:
     description: Enable vsx_sync (Only for VSX device)
     required: false
-    default: None
     type: bool
   ip_igmp_snooping:
     description: Enable IP IGMP Snooping
     required: false
-    default: None
     type: bool
   state:
     description: Create or update or delete the VLAN.
@@ -130,17 +127,14 @@ def get_argument_spec():
         "voice": {
             "type": "bool",
             "required": False,
-            "default": None,
         },
         "vsx_sync": {
             "type": "bool",
             "required": False,
-            "default": None,
         },
         "ip_igmp_snooping": {
             "type": "bool",
             "required": False,
-            "default": None,
         },
         "state": {
             "type": "str",
@@ -179,7 +173,7 @@ def main():
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
         ansible_module.fail_json(
-            msg="Could not get PYAOSCX Session: {}".format(str(e))
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
     # device = Device(session)
     Vlan = session.api.get_module_class(session, "Vlan")
