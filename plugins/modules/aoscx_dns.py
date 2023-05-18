@@ -212,15 +212,30 @@ def main():
 
     # Set Variables
     mgmt_nameservers = ansible_module.params["mgmt_nameservers"]
+    if mgmt_nameservers is None:
+        mgmt_nameservers = {}
     domain_name = ansible_module.params["domain_name"]
     domain_list = ansible_module.params["domain_list"]
+    if domain_list is None:
+        domain_list = {}
     vrf_name = ansible_module.params["vrf"]
     name_servers = ansible_module.params["name_servers"]
+    if name_servers is None:
+        name_servers = {}
     host_v4_address_mapping = ansible_module.params["host_v4_address_mapping"]
+    if host_v4_address_mapping is None:
+        host_v4_address_mapping = {}
     host_v6_address_mapping = ansible_module.params["host_v6_address_mapping"]
+    if host_v6_address_mapping is None:
+        host_v6_address_mapping = {}
     state = ansible_module.params["state"]
 
-    session = get_pyaoscx_session(ansible_module)
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
 
     vrf = Vrf(session, vrf_name)
 
@@ -231,36 +246,43 @@ def main():
 
     dns = Dns(session, vrf_name)
 
+    try:
+        dns.get()
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
+
     modified_op = False
     modified_op2 = False
 
     if state == "delete":
-        if mgmt_nameservers != {}:
-            modified_op = dns.delete_mgmt_nameservers(session)
+        try:
+            if mgmt_nameservers != {}:
+                modified_op = dns.delete_mgmt_nameservers(session)
 
-        dns.delete_dns(
-            domain_name,
-            domain_list,
-            name_servers,
-            host_v4_address_mapping,
-            host_v6_address_mapping,
-        )
+            dns.delete_dns(
+                domain_name,
+                domain_list,
+                name_servers,
+                host_v4_address_mapping,
+                host_v6_address_mapping,
+            )
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
         modified_op2 = dns.was_modified()
         result["changed"] = modified_op or modified_op2
 
     else:
-        dns = Dns(
-            session,
-            vrf_name=vrf_name,
-            domain_name=domain_name,
-            domain_list=domain_list,
-            domain_servers=name_servers,
-            host_v4_address_mapping=host_v4_address_mapping,
-            host_v6_address_mapping=host_v6_address_mapping,
-        )
+        dns_kwargs = ansible_module.params.copy()
+        for k in ["state", "mgmt_nameservers", "vrf"]:
+            dns_kwargs.pop(k, None)
+        dns_kwargs["domain_servers"] = dns_kwargs.pop("name_servers", None)
+
+        try:
+            dns.setup_dns(**dns_kwargs)
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
 
         modified_op = dns.was_modified()
-
         # Set MGMT name servers
         if mgmt_nameservers != {}:
             primary = None
@@ -271,14 +293,14 @@ def main():
                     primary = value
                 elif key.lower() == "secondary":
                     secondary = value
-            modified_op2 = dns.setup_mgmt_nameservers(
-                session, primary=primary, secondary=secondary
-            )
+            try:
+                modified_op2 = dns.setup_mgmt_nameservers(
+                    session, primary=primary, secondary=secondary
+                )
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
 
         result["changed"] = modified_op or modified_op2
-
-    if result["changed"]:
-        dns.apply()
 
     ansible_module.exit_json(**result)
 
