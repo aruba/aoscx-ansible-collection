@@ -159,7 +159,6 @@ ansible_net_mgmt_intf_status:
   returned: always
   type: dict
 """
-
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
@@ -239,29 +238,34 @@ def main():
     ansible_facts = {}
 
     # Retrieve variables from module parameters
-    network_resource_list = ansible_module.params[
-        "gather_network_resources"
-    ]
+    network_resource_list = ansible_module.params["gather_network_resources"]
     subset_list = ansible_module.params["gather_subset"]
 
     # Retrieve ansible_network_resources
     ansible_network_resources = {}
     if network_resource_list is not None:
         for resource in network_resource_list:
-            if resource == "interfaces":
-                Interface = session.api.get_module_class(session, "Interface")
-                ansible_network_resources.update(
-                    {"interfaces": Interface.get_facts(session)}
-                )
-            elif resource == "vlans":
-                Vlan = session.api.get_module_class(session, "Vlan")
-                ansible_network_resources.update(
-                    {"vlans": Vlan.get_facts(session)}
-                )
-            elif resource == "vrfs":
-                Vrf = session.api.get_module_class(session, "Vrf")
-                ansible_network_resources.update(
-                    {"vrfs": Vrf.get_facts(session)}
+            try:
+                if resource == "interfaces":
+                    Interface = session.api.get_module_class(
+                        session, "Interface"
+                    )
+                    ansible_network_resources.update(
+                        {"interfaces": Interface.get_facts(session)}
+                    )
+                elif resource == "vlans":
+                    Vlan = session.api.get_module_class(session, "Vlan")
+                    ansible_network_resources.update(
+                        {"vlans": Vlan.get_facts(session)}
+                    )
+                elif resource == "vrfs":
+                    Vrf = session.api.get_module_class(session, "Vrf")
+                    ansible_network_resources.update(
+                        {"vrfs": Vrf.get_facts(session)}
+                    )
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Network resources: {0}".format(str(e))
                 )
 
     ansible_facts.update(
@@ -277,9 +281,12 @@ def main():
     ansible_facts.update({"ansible_net_gather_subset": subset_list})
 
     # Retrieve device facts
-    switch = Device(session)
-    switch.get()
-    switch.get_subsystems()  # subsystem
+    try:
+        switch = Device(session)
+        switch.get()
+        switch.get_subsystems()  # subsystem
+    except Exception as e:
+        ansible_module.fail_json(msg="Subsystem: {0}".format(str(e)))
 
     # Set the subsystem attributes allowed to retrieve as facts
     allowed_subsystem_attributes = [
@@ -309,7 +316,23 @@ def main():
         if subset == "management_interface":
             subset = "mgmt_intf_status"
         elif subset == "physical_interfaces":
-            curr_firmware = iter(switch.get_firmware_version().split("."))
+            try:
+                curr_firmware = iter(switch.get_firmware_version().split("."))
+            except Exception:
+                # Reconnect and retry:
+                # Platforms 6000 and 6100 fail here
+                # The session is suddenly closed and it is necessary
+                # to reopen it
+                try:
+                    session.open(
+                        username=session.username(),
+                        password=session.password(),
+                        use_proxy=False,
+                    )
+                except Exception as e:
+                    ansible_module.fail_json(msg=str(e))
+
+                curr_firmware = iter(switch.get_firmware_version().split("."))
             platform = next(curr_firmware)
             main_version = int(next(curr_firmware))
             sub_version = int(next(curr_firmware))
@@ -326,13 +349,16 @@ def main():
                         " in your inventory file for this host. Or define "
                         "environment variable ANSIBLE_AOSCX_REST_VERSION "
                         "with value 10.09"
-                    ).format(
-                        session.api, platform, main_version, sub_version
-                    )
+                    ).format(session.api, platform, main_version, sub_version)
                     warnings.append(w_message)
                 else:
                     use_data_planes = True
-                    switch.get_data_planes()
+                    try:
+                        switch.get_data_planes()
+                    except Exception as e:
+                        ansible_module.fail_json(
+                            msg="Dataplanes: {0}".format(str(e))
+                        )
 
             subset = "interfaces"
         elif subset == "host_name":
@@ -365,9 +391,8 @@ def main():
                     intfs = switch.subsystems[subsystem][subset]
                 ansible_facts[str_subset].update({subsystem: intfs})
 
-    ansible_module.exit_json(
-        ansible_facts=ansible_facts, warnings=warnings
-    )
+    session.close()
+    ansible_module.exit_json(ansible_facts=ansible_facts, warnings=warnings)
 
 
 if __name__ == "__main__":
