@@ -280,10 +280,17 @@ def main():
     # Retrieve ansible_net_gather_subset
     ansible_facts.update({"ansible_net_gather_subset": subset_list})
 
-    # Retrieve device facts
     try:
         switch = Device(session)
-        switch.get()
+        curr_firmware = iter(switch.get_firmware_version().split("."))
+        platform = next(curr_firmware)
+        main_version = int(next(curr_firmware))
+        sub_version = int(next(curr_firmware))
+    except Exception as e:
+        ansible_module.fail_json(msg="Firmware version: {0}".format(str(e)))
+
+    # Retrieve device facts
+    try:
         switch.get_subsystems()  # subsystem
     except Exception as e:
         ansible_module.fail_json(msg="Subsystem: {0}".format(str(e)))
@@ -310,33 +317,11 @@ def main():
     # in argument_spec
     use_data_planes = False
     for subset in subset_list:
-
         # Argument translation for management_interface and
         # physical_interfaces
         if subset == "management_interface":
             subset = "mgmt_intf_status"
         elif subset == "physical_interfaces":
-            try:
-                curr_firmware = iter(switch.get_firmware_version().split("."))
-            except Exception:
-                # Reconnect and retry:
-                # Platforms 6000 and 6100 fail here
-                # The session is suddenly closed and it is necessary
-                # to reopen it
-                try:
-                    session.open(
-                        username=session.username(),
-                        password=session.password(),
-                        use_proxy=False,
-                    )
-                except Exception as e:
-                    ansible_module.fail_json(msg=str(e))
-
-                curr_firmware = iter(switch.get_firmware_version().split("."))
-            platform = next(curr_firmware)
-            main_version = int(next(curr_firmware))
-            sub_version = int(next(curr_firmware))
-
             if platform in ["FL", "ML", "CL", "LL"] and (
                 main_version > 10 or sub_version > 8
             ):
@@ -391,7 +376,6 @@ def main():
                     intfs = switch.subsystems[subsystem][subset]
                 ansible_facts[str_subset].update({subsystem: intfs})
 
-    session.close()
     ansible_module.exit_json(ansible_facts=ansible_facts, warnings=warnings)
 
 
