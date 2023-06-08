@@ -38,3 +38,13 @@ releases:
       - Fix idempotency in ACL module.
       release_summary: New features (port security, PoE, MAC, static MAC and speed/duplex) and bugfixes
     release_date: '2023-03-06'
+  4.2.1:
+    changes:
+      major_changes:
+      - Fix module aoscx_facts (failing on 6000 and 6100, also with other platforms when stressing the device).
+      - Remove legacy code not using the pyaoscx library.
+      - Fix errors in documentation.
+      minor_changes:
+      - Fix sanity errors for Ansible 2.12.
+      release_summary: Documentation and bug fixes release
+    release_date: '2023-06-08'
