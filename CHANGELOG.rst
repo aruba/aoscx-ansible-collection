@@ -5,6 +5,26 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.2.1
+======
+
+Release Summary
+---------------
+
+Documentation and bug fixes release
+
+Major Changes
+-------------
+
+- Fix errors in documentation.
+- Fix module aoscx_facts (failing on 6000 and 6100, also with other platforms when stressing the device).
+- Remove legacy code not using the pyaoscx library.
+
+Minor Changes
+-------------
+
+- Fix sanity errors for Ansible 2.12.
+
 v4.2.0
 ======
 
