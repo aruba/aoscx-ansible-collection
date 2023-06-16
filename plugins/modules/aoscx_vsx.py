@@ -445,19 +445,34 @@ def main():
             msg="Could not find the PYAOSCX SDK. Make sure it is installed."
         )
 
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            "Could not get PYAOSCX Session: {0}".format(str(e))
+        )
+
+    # Get Pyaoscx device to handle switch configuration
+    device = Device(session)
+
     params = ansible_module.params.copy()
     state = params.pop("state")
+
+    if "isl_port" in params:
+        try:
+            isl_port = device.interface(params["isl_port"])
+            isl_port.admin_state = "up"
+            isl_port.configure_l2(
+                vlan_mode="trunk", trunk_allowed_all=True, native_vlan_tag=True
+            )
+        except Exception as e:
+            ansible_module.fail_json(str(e))
 
     # NOTE: remove all values that are unspecified in playbook
     vsx_kw = {}
     for k, v in params.items():
         if v is not None:
             vsx_kw[k] = v
-
-    session = get_pyaoscx_session(ansible_module)
-
-    # Get Pyaoscx device to handle switch configuration
-    device = Device(session)
 
     vsx = device.vsx(**vsx_kw)
     result["changed"] = vsx.modified
