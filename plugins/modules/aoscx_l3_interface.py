@@ -40,18 +40,15 @@ options:
     description: >
       The IPv4 address and subnet mask in the address/mask format. The first
       entry in the list is the primary IPv4, the remainings are secondary IPv4.
-      To remove an IP address pass in the list without the IP address yo wish
-      to remove, and use the update state.
+      To remove an IP address pass in the list and use the delete state.
     type: list
     elements: str
     required: false
   ipv6:
     description: >
-      The IPv6 address and subnet mask in the address/mask format.
       The IPv6 address and subnet mask in the address/mask format. It takes
       multiple IPv6 with comma separated in the list. To remove an IP address
-      pass in the list without the IP address yo wish to remove, and use the
-      update state.
+      pass in the list and use the delete state.
     type: list
     elements: str
     required: false
@@ -130,6 +127,14 @@ EXAMPLES = """
     interface: 1/1/6
     ipv4:
       - 10.33.4.15/24
+      - 10.0.1.1/24
+
+- name: Delete IPv4 addresses on VRF default from L3 Interface 1/1/6
+  aoscx_l3_interface:
+    interface: 1/1/6
+    ipv4:
+      - 10.0.1.1/24
+    state: delete
 
 - name: Deleting L3 Interface - 1/1/3
   aoscx_l3_interface:
@@ -213,7 +218,7 @@ def main():
     interface = device.interface(interface_name)
     modified = interface.modified
 
-    if state == "delete":
+    if state == "delete" and not ipv4 and not ipv6:
         special_type = interface.type in [
             "lag",
             "loopback",
@@ -226,15 +231,67 @@ def main():
         result["changed"] = not modified and special_type
 
     else:
+        new_ipv6_list = None
+        new_ipv4_list = None
         # Verify if interface was create
         if interface.was_modified():
             # Changed
             result["changed"] = True
-        # Configure L4
-        # Verify if object was changed
-        modified_op = interface.configure_l3(
-            ipv4=ipv4, ipv6=ipv6, vrf=vrf, description=description
-        )
+        modified = False
+        if state == "delete":
+            if ipv4:
+                new_ipv4_set = set()
+                if interface.ip4_address_secondary:
+                    new_ipv4_set = set(interface.ip4_address_secondary) - set(
+                        ipv4
+                    )
+                    modified |= (
+                        set(interface.ip4_address_secondary) != new_ipv4_set
+                    )
+                new_ipv4_list = list(new_ipv4_set)
+                if interface.ip4_address:
+                    if interface.ip4_address not in ipv4:
+                        new_ipv4_list.insert(0, interface.ip4_address)
+                    else:
+                        modified = True
+            if ipv6:
+                new_ipv6_list = (
+                    list(set(interface.ip6_addresses) - set(ipv6))
+                    if interface.ip6_addresses
+                    else []
+                )
+                modified |= interface.ip6_addresses is not None and set(
+                    new_ipv6_list
+                ) != set(interface.ip6_addresses)
+        else:
+            if ipv4:
+                new_ipv4_set = set(ipv4)
+                if interface.ip4_address_secondary:
+                    new_ipv4_set |= set(interface.ip4_address_secondary)
+                    modified |= new_ipv4_set != set(
+                        interface.ip4_address_secondary
+                    )
+                if interface.ip4_address:
+                    new_ipv4_set -= set([interface.ip4_address])
+                new_ipv4_list = list(new_ipv4_set)
+                if interface.ip4_address:
+                    new_ipv4_list.insert(0, interface.ip4_address)
+                else:
+                    modified = True
+
+            if ipv6:
+                new_ipv6_list = list(set(ipv6) | set(interface.ip6_addresses))
+                modified |= set(ipv6) != set(interface.ip6_addresses)
+
+        try:
+            interface.configure_l3(
+                ipv4=new_ipv4_list,
+                ipv6=new_ipv6_list,
+                vrf=vrf,
+                description=description,
+            )
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
 
         if ip_helper_addresses is not None:
             # Create DHCP_Relay object
@@ -242,7 +299,7 @@ def main():
             # Add helper addresses
             dhcp_relay.add_ipv4_addresses(ip_helper_addresses)
 
-        if modified_op:
+        if modified:
             # Changed
             result["changed"] = True
 
