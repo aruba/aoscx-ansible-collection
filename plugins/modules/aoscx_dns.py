@@ -255,6 +255,7 @@ def main():
     modified_op2 = False
 
     if state == "delete":
+
         try:
             if mgmt_nameservers != {}:
                 modified_op = dns.delete_mgmt_nameservers(session)
@@ -268,6 +269,19 @@ def main():
             )
         except Exception as e:
             ansible_module.fail_json(msg=str(e))
+
+        if (
+            domain_name is None
+            and domain_list == {}
+            and name_servers == {}
+            and mgmt_nameservers == {}
+            and host_v4_address_mapping == {}
+            and host_v6_address_mapping == {}
+        ):
+            modified_op = dns.delete_mgmt_nameservers(session)
+            
+            dns.delete()
+
         modified_op2 = dns.was_modified()
         result["changed"] = modified_op or modified_op2
 
