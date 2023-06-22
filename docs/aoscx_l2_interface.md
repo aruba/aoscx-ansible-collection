@@ -144,6 +144,25 @@ interface 1/1/1
     vlan trunk allowed 200,300
 ```
 
+Playbook:
+```YAML
+- name: Remove vlan 200 from Interface 1/1/1
+  aoscx_l2_interface:
+    interface: 1/1/1
+    vlan_mode: trunk
+    vlan_trunks:
+      - 200
+    state: delete
+```
+
+After Device Configuration:
+```
+interface 1/1/1
+    no shutdown
+    vlan trunk native 1
+    vlan trunk allowed 300
+```
+
 Before Device Configuration:
 ```
 interface 1/1/3

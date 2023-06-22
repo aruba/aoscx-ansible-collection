@@ -489,7 +489,11 @@ def main():
     interface = device.interface(interface_name)
     modified = interface.modified
 
-    if state == "delete" and port_security_enable is None:
+    if (
+        state == "delete"
+        and port_security_enable is None
+        and vlan_trunks is None
+    ):
         special_type = interface.type in [
             "lag",
             "loopback",
@@ -511,14 +515,41 @@ def main():
 
     if interface.was_modified():
         result["changed"] = True
-    modified_op = interface.configure_l2(
-        description=description,
-        vlan_mode=vlan_mode,
-        vlan_tag=vlan_tag,
-        vlan_ids_list=vlan_trunks,
-        trunk_allowed_all=trunk_allowed_all,
-        native_vlan_tag=native_vlan_tag,
-    )
+
+    if vlan_trunks:
+        if interface.vlan_mode in ["native-tagged", "native-untagged"]:
+            Vlan = session.api.get_module_class(session, "Vlan")
+            orig_vlan_set = set(
+                [str(v.id) for v in interface.vlan_trunks]
+                if interface.vlan_trunks
+                else [str(v.id) for v in Vlan.get_all()]
+            )
+            if state == "delete":
+                new_vlan_set = orig_vlan_set - set(vlan_trunks)
+            else:
+                new_vlan_set = orig_vlan_set | set(vlan_trunks)
+            trunk_allowed_all = (
+                not interface.vlan_trunks and orig_vlan_set == new_vlan_set
+            )
+            vlan_trunks = list(new_vlan_set)
+        elif state == "delete":
+            ansible_module.fail_json(
+                msg="Deleting VLANs on non-trunk interface {0}".format(
+                    interface.name
+                )
+            )
+
+    try:
+        modified_op = interface.configure_l2(
+            description=description,
+            vlan_mode=vlan_mode,
+            vlan_tag=vlan_tag,
+            vlan_ids_list=vlan_trunks,
+            trunk_allowed_all=trunk_allowed_all,
+            native_vlan_tag=native_vlan_tag,
+        )
+    except Exception as e:
+        ansible_module.fail_json(str(e))
 
     if port_security_enable is not None and not port_security_enable:
         modified_op |= interface.port_security_disable()
