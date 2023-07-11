@@ -265,6 +265,7 @@ def main():
                 ) != set(interface.ip6_addresses)
         else:
             if ipv4:
+                primary = ipv4[0]
                 new_ipv4_set = set(ipv4)
                 if interface.ip4_address_secondary:
                     new_ipv4_set |= set(interface.ip4_address_secondary)
@@ -277,6 +278,8 @@ def main():
                 if interface.ip4_address:
                     new_ipv4_list.insert(0, interface.ip4_address)
                 else:
+                    new_ipv4_list.remove(primary)
+                    new_ipv4_list.insert(0, primary)
                     modified = True
 
             if ipv6:
