@@ -518,20 +518,23 @@ def main():
 
     if vlan_trunks:
         if interface.vlan_mode in ["native-tagged", "native-untagged"]:
-            Vlan = session.api.get_module_class(session, "Vlan")
-            orig_vlan_set = set(
-                [str(v.id) for v in interface.vlan_trunks]
-                if interface.vlan_trunks
-                else [str(v.id) for v in Vlan.get_all()]
-            )
             if state == "delete":
+                Vlan = session.api.get_module_class(session, "Vlan")
+                orig_vlan_set = set(
+                    [str(v.id) for v in interface.vlan_trunks]
+                    if interface.vlan_trunks
+                    else [str(v.id) for v in Vlan.get_all(session)]
+                )
                 new_vlan_set = orig_vlan_set - set(vlan_trunks)
             else:
+                orig_vlan_set = set(
+                    [str(v.id) for v in interface.vlan_trunks]
+                    if interface.vlan_trunks
+                    else []
+                )
                 new_vlan_set = orig_vlan_set | set(vlan_trunks)
-            trunk_allowed_all = (
-                not interface.vlan_trunks and orig_vlan_set == new_vlan_set
-            )
             vlan_trunks = list(new_vlan_set)
+            trunk_allowed_all = vlan_trunks == []
         elif state == "delete":
             ansible_module.fail_json(
                 msg="Deleting VLANs on non-trunk interface {0}".format(
