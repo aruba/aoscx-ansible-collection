@@ -298,7 +298,7 @@ def main():
     match = module.params["match"]
 
     while retries >= 0:
-        responses = run_commands(module, commands)
+        responses = run_commands(module, commands, check_rc=True)
 
         for item in list(conditionals):
             if item(responses):
