@@ -193,10 +193,6 @@ def main():
     if ipv6 == [""]:
         ipv6 = []
 
-    # Set Variables
-    if vrf is None:
-        vrf = "default"
-
     # Set result var
     result = dict(changed=False)
 
@@ -217,7 +213,7 @@ def main():
     device = Device(session)
     interface = device.interface(interface_name)
     modified = interface.modified
-
+    exists = not modified
     if state == "delete" and not ipv4 and not ipv6:
         special_type = interface.type in [
             "lag",
@@ -263,19 +259,29 @@ def main():
                 modified |= interface.ip6_addresses is not None and set(
                     new_ipv6_list
                 ) != set(interface.ip6_addresses)
+            vrf = interface.vrf if interface.vrf is not None else "default"
         else:
+            if not exists and vrf is None:
+                vrf = "default"
+            modified_vrf = False
+            if exists:
+                current_vrf = (
+                    interface.vrf if interface.vrf is not None else "default"
+                )
+                modified_vrf = vrf is not None and current_vrf != vrf
+                vrf = current_vrf if vrf is None else current_vrf
             if ipv4:
                 primary = ipv4[0]
                 new_ipv4_set = set(ipv4)
-                if interface.ip4_address_secondary:
+                if interface.ip4_address_secondary and not modified_vrf:
                     new_ipv4_set |= set(interface.ip4_address_secondary)
                     modified |= new_ipv4_set != set(
                         interface.ip4_address_secondary
                     )
-                if interface.ip4_address:
+                if interface.ip4_address and not modified_vrf:
                     new_ipv4_set -= set([interface.ip4_address])
                 new_ipv4_list = list(new_ipv4_set)
-                if interface.ip4_address:
+                if interface.ip4_address and not modified_vrf:
                     new_ipv4_list.insert(0, interface.ip4_address)
                 else:
                     new_ipv4_list.remove(primary)
@@ -283,8 +289,14 @@ def main():
                     modified = True
 
             if ipv6:
-                new_ipv6_list = list(set(ipv6) | set(interface.ip6_addresses))
-                modified |= set(ipv6) != set(interface.ip6_addresses)
+                new_ipv6_list = (
+                    list(set(ipv6) | set(interface.ip6_addresses))
+                    if not modified_vrf
+                    else ipv6
+                )
+                modified |= modified_vrf or (
+                    set(ipv6) != set(interface.ip6_addresses)
+                )
 
         try:
             interface.configure_l3(

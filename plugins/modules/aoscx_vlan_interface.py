@@ -64,7 +64,6 @@ options:
       must delete the VLAN interface then recreate the VLAN interface in the
       desired VRF.
     type: str
-    default: default
     required: false
   ip_helper_address:
     description: >
@@ -144,7 +143,7 @@ def main():
         ipv4=dict(type="list", elements="str", default=None),
         description=dict(type="str", default=None),
         ipv6=dict(type="list", elements="str", default=None),
-        vrf=dict(type="str", default="default"),
+        vrf=dict(type="str", default=None),
         ip_helper_address=dict(type="list", elements="str", default=None),
         active_gateway_ip=dict(type="str", default=None),
         active_gateway_mac_v4=dict(type="str", default=None),
@@ -192,25 +191,29 @@ def main():
         )
 
     device = Device(session)
+    vlan_interface = device.interface(vlan_interface_id)
+    modified = vlan_interface.modified
+    exists = not modified
 
     if state == "delete":
-        # Create Interface Object
-        vlan_interface = device.interface(vlan_interface_id)
         # Delete it
         vlan_interface.delete()
         # Changed
-        result["changed"] = True
+        result["changed"] = exists
 
     if state == "create" or state == "update":
-        # Create Interface with incoming attributes
-        vlan_interface = device.interface(vlan_interface_id)
-        # Verify if interface was create
-        if vlan_interface.was_modified():
-            # Changed
-            result["changed"] = True
-
         if admin_state:
             vlan_interface.admin_state = admin_state
+
+        if not exists and vrf is None:
+            vrf = "default"
+        if exists:
+            current_vrf = (
+                vlan_interface.vrf.name
+                if vlan_interface.vrf is not None
+                else "default"
+            )
+            vrf = current_vrf if vrf is None else vrf
 
         # Configure SVI
         # Verify if object was changed
