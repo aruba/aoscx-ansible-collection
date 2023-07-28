@@ -288,6 +288,7 @@ from ansible.module_utils.basic import AnsibleModule
 try:
     from pyaoscx.device import Device
     from pyaoscx.interface import Interface
+    from pyaoscx.utils import util as utils
 
     HAS_PYAOSCX = True
 except ImportError:
@@ -510,16 +511,41 @@ def main():
     modified = interface.modified
 
     if state == "delete" and not configure_speed:
-        special_type = interface.type in [
+        is_special_type = interface.type in [
             "lag",
             "loopback",
             "tunnel",
             "vlan",
             "vxlan",
         ]
-        interface.delete()
-        # report only if created before this run
-        result["changed"] = not modified and special_type
+        if is_special_type:
+            # report only if created before this run
+            interface.delete()
+            result["changed"] = not modified
+        else:
+            # physical interfaces cannot be deleted, in this case default
+            # values are loaded
+            prev_intf_attrs = utils.get_attrs(
+                interface, interface.config_attrs
+            )
+            interface.delete()
+            interface = Interface(session, name)
+            interface.get()
+            curr_intf_attrs = utils.get_attrs(
+                interface, interface.config_attrs
+            )
+            # interfaces list members in dictionary are pointers to Interface
+            # objects, so they are converted to str value to avoid false
+            # negatives
+            prev_intf_attrs["interfaces"] = list(
+                map(str, prev_intf_attrs["interfaces"])
+            )
+            curr_intf_attrs["interfaces"] = list(
+                map(str, curr_intf_attrs["interfaces"])
+            )
+
+            # need to compare if there are any changes after deleting
+            result["changed"] = prev_intf_attrs != curr_intf_attrs
         ansible_module.exit_json(**result)
 
     if description:

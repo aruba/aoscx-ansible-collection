@@ -201,6 +201,7 @@ def main():
 
     try:
         from pyaoscx.device import Device
+        from pyaoscx.utils import util as utils
     except Exception as e:
         ansible_module.fail_json(msg=str(e))
 
@@ -215,17 +216,42 @@ def main():
     modified = interface.modified
     exists = not modified
     if state == "delete" and not ipv4 and not ipv6:
-        special_type = interface.type in [
+        is_special_type = interface.type in [
             "lag",
             "loopback",
             "tunnel",
             "vlan",
             "vxlan",
         ]
-        # Delete it
-        interface.delete()
-        result["changed"] = not modified and special_type
+        if is_special_type:
+            # report only if created before this run
+            interface.delete()
+            result["changed"] = not modified
+        else:
+            # physical interfaces cannot be deleted, in this case default
+            # values are loaded
+            prev_intf_attrs = utils.get_attrs(
+                interface, interface.config_attrs
+            )
+            interface.delete()
+            Interface = session.api.get_module_class(session, "Interface")
+            interface = Interface(session, interface_name)
+            interface.get()
+            curr_intf_attrs = utils.get_attrs(
+                interface, interface.config_attrs
+            )
+            # interfaces list members in dictionary are pointers to Interface
+            # objects, so they are converted to str value to avoid false
+            # negatives
+            prev_intf_attrs["interfaces"] = list(
+                map(str, prev_intf_attrs["interfaces"])
+            )
+            curr_intf_attrs["interfaces"] = list(
+                map(str, curr_intf_attrs["interfaces"])
+            )
 
+            # need to compare if there are any changes after deleting
+            result["changed"] = prev_intf_attrs != curr_intf_attrs
     else:
         new_ipv6_list = None
         new_ipv4_list = None

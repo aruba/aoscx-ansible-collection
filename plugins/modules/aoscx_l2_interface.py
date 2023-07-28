@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -324,6 +324,7 @@ RETURN = r""" # """
 
 
 from ansible.module_utils.basic import AnsibleModule
+
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
@@ -442,6 +443,11 @@ def main():
         argument_spec=get_argument_spec(), supports_check_mode=True
     )
 
+    result = dict(changed=False)
+
+    if ansible_module.check_mode:
+        ansible_module.exit_json(**result)
+
     interface_name = ansible_module.params["interface"]
     description = ansible_module.params["description"]
     vlan_mode = ansible_module.params["vlan_mode"]
@@ -469,13 +475,9 @@ def main():
         "port_security_recovery_time"
     ]
 
-    result = dict(changed=False)
-
-    if ansible_module.check_mode:
-        ansible_module.exit_json(**result)
-
     try:
         from pyaoscx.device import Device
+        from pyaoscx.utils import util as utils
     except Exception as e:
         ansible_module.fail_json(msg=str(e))
 
@@ -485,6 +487,7 @@ def main():
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
+
     device = Device(session)
     interface = device.interface(interface_name)
     modified = interface.modified
@@ -494,15 +497,42 @@ def main():
         and port_security_enable is None
         and vlan_trunks is None
     ):
-        special_type = interface.type in [
+        is_special_type = interface.type in [
             "lag",
             "loopback",
             "tunnel",
             "vlan",
             "vxlan",
         ]
-        interface.delete()
-        result["changed"] = not modified and special_type
+        if is_special_type:
+            # report only if created before this run
+            interface.delete()
+            result["changed"] = not modified
+        else:
+            # physical interfaces cannot be deleted, in this case default
+            # values are loaded
+            prev_intf_attrs = utils.get_attrs(
+                interface, interface.config_attrs
+            )
+            interface.delete()
+            Interface = session.api.get_module_class(session, "Interface")
+            interface = Interface(session, interface_name)
+            interface.get()
+            curr_intf_attrs = utils.get_attrs(
+                interface, interface.config_attrs
+            )
+            # interfaces list members in dictionary are pointers to Interface
+            # objects, so they are converted to str value to avoid false
+            # negatives
+            prev_intf_attrs["interfaces"] = list(
+                map(str, prev_intf_attrs["interfaces"])
+            )
+            curr_intf_attrs["interfaces"] = list(
+                map(str, curr_intf_attrs["interfaces"])
+            )
+
+            # need to compare if there are any changes after deleting
+            result["changed"] = prev_intf_attrs != curr_intf_attrs
         ansible_module.exit_json(**result)
     vlan_tag = None
     if vlan_access is not None:
