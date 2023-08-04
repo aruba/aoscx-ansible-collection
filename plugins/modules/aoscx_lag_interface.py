@@ -32,7 +32,10 @@ options:
     type: str
     required: true
   interfaces:
-    description: List of interfaces in the LAG
+    description: >
+      List of interfaces in the LAG. Each interface added to a LAG interface
+      will inherit the LAG manager state of the LAG, wether it is "up" or
+      "down".
     type: list
     elements: str
     required: false
@@ -79,7 +82,10 @@ options:
     type: bool
     required: false
   state:
-    description: Create, Update or Delete the Interface.
+    description: >
+      Create, Update or Delete the Interface. After that a physical interface
+      is removed from a LAG, interface will be shutdown (admin state in down).
+      LAG interface
     type: str
     default: create
     choices:
