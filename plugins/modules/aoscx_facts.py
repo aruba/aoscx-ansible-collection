@@ -282,12 +282,14 @@ def main():
 
     try:
         switch = Device(session)
-        curr_firmware = iter(switch.get_firmware_version().split("."))
-        platform = next(curr_firmware)
-        main_version = int(next(curr_firmware))
-        sub_version = int(next(curr_firmware))
+        switch.get()
     except Exception as e:
-        ansible_module.fail_json(msg="Firmware version: {0}".format(str(e)))
+        ansible_module.fail_json(msg="System: {0}".format(str(e)))
+
+    curr_firmware = iter(switch.firmware_version.split("."))
+    platform = next(curr_firmware)
+    main_version = int(next(curr_firmware))
+    sub_version = int(next(curr_firmware))
 
     # Retrieve device facts
     try:
