@@ -178,6 +178,7 @@ def main():
     # device = Device(session)
     Vlan = session.api.get_module_class(session, "Vlan")
     vlan = Vlan(session, vlan_id, vlan_name)
+    warnings = []
     modified = False
 
     try:
@@ -210,8 +211,15 @@ def main():
             vlan.description = description
 
         if admin_state is not None:
-            modified |= vlan.admin != admin_state
-            vlan.admin = admin_state
+            if hasattr(vlan, "admin"):
+                modified |= vlan.admin != admin_state
+                vlan.admin = admin_state
+            elif admin_state == "down":
+                warnings.append(
+                    "Unable to set admin_state to down on VLAN {0}".format(
+                        vlan_id
+                    )
+                )
 
         if voice is not None:
             modified |= vlan.voice != voice
@@ -242,6 +250,7 @@ def main():
             ansible_module.fail_json(msg=str(e))
 
     result["changed"] = modified
+    result["warnings"] = warnings
 
     # Exit
     ansible_module.exit_json(**result)
