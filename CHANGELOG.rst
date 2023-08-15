@@ -5,6 +5,29 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.3.0
+======
+
+Release Summary
+---------------
+
+New features (LAG and DNS), enhancements (VLAN) and bugfixes
+
+Major Changes
+-------------
+
+- Add enhancements for VLAN module by Alexis La Goutte (https://github.com/aruba/aoscx-ansible-collection/pull/60)
+- Add new modules for LAG (aoscx_lag_interface) and DNS (aoscx_dns)
+- Include fixes for issues found internally.
+
+Minor Changes
+-------------
+
+- Fix Facts Ansible module. The ``gather_subset`` choices ``management_interface`` , ``platform_name``, ``host_name``, ``product_info``, ``software_images`` are working again. (https://github.com/aruba/aoscx-ansible-collection/issues/76)
+- Fix aoscx_command module (https://github.com/aruba/aoscx-ansible-collection/issues/70)
+- Fix sanity tests errors.
+- The ``gather_subsets`` choice ``config`` is not available yet and it will be available in a future release.
+
 v4.2.1
 ======
 

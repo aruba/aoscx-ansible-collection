@@ -48,3 +48,19 @@ releases:
       - Fix sanity errors for Ansible 2.12.
       release_summary: Documentation and bug fixes release
     release_date: '2023-06-08'
+  4.3.0:
+    changes:
+      major_changes:
+      - Add new modules for LAG (aoscx_lag_interface) and DNS (aoscx_dns)
+      - Add enhancements for VLAN module by Alexis La Goutte (https://github.com/aruba/aoscx-ansible-collection/pull/60)
+      - Include fixes for issues found internally.
+      minor_changes:
+      - Fix aoscx_command module (https://github.com/aruba/aoscx-ansible-collection/issues/70)
+      - Fix Facts Ansible module. The ``gather_subset`` choices ``management_interface``
+        , ``platform_name``, ``host_name``, ``product_info``, ``software_images`` are working
+        again. (https://github.com/aruba/aoscx-ansible-collection/issues/76)
+      - The ``gather_subsets`` choice ``config`` is not available yet and it will be available
+        in a future release.
+      - Fix sanity tests errors.
+      release_summary: New features (LAG and DNS), enhancements (VLAN) and bugfixes
+    release_date: '2023-08-30'
