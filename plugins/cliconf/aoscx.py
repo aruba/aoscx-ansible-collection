@@ -36,7 +36,6 @@ from ansible.plugins.cliconf import CliconfBase, enable_mode
 
 from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.utils import (  # NOQA
     to_list,
-    ComplexList,
 )
 
 

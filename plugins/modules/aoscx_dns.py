@@ -279,7 +279,7 @@ def main():
             and host_v6_address_mapping == {}
         ):
             modified_op = dns.delete_mgmt_nameservers(session)
-            
+
             dns.delete()
 
         modified_op2 = dns.was_modified()
