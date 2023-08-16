@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2020-2022 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2020-2023 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -110,6 +110,10 @@ ansible_net_gather_network_resources:
     The list of fact for network resource subsets collected from the device.
   returned: when the resource is configured
   type: list
+ansible_net_config:
+  description: The running configuration returned from the device
+  returned: when the parameter is included in the list
+  type: dict
 ansible_net_domain_name:
   description: The domain name returned from the device
   returned: always
@@ -310,7 +314,9 @@ def main():
     default_subset_list = ["management_interface", "software_version"]
 
     # Extend subset_list with default subsets
-    subset_list.extend(default_subset_list)
+    for ss in default_subset_list:
+        if ss not in subset_list:
+            subset_list.append(ss)
 
     # Delete duplicates
     subset_list = list(dict.fromkeys(subset_list))
@@ -350,6 +356,9 @@ def main():
             subset = "interfaces"
         elif subset == "host_name":
             subset = "hostname"
+        elif subset == "config":
+            configuration = switch.configuration()
+            ansible_facts["ansible_net_config"] = configuration.get_full_config()
 
         str_subset = "ansible_net_" + subset
 
