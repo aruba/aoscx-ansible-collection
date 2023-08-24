@@ -350,7 +350,12 @@ def main():
             subset = "interfaces"
         elif subset == "host_name":
             subset = "hostname"
-
+        elif subset == "config":
+            w_message = (
+                "gather_subset:config is not available yet, it will "
+                "be available in a future release"
+            )
+            warnings.append(w_message)
         str_subset = "ansible_net_" + subset
 
         # Check if current subset is inside the Device object

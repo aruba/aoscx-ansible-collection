@@ -25,6 +25,8 @@ ansible_aoscx_rest_version: 10.09
 ```
 export ANSIBLE_AOSCX_REST_VERSION=10.09
 ```
+In the case of the "gather_subset" parameter, the choice "config" is not
+available yet, it will be available in a future release.
 
 ##### ARGUMENTS
 
