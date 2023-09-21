@@ -63,15 +63,16 @@ options:
       - software_version
   gather_network_resources:
     description: >
-      Retrieve vlan, interface, or vrf information. This can be a single
-      category or it can be a list. Leaving this field blank returns all all
-      interfaces, vlans, and vrfs.
+      Retrieve vlan, interface, lldp_neighbors or vrf information. This can
+      be a single category or it can be a list. Leaving this field blank
+      returns all interfaces, vlans, and vrfs.
     type: list
     elements: str
     choices:
       - interfaces
       - vlans
       - vrfs
+      - lldp_neighbors
     required: false
 """
 
@@ -208,7 +209,7 @@ def main():
         "gather_network_resources": dict(
             type="list",
             elements="str",
-            choices=["interfaces", "vlans", "vrfs"],
+            choices=["interfaces", "vlans", "vrfs", "lldp_neighbors"],
         ),
     }
     ansible_module = AnsibleModule(
@@ -262,6 +263,13 @@ def main():
                     Vrf = session.api.get_module_class(session, "Vrf")
                     ansible_network_resources.update(
                         {"vrfs": Vrf.get_facts(session)}
+                    )
+                elif resource == "lldp_neighbors":
+                    LLDPNeighbor = session.api.get_module_class(
+                        session, "LLDPNeighbor"
+                    )
+                    ansible_network_resources.update(
+                        {"lldp_neighbors": LLDPNeighbor.get_facts(session)}
                     )
             except Exception as e:
                 ansible_module.fail_json(

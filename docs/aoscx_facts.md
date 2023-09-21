@@ -77,6 +77,7 @@ available yet, it will be available in a future release.
       - interfaces
       - vlans
       - vrfs
+      - lldp_neighbors
     required: false
 ```
 
