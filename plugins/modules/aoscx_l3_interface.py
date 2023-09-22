@@ -292,10 +292,12 @@ def main():
             modified_vrf = False
             if exists:
                 current_vrf = (
-                    interface.vrf if interface.vrf is not None else "default"
+                    interface.vrf.name
+                    if interface.vrf is not None
+                    else "default"
                 )
                 modified_vrf = vrf is not None and current_vrf != vrf
-                vrf = current_vrf if vrf is None else current_vrf
+                vrf = current_vrf if vrf is None else vrf
             if ipv4:
                 primary = ipv4[0]
                 new_ipv4_set = set(ipv4)
