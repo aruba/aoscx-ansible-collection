@@ -132,6 +132,7 @@ def main():
     if state == "create":
        # Configure RD (Route Distinguisher)
         if rd:
+           modified |= vrf.rd != rd
            vrf.rd = rd
 
         # Create VRF with incoming attributes
