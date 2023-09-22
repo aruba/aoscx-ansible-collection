@@ -115,9 +115,6 @@ def main():
     # device = Device(session)
     Vrf = session.api.get_module_class(session, "Vrf")
     vrf = Vrf(session, vrf_name)
-    # Configure RD (Route Distinguisher)
-    if rd:
-        vrf.rd = rd
     modified = False
 
     try:
@@ -133,6 +130,10 @@ def main():
             modified = True
 
     if state == "create":
+       # Configure RD (Route Distinguisher)
+        if rd:
+           vrf.rd = rd
+
         # Create VRF with incoming attributes
         if not vrf_exists:
             # Changed
