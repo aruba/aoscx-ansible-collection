@@ -46,6 +46,9 @@ there is a maximum of eight OSPF processes allowed per VRF.
 | `vrf`          | str  |                                                           | [x]      | Name of the VRF where the router will be in.              |
 | `instance_tag` | int  |                                                           | [x]      | OSPF process ID (1-63).                                   |
 | `redistribute` | list | [`connected`, `local_loopback`, `static`, `bgp`, `ripng`] | [ ]      | List with route sources to redistribute in this instance. |
+| `active_interfaces` | list |                                                      | [ ]      | List of the active interfaces. If `passive_interface_default` is set `false`, then this list should be empty.                                |
+| `passive_interface_default` | bool |                                              | [ ]      | This determines whether all interfaces should be set to passive by default.
+| `passive_interfaces` | list |                                                      | [ ]     | List of the passive interfaces. If `passive_interface_default` is set `true`, then this list should be empty.                                |
 
 ---
 ## aoscx_ospf_area
@@ -164,7 +167,8 @@ connection to the backbone area.
 
 ```YAML
 - name: >
-    Create new OSPF Router, with bgp, and static as OSPF redistribution methods
+    Create new OSPF Router, with bgp, and static as OSPF redistribution methods.
+    Also set passive interfaces.
   aoscx_ospf_router:
     state: update
     vrf: default
@@ -172,6 +176,10 @@ connection to the backbone area.
     redistribute:
       - bgp
       - static
+    passive_interface_default: false
+    passive_interfaces:
+      - 1/1/5
+      - 1/1/6
 ```
 
 ## Update OSPF Router
@@ -192,7 +200,8 @@ connection to the backbone area.
 ```YAML
 - name: >
     Update OSPF Router, set redistribute to connected, and static only. This
-    deletes bgp from the list.
+    deletes bgp from the list and remove a previously configured passive 
+    interface (1/1/5).
   aoscx_ospf_router:
     state: override
     vrf: default
@@ -200,6 +209,10 @@ connection to the backbone area.
     redistribute:
       - connected
       - static
+    passive_interface_default: false
+    passive_interfaces:
+      - 1/1/6
+
 ```
 
 ## Update OSPF Router
@@ -207,13 +220,18 @@ connection to the backbone area.
 ```YAML
 - name: >
     Update OSPF Router, set redistribute to connected only. This deletes static
-    from the list.
+    from the list. Set an active interfaces and remove all passive interfaces.
   aoscx_ospf_router:
     state: override
     vrf: default
     instance_tag: 1
     redistribute:
       - connected
+    passive_interface_default: true
+    passive_interfaces: []
+    active_interfaces:
+      - 1/1/6
+
 ```
 
 ## Delete OSPF Router

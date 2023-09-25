@@ -317,7 +317,7 @@ EXAMPLES = """
 
 - name: >
     Create new OSPF Router, with bgp, and static as OSPF redistribution
-    methods.
+    methods. Also set passive interfaces.
   aoscx_ospf_router:
     state: update
     vrf: default
@@ -325,6 +325,10 @@ EXAMPLES = """
     redistribute:
       - bgp
       - static
+    passive_interface_default: false
+    passive_interfaces:
+      - 1/1/5
+      - 1/1/6
 
 - name: >
     Update OSPF Router, add connected to the redistribute methods list.
@@ -337,7 +341,8 @@ EXAMPLES = """
 
 - name: >
     Update OSPF Router, set redistribute to connected, and static only. This
-    deletes bgp from the list.
+    deletes bgp from the list and remove a previously configured passive
+    interface (1/1/5).
   aoscx_ospf_router:
     state: override
     vrf: default
@@ -345,16 +350,26 @@ EXAMPLES = """
     redistribute:
       - connected
       - static
+    passive_interface_default: false
+    passive_interfaces:
+      - 1/1/6
 
 - name: >
     Update OSPF Router, set redistribute to connected only. This deletes static
-    from the list.
+    from the list. Set an active interfaces and remove all passive interfaces.
   aoscx_ospf_router:
     state: override
     vrf: default
     instance_tag: 1
     redistribute:
       - connected
+    passive_interface_default: true
+    passive_interfaces: []
+    active_interfaces:
+      - 1/1/6
+
+- name: >
+    Update OS
 
 - name: Delete OSPF Router
   aoscx_ospf_router:
