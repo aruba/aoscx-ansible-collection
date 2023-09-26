@@ -40,11 +40,30 @@ Skipping 'ansible.netcommon:2.3.0' as it is already installed
 Skipping 'ansible.utils:2.3.1' as it is already installed
 ```
 
-* **Change into the collections directory** where the AOS-CX Ansible collection (arubanetworks.aoscx) was installed:
+* **Change into the collections directory** where the AOS-CX Ansible collection (arubanetworks.aoscx) was installed.
+    You can either execute `ansible-galaxy collection list` to find or use the following command:
     ```
     cd "$(ansible-galaxy collection list | grep -E '^#.*\.ansible' | sed 's/\# //')/arubanetworks/aoscx"
     ```
+    * Example output of `ansible-galaxy collection list` and `cd` command:
 
+    ```
+	ansible-control-machine$ansible-galaxy collection list
+	# /users/chiapuzi/.ansible/collections/ansible_collections
+	Collection               Version
+	------------------------ -------
+	ansible.netcommon        2.3.0
+	ansible.posix            1.1.1
+	ansible.utils            2.3.1
+	arubanetworks.aos_switch 1.4.0
+	arubanetworks.aoscx      3.0.1
+	ansible-control-machine$cd /users/chiapuzi/.ansible/collections/ansible_collections/arubanetworks/aoscx/
+	ansible-control-machine$ls
+	CONTRIBUTING.md  FILES.json     meta     README.md         requirements.yml
+	docs             MANIFEST.json  plugins  requirements.txt
+	ansible-control-machine$
+	```
+    
 * Install all Ansible requirements, with the following command:
     ```
     ansible-galaxy install -r requirements.yml
