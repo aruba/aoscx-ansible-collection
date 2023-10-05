@@ -294,6 +294,33 @@ def main():
     except Exception as e:
         ansible_module.fail_json(msg="System: {0}".format(str(e)))
 
+    # LLDP Neighbors for interface mgmt are located in System (switch)
+    if (
+        "lldp_neighbors" in ansible_network_resources
+        and switch.lldp_mgmt_neighbor_info
+    ):
+        mgmt_lldp_neighbors = {}
+        for neighbor in switch.lldp_mgmt_neighbor_info.values():
+            # Creating an entry similar to those obtained
+            # from LLDPNeighbor.get_facts()
+            tmp_chassis_id = neighbor.pop("chassis_id", "")
+            tmp_port_id = neighbor.pop("port_id", "")
+            tmp_mac_addr = neighbor.pop("mac_addr", "")
+            neighbor_idx = tmp_chassis_id + "," + tmp_port_id
+
+            mgmt_lldp_neighbors[neighbor_idx] = {}
+            mgmt_lldp_neighbors[neighbor_idx].update(
+                {
+                    "chassis_id": tmp_chassis_id,
+                    "port_id": tmp_port_id,
+                    "mac_addr": tmp_mac_addr,
+                    "neighbor_info": neighbor,
+                }
+            )
+        ansible_network_resources["lldp_neighbors"].update(
+            {"mgmt": mgmt_lldp_neighbors}
+        )
+
     curr_firmware = iter(switch.firmware_version.split("."))
     platform = next(curr_firmware)
     main_version = int(next(curr_firmware))
