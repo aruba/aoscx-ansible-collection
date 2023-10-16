@@ -312,7 +312,7 @@ def main():
                     if interface.vrf is not None
                     else "default"
                 )
-
+                vrf = current_vrf if vrf is None else vrf
                 modified_vrf |= current_vrf != vrf
                 if current_vrf == "default" and vrf is None:
                     modified_vrf = False
