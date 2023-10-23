@@ -194,6 +194,7 @@ def main():
     vlan_interface = device.interface(vlan_interface_id)
     modified = vlan_interface.modified
     exists = not modified
+    modified_op = False
 
     if state == "delete":
         # Delete it
@@ -214,16 +215,34 @@ def main():
                 else "default"
             )
             vrf = current_vrf if vrf is None else vrf
+            modified_op |= current_vrf != vrf
+            if current_vrf == "default" and vrf is None:
+                modified_op = False
+            if modified_op:
+                ipv4 = []
+                ipv6 = []
+                description = None
+                vlan_interface.delete_active_gateway()
+                dhcp_relay = device.dhcp_relay(
+                    vrf=current_vrf, port=vlan_interface_id
+                )
+                try:
+                    dhcp_relay.delete()
+                except Exception as e:
+                    ansible_module.fail_json(msg=str(e))
 
         # Configure SVI
         # Verify if object was changed
-        modified_op = vlan_interface.configure_svi(
-            vlan=int(vlan_id),
-            ipv4=ipv4,
-            ipv6=ipv6,
-            vrf=vrf,
-            description=description,
-        )
+        try:
+            modified_op = vlan_interface.configure_svi(
+                vlan=int(vlan_id),
+                ipv4=ipv4,
+                ipv6=ipv6,
+                vrf=vrf,
+                description=description,
+            )
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
 
         if active_gateway_ip and active_gateway_mac_v4:
             modified_op2 = vlan_interface.set_active_gateway(
@@ -233,8 +252,8 @@ def main():
 
         if ip_helper_address:
             # Create DHCP_Relay object
-            dhcp_relay = device.dhcp_relay(vrf=vrf, port=vlan_interface_id)
             # Add helper addresses
+            dhcp_relay = device.dhcp_relay(vrf=vrf, port=vlan_interface_id)
             modified_dhcp_relay = dhcp_relay.add_ipv4_addresses(
                 ip_helper_address
             )
