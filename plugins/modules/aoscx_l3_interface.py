@@ -54,10 +54,9 @@ options:
     required: false
   vrf:
     description: >
-      The VRF the interface will belong to once created. If none provided, the
-      interface will be in the Default VRF. If an L3 interface is created and
-      the user wants to change the interface's VRF, the user must delete the L3
-      interface then recreate the interface in the desired VRF.
+      VRF to which the port belongs if the port is routing. If none provided,
+      the interface will be in the Default VRF. If the VRF is removed or
+      changed all configuration is erased from the interface.
     type: str
     required: false
   interface_qos_schedule_profile:
@@ -134,6 +133,12 @@ EXAMPLES = """
     interface: 1/1/6
     ipv4:
       - 10.0.1.1/24
+    state: delete
+
+- name: Delete VRF attach of the Interface 1/1/3
+  aoscx_l3_interface:
+    interface: 1/1/3
+    vrf: red
     state: delete
 
 - name: Deleting L3 Interface - 1/1/3
