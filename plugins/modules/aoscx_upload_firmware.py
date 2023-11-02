@@ -148,10 +148,10 @@ def main():
     device = Device(session)
     prev_firmware = device.get_firmware_info()
 
-    # 4100i, 6000 and 6100 have problems with library requests
+    # 4100i and 6X00 have problems with library requests
     # PYAOSCX will try to use pycurl if available
     platform = prev_firmware[partition_idx].split(".")[0]
-    needs_pycurl = platform in ["PL", "RL"]
+    needs_pycurl = platform in ["PL", "RL", "ML", "FL"]
     w_message = ""
     if needs_pycurl:
         import importlib.util
