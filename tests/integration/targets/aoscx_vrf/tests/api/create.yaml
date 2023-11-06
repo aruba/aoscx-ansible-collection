@@ -1,0 +1,42 @@
+---
+- debug:
+    msg: START aoscx_vrf create integration tests on connection={{ ansible_connection }}
+
+- import_tasks: _remove_config.yaml
+
+- block:
+
+# - import_tasks: _populate.yaml
+
+  - name: Create vrf
+    register: result
+    aoscx_vrf:
+      name: ansible_vrf_test_1
+      state: create
+
+  - name: Get vrf facts
+    register: vrf_facts
+    aoscx_facts:
+      gather_network_resources:
+        - vrfs
+
+  - name: Assert if vrf is not created
+    ansible.builtin.assert:
+     that:
+        - "'ansible_vrf_test_1' in vrf_facts.ansible_facts.ansible_network_resources.vrfs"
+
+  - name: Create vrf (idempotent)
+    register: result
+    aoscx_vrf:
+      name: ansible_vrf_test_1
+      state: create
+
+  -  name: Assert that the previous task was idempotent
+     ansible.builtin.assert:
+       that:
+         - not result['changed']
+
+  always:
+
+    - import_tasks: _remove_config.yaml
+

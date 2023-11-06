@@ -102,3 +102,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+#ansible-test network-integration
+tests/integration/inventory.networking
