@@ -1,0 +1,5 @@
+---
+- name: Remove VRF
+  aoscx_vrf:
+    name: ansible_vrf_test_1
+    state: delete
