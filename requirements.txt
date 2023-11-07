@@ -1,4 +1,4 @@
 paramiko
 requests
 ansible-pylibssh
-pyaoscx>=2.5.0
+pyaoscx>=2.5.1

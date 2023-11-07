@@ -5,6 +5,27 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.3.1
+======
+
+Release Summary
+---------------
+
+Fixes for documentation, enhancements (aoscx_facts) and bugfixes (aoscx_l3_interface)
+
+Major Changes
+-------------
+
+- Add option lldp_neighbors to aoscx_facts (https://github.com/aruba/aoscx-ansible-collection/issues/79)
+- Bugfixes for vrf attach in l3 Interface module
+
+Minor Changes
+-------------
+
+- Add documentation for passive and active interfaces in ospf module (https://github.com/aruba/aoscx-ansible-collection/issues/65)
+- Add support for cgroupv2 and Ubuntu 22.04 by Alexis La Goutte(https://github.com/ansible-collections/collection_template/pull/56)
+- Fix in README for requirements documentation by Olivier Magloire (https://github.com/aruba/aoscx-ansible-collection/pull/74)
+
 v4.3.0
 ======
 

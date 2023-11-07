@@ -64,3 +64,14 @@ releases:
       - Fix sanity tests errors.
       release_summary: New features (LAG and DNS), enhancements (VLAN) and bugfixes
     release_date: '2023-08-30'
+  4.3.1:
+    changes:
+      major_changes:
+      - Add option lldp_neighbors to aoscx_facts (https://github.com/aruba/aoscx-ansible-collection/issues/79)
+      - Bugfixes for vrf attach in l3 Interface module
+      minor_changes:
+      - Add support for cgroupv2 and Ubuntu 22.04 by Alexis La Goutte(https://github.com/ansible-collections/collection_template/pull/56)
+      - Fix in README for requirements documentation by Olivier Magloire (https://github.com/aruba/aoscx-ansible-collection/pull/74)
+      - Add documentation for passive and active interfaces in ospf module (https://github.com/aruba/aoscx-ansible-collection/issues/65)
+      release_summary: Fixes for documentation, enhancements (aoscx_facts) and bugfixes (aoscx_l3_interface)
+    release_date: '2023-11-10'
