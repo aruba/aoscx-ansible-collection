@@ -74,6 +74,27 @@ options:
     type: list
     elements: int
     required: false
+  acl_name:
+    description: Name of the ACL being applied or removed from the VLAN.
+    required: false
+    type: str
+  acl_type:
+    description: Type of ACL being applied or removed from the VLAN.
+    choices:
+      - ipv4
+      - ipv6
+      - mac
+    required: false
+    type: str
+  acl_direction:
+    description: Direction for which the ACL is to be applied or removed.
+    choices:
+      - in
+      - out
+      - routed-in
+      - routed-out
+    required: false
+    type: str
   vsx_sync:
     description: >
       Controls which attributes should be synchronized between VSX peers.
@@ -342,6 +363,16 @@ def get_argument_spec():
             "required": False,
             "default": None,
         },
+        "acl_name": {"type": "str", "required": False},
+        "acl_type": {
+            "type": "str",
+            "required": False,
+            "choices": ["ipv4", "ipv6", "mac"],
+        },
+        "acl_direction": {
+            "type": "str",
+            "choices": ["in", "out", "routed-in", "routed-out"],
+        },
         "vsx_sync": {
             "type": "list",
             "elements": "str",
@@ -471,6 +502,7 @@ def main():
             ("configure_speed", True, ("autoneg",), False),
             ("autoneg", "off", ("duplex", "speeds"), False),
         ],
+        required_together=[["acl_name", "acl_type", "acl_direction"]],
     )
 
     result = dict(changed=False)
@@ -490,6 +522,9 @@ def main():
     vsx_sync = ansible_module.params["vsx_sync"]
     state = ansible_module.params["state"]
     mtu = ansible_module.params["mtu"]
+    acl_name = ansible_module.params["acl_name"]
+    acl_type = ansible_module.params["acl_type"]
+    acl_direction = ansible_module.params["acl_direction"]
     qos = ansible_module.params["qos"]
     no_qos = ansible_module.params["no_qos"]
     queue_profile = ansible_module.params["queue_profile"]
@@ -510,7 +545,7 @@ def main():
     interface = device.interface(name)
     modified = interface.modified
 
-    if state == "delete" and not configure_speed:
+    if state == "delete" and not configure_speed and not acl_type:
         is_special_type = interface.type in [
             "lag",
             "loopback",
@@ -565,7 +600,17 @@ def main():
         interface.vsx_sync = clean_vsx_features
 
     modified |= interface.apply()
-
+    if acl_type:
+        if state == "delete":
+            try:
+                interface.clear_acl(acl_type, acl_direction)
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
+        else:
+            try:
+                interface.set_acl(acl_name, acl_type, acl_direction)
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
     if configure_speed:
         # Ansible detects on/off as True/False, so we accept the boolean, and
         # convert to the str, which is what the REST API accepts

@@ -59,6 +59,24 @@ on AOS-CX devices.
     description: VLAN description
     required: false
     type: str
+  acl_name:
+    description: Name of the ACL being applied or removed from the VLAN.
+    required: false
+    type: str
+  acl_type:
+    description: Type of ACL being applied or removed from the VLAN.
+    choices:
+      - ipv4
+      - ipv6
+    required: false
+    type: str
+  acl_direction:
+    description: Direction for which the ACL is to be applied or removed.
+    choices:
+      - routed-in
+      - routed-out
+    required: false
+    type: str
   active_gateway_ip:
     description: Configure IPv4 active-gateway for vlan interface.
     type: str
@@ -107,5 +125,20 @@ on AOS-CX devices.
   - name: Delete VLAN Interface 100
     aoscx_vlan_interface:
       vlan_id: 100
+      state: delete
+
+  - name: Apply ipv4 ACL ROUTED-IN to VLAN (new method)
+    aoscx_vlan_interface:
+      vlan_id: 200
+      acl_name: ipv4_acl
+      acl_type: ipv4
+      acl_direction: routed-in
+
+  - name: Remove ipv4 ACL ROUTED-IN from VLAN (new method)
+    aoscx_vlan_interface:
+      vlan_id: 200
+      acl_name: ipv4_acl
+      acl_type: ipv4
+      acl_direction: routed-in
       state: delete
 ```

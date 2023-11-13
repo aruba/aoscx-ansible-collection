@@ -45,6 +45,25 @@ options:
       - up
       - down
     type: str
+  acl_name:
+    description: Name of the ACL being applied or removed from the VLAN.
+    required: false
+    type: str
+  acl_type:
+    description: Type of ACL being applied or removed from the VLAN.
+    choices:
+      - ipv4
+      - ipv6
+      - mac
+    required: false
+    type: str
+  acl_direction:
+    description: Direction for which the ACL is to be applied or removed.
+    choices:
+      - in
+      - out
+    required: false
+    type: str
   voice:
     description: Enable Voice VLAN
     required: false
@@ -79,6 +98,21 @@ EXAMPLES = """
     vlan_id: 300
     name: UPLINK_VLAN
     description: This is VLAN 300
+
+- name: Set ACL test_acl type ipv6 in
+  aoscx_vlan:
+    vlan_id: 300
+    acl_name: test_acl
+    acl_type: ipv6
+    acl_direction: in
+
+- name: Remove ACL test_acl type ipv6 in
+  aoscx_vlan:
+    vlan_id: 300
+    acl_name: test_acl
+    acl_type: ipv6
+    acl_direction: in
+    state: delete
 
 - name: Create VLAN 400 with name, voice, vsx_sync and ip igmp snooping
   aoscx_vlan:
@@ -124,6 +158,13 @@ def get_argument_spec():
                 "down",
             ],
         },
+        "acl_name": {"type": "str", "required": False},
+        "acl_type": {
+            "type": "str",
+            "required": False,
+            "choices": ["ipv4", "ipv6", "mac"],
+        },
+        "acl_direction": {"type": "str", "choices": ["in", "out"]},
         "voice": {
             "type": "bool",
             "required": False,
@@ -152,6 +193,7 @@ def get_argument_spec():
 def main():
     ansible_module = AnsibleModule(
         argument_spec=get_argument_spec(),
+        required_together=[["acl_name", "acl_type", "acl_direction"]],
         supports_check_mode=True,
     )
 
@@ -165,6 +207,9 @@ def main():
     vlan_name = ansible_module.params["name"]
     description = ansible_module.params["description"]
     admin_state = ansible_module.params["admin_state"]
+    acl_name = ansible_module.params["acl_name"]
+    acl_type = ansible_module.params["acl_type"]
+    acl_direction = ansible_module.params["acl_direction"]
     voice = ansible_module.params["voice"]
     vsx_sync = ansible_module.params["vsx_sync"]
     ip_igmp_snooping = ansible_module.params["ip_igmp_snooping"]
@@ -188,7 +233,13 @@ def main():
         vlan_exists = False
 
     if state == "delete":
-        if vlan_exists:
+        if acl_type:
+            try:
+                vlan.clear_acl(acl_type, acl_direction)
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
+            modified = True
+        elif vlan_exists:
             vlan.delete()
             modified = True
 
@@ -244,10 +295,17 @@ def main():
             )
             vlan.mgmd_enable["igmp"] = ip_igmp_snooping
 
-        try:
-            vlan.apply()
-        except Exception as e:
-            ansible_module.fail_json(msg=str(e))
+        if modified:
+            try:
+                vlan.apply()
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
+
+        if acl_name:
+            try:
+                modified |= vlan.set_acl(acl_name, acl_type, acl_direction)
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
 
     result["changed"] = modified
     result["warnings"] = warnings

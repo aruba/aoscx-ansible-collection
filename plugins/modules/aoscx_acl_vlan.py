@@ -122,50 +122,31 @@ def main():
         ansible_module.exit_json(**result)
 
     try:
-        from pyaoscx.device import Device
-    except Exception as e:
-        ansible_module.fail_json(msg=str(e))
-
-    try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-    # Create a Pyaoscx Device Object
-    device = Device(session)
-
     for vlan_name in acl_vlan_list:
+        # Create VLAN Object
+        vlan = session.api.get_module(session, "Vlan", vlan_name)
+        try:
+            vlan.get()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="VLAN {0}: {1}".format(vlan_name, str(e))
+            )
+        modified = False
         if state == "delete":
-            # Create VLAN Object
-            vlan = device.vlan(vlan_name)
             # Delete acl
-            if acl_direction == "in":
-                vlan.detach_acl_in(acl_name, acl_type)
-            if acl_direction == "out":
-                vlan.detach_acl_out(acl_name, acl_type)
+            modified |= vlan.clear_acl(acl_type, acl_direction)
             # Changed
-            result["changed"] = True
+            result["changed"] = modified
 
         if state == "create" or state == "update":
-            # Create VLAN Object
-            vlan = device.vlan(vlan_name)
-            # Verify if interface was create
-            if vlan.was_modified():
-                # Changed
-                result["changed"] = True
-            # Set variables
-            modified_op1 = False
-            modified_op2 = False
-            # Update ACL inside VLAN
-            if acl_direction == "in":
-                modified_op1 = vlan.attach_acl_in(acl_name, acl_type)
-            if acl_direction == "out":
-                modified_op2 = vlan.attach_acl_out(acl_name, acl_type)
-            if modified_op1 or modified_op2:
-                # Changed
-                result["changed"] = True
+            modified |= vlan.set_acl(acl_name, acl_type, acl_direction)
+            result["changed"] = modified
 
     # Exit
     ansible_module.exit_json(**result)

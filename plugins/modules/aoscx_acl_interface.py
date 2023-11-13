@@ -85,6 +85,23 @@ EXAMPLES = """
     acl_interface_list:
       - 1/1/2
       - 1/2/23
+
+- name: Apply ipv4 ACL to interfaces (new method)
+  aoscx_interface:
+    name: "{{item}}"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+  loop: ["1/1/2", "1/2/23"]
+
+- name: Remove ipv4 ACL from interfaces (new method)
+  aoscx_interface:
+    name: "{{item}}"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+    state: delete
+  loop: ["1/1/2", "1/2/23"]
 """
 
 RETURN = r""" # """
@@ -136,31 +153,22 @@ def main():
 
     device = Device(session)
     for interface_name in acl_interface_list:
+        # Create Interface Object
+        interface = device.interface(interface_name)
         if state == "delete":
-            # Create ACL Object
-            interface = device.interface(interface_name)
             # Delete it
             interface.clear_acl(acl_type, acl_direction)
             # Changed
             result["changed"] = True
 
         if state == "create" or state == "update":
-            # Create ACL Object
-            interface = device.interface(interface_name)
             # Verify if interface was create
             if interface.was_modified():
                 # Changed
                 result["changed"] = True
 
-            # Modified variables
-            modified_op1 = False
-            modified_op2 = False
-            # Update ACL inside Interface
-            if acl_direction == "in":
-                modified_op1 = interface.update_acl_in(acl_name, acl_type)
-            if acl_direction == "out":
-                modified_op2 = interface.update_acl_out(acl_name, acl_type)
-            if modified_op1 or modified_op2:
+            modified = interface.set_acl(acl_name, acl_type, acl_direction)
+            if modified:
                 # Changed
                 result["changed"] = True
 
