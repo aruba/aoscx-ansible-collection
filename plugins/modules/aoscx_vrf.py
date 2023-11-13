@@ -143,9 +143,9 @@ def main():
 
         # Configure RD (Route Distinguisher)
         if rd:
-           modified |= vrf.rd != rd
-           vrf.rd = rd
-           vrf.apply()
+            modified |= vrf.rd != rd
+            vrf.rd = rd
+            vrf.apply()
 
     result["changed"] = modified
     ansible_module.exit_json(**result)
