@@ -105,3 +105,4 @@ venv.bak/
 
 #ansible-test network-integration
 tests/integration/inventory.networking
+tests/output/
