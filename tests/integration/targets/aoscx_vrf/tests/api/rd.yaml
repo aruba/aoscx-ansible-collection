@@ -35,9 +35,9 @@
       state: create
 
   - name: Assert that the previous task was idempotent
-     ansible.builtin.assert:
-       that:
-         - not result['changed']
+    ansible.builtin.assert:
+        that:
+          - not result['changed']
 
 # Modify
   - name: Modify vrf with RD
@@ -55,7 +55,7 @@
 
   - name: Assert if vrf is not modifiy with rd
     ansible.builtin.assert:
-     that:
+      that:
         - "'ansible_vrf_test_1' in vrf_facts.ansible_facts.ansible_network_resources.vrfs"
         - vrf_facts.ansible_facts.ansible_network_resources.vrfs.ansible_vrf_test_1.rd == '44:44'
 
@@ -67,9 +67,9 @@
       state: create
 
   - name: Assert that the previous task was idempotent
-     ansible.builtin.assert:
-       that:
-         - not result['changed']
+    ansible.builtin.assert:
+      that:
+        - not result['changed']
 
   always:
 
