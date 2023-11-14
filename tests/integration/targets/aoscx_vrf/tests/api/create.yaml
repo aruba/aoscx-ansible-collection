@@ -22,7 +22,7 @@
 
   - name: Assert if vrf is not created
     ansible.builtin.assert:
-     that:
+      that:
         - "'ansible_vrf_test_1' in vrf_facts.ansible_facts.ansible_network_resources.vrfs"
 
   - name: Create vrf (idempotent)
@@ -31,12 +31,11 @@
       name: ansible_vrf_test_1
       state: create
 
-  -  name: Assert that the previous task was idempotent
-     ansible.builtin.assert:
-       that:
-         - not result['changed']
+  - name: Assert that the previous task was idempotent
+    ansible.builtin.assert:
+      that:
+        - not result['changed']
 
   always:
 
     - import_tasks: _remove_config.yaml
-
