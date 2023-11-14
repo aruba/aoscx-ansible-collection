@@ -31,12 +31,11 @@
       name: ansible_vrf_test_1
       state: delete
 
-  -  name: Assert that the previous task was idempotent
-     ansible.builtin.assert:
-       that:
-         - not result['changed']
+  - name: Assert that the previous task was idempotent
+    ansible.builtin.assert:
+      that:
+        - not result['changed']
 
   always:
 
     - import_tasks: _remove_config.yaml
-
