@@ -566,7 +566,10 @@ def main():
                 # Need to translate L4 port name if any
                 if "src_l4_port" in config:
                     l4_port = config["src_l4_port"]
-                    if "-" in l4_port:
+                    if isinstance(l4_port, int):
+                        config["src_l4_port_min"] = l4_port
+                        config["src_l4_port_max"] = l4_port
+                    elif "-" in l4_port:
                         try:
                             port_range = iter(l4_port.split("-"))
                             config["src_l4_port_min"] = int(next(port_range))
@@ -585,7 +588,10 @@ def main():
                     del config["src_l4_port"]
                 if "dst_l4_port" in config:
                     l4_port = config["dst_l4_port"]
-                    if "-" in l4_port:
+                    if isinstance(l4_port, int):
+                        config["src_l4_port_min"] = l4_port
+                        config["src_l4_port_max"] = l4_port
+                    elif "-" in l4_port:
                         try:
                             port_range = iter(l4_port.split("-"))
                             config["dst_l4_port_min"] = int(next(port_range))

@@ -215,11 +215,11 @@ def main():
         if ports:
             ports_dict = ports.copy()
             for idx, ports_data in ports_dict.items():
-                if "-" in ports_data:
+                ports_kwargs = {}
+                if isinstance(ports_data, str) and "-" in ports_data:
                     range_values = iter(ports_data.split("-"))
                     min_value = next(range_values)
                     max_value = next(range_values)
-                    ports_kwargs = {}
                     if min_value.isnumeric():
                         ports_kwargs["port_min"] = int(min_value)
                     if max_value.isnumeric():
