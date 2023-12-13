@@ -551,10 +551,6 @@ def main():
                             )
                         config[ip_grp_name] = ip_group
                         config.pop(ip_param, None)
-                # Need to remove parameter if value is "any"
-                for addr_param in ["src_ip", "dst_ip", "src_mac", "dst_mac"]:
-                    if addr_param in config and config[addr_param] == "any":
-                        del config[addr_param]
                 # Need to translate L4 port name if any
                 if "src_l4_port" in config:
                     l4_port = config["src_l4_port"]
@@ -581,8 +577,8 @@ def main():
                 if "dst_l4_port" in config:
                     l4_port = config["dst_l4_port"]
                     if isinstance(l4_port, int):
-                        config["src_l4_port_min"] = l4_port
-                        config["src_l4_port_max"] = l4_port
+                        config["dst_l4_port_min"] = l4_port
+                        config["dst_l4_port_max"] = l4_port
                     elif "-" in l4_port:
                         try:
                             port_range = iter(l4_port.split("-"))
