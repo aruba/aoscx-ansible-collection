@@ -290,7 +290,7 @@ def main():
 
     try:
         switch = Device(session)
-        switch.get(selector="status")
+        switch.get()
     except Exception as e:
         ansible_module.fail_json(msg="System: {0}".format(str(e)))
 
