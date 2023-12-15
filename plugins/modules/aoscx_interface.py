@@ -254,7 +254,7 @@ EXAMPLES = """
 
 - name: Configure Interface 1/1/3 to use the global QoS trust mode
   aoscx_interface:
-    name: 1/1/13
+    name: 1/1/3
     qos_trust_mode: global
 
 - name: Set a Queue Profile for interface 1/1/2
@@ -267,12 +267,12 @@ EXAMPLES = """
     name: 1/1/3
     use_global_queue_profile: true
 
-- name: Configure Schedule Profile on an interface
+- name: Configure Schedule Profile on an interface 1/1/17
   aoscx_interface:
     name: 1/1/17
     qos: STRICT
 
-- name: Remove a Schedule Profile from an interface
+- name: Remove a Schedule Profile from an interface 1/1/17
   aoscx_interface:
     name: 1/1/17
     no_qos: true
@@ -296,7 +296,7 @@ EXAMPLES = """
       - vlan
       - vsx_virtual
 
-- name: Set the MTU rate to the 1/1/1 Interface
+- name: Set the MTU to the 1/1/17 Interface
   aoscx_interface:
     name: 1/1/17
     mtu: 1300
