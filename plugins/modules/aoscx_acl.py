@@ -471,9 +471,8 @@ def main():
     if state == "delete" and acl_exists:
         #  If there are entries in configuration, delete them
         if acl_entries:
-            aces = acl.cfg_aces[:]
-            for acl_entry in aces:
-                if acl_entry.sequence_number in acl_entries:
+            for seq_num, acl_entry in acl.cfg_aces.items():
+                if seq_num in acl_entries:
                     acl_entry.delete()
                     modified_op = True
         else:
@@ -487,7 +486,7 @@ def main():
 
         if acl_entries:
             AclEntry = session.api.get_module_class(session, "AclEntry")
-            sw_acl_entries = AclEntry.get_all(session, acl)
+            sw_acl_entries = acl.cfg_aces.copy()
             valid_tcp_flags = [
                 "ack",
                 "cwr",
@@ -500,6 +499,7 @@ def main():
                 "urg",
             ]
             for sequence_number, config_cls in acl_entries.items():
+                sequence_number = int(sequence_number)
                 config = config_cls.copy()
                 # Need to convert tcp_flags list in {tcp_flag: True}
                 if "tcp_flags" in config:
@@ -597,22 +597,19 @@ def main():
                         config["dst_l4_port_max"] = l4_port
                     del config["dst_l4_port"]
 
-                acl_entry = AclEntry(
-                    session,
-                    sequence_number=int(sequence_number),
-                    parent_acl=acl,
-                    **config
-                )
-                if sequence_number in sw_acl_entries:
-                    try:
-                        acl_entry.get(selector="configuration")
+                try:
+                    if sequence_number in sw_acl_entries:
+                        acl_entry = sw_acl_entries[sequence_number]
                         for attr, value in config.items():
                             setattr(acl_entry, attr, value)
-                    except Exception as e:
-                        ansible_module.fail_json(msg=str(e))
-
-                try:
-                    modified_op = acl_entry.apply()
+                    else:
+                        acl_entry = AclEntry(
+                            session,
+                            sequence_number=int(sequence_number),
+                            parent_acl=acl,
+                            **config
+                        )
+                        modified_op |= acl_entry.apply()
                 except Exception as e:
                     ansible_module.fail_json(msg=str(e))
 
