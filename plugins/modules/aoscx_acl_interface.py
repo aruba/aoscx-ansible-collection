@@ -133,8 +133,11 @@ def main():
     acl_type = ansible_module.params["acl_type"]
     acl_direction = ansible_module.params["acl_direction"]
     state = ansible_module.params["state"]
-
     result = dict(changed=False)
+    warnings = []
+    warnings.append(
+       "This module is deprecated, use aoscx_interface instead"
+    )
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -173,7 +176,7 @@ def main():
                 result["changed"] = True
 
     # Exit
-    ansible_module.exit_json(**result)
+    ansible_module.exit_json(**result, warnings=warnings)
 
 
 if __name__ == "__main__":
