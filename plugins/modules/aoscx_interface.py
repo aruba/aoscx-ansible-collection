@@ -603,12 +603,14 @@ def main():
     if acl_type:
         if state == "delete":
             try:
-                interface.clear_acl(acl_type, acl_direction)
+                modified |= interface.clear_acl(acl_type, acl_direction)
             except Exception as e:
                 ansible_module.fail_json(msg=str(e))
         else:
             try:
-                interface.set_acl(acl_name, acl_type, acl_direction)
+                modified |= interface.set_acl(
+                    acl_name, acl_type, acl_direction
+                )
             except Exception as e:
                 ansible_module.fail_json(msg=str(e))
     if configure_speed:
