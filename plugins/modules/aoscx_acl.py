@@ -609,7 +609,7 @@ def main():
                             parent_acl=acl,
                             **config
                         )
-                        modified_op |= acl_entry.apply()
+                    modified_op |= acl_entry.apply()
                 except Exception as e:
                     ansible_module.fail_json(msg=str(e))
 
