@@ -192,18 +192,41 @@ def main():
 
     modified = False
     if state == "delete" and exists:
-        try:
-            if addresses:
+        if addresses:
+            try:
                 for idx in addresses:
                     modified |= object_group.remove_ip_entry_from_group(idx)
-            elif ports:
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not remove addresses entry {0}: {1}".format(
+                        idx, str(e)
+                    )
+                )
+        elif ports:
+            try:
                 for idx in ports:
                     modified |= object_group.remove_port_range_from_group(idx)
-            else:
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not remove ports entry {0}: {1}".format(
+                        idx, str(e)
+                    )
+                )
+        else:
+            try:
                 object_group.delete()
                 modified = True
-        except Exception as e:
-            ansible_module.fail_json(msg="Could not delete {0}".format(str(e)))
+            except Exception as e:
+                # At this point, the object group exists but it could not be
+                # deleted, if it is attached to an existing ACL, an error 500
+                # is returned by REST
+                if "Code: 500" in str(e):
+                    err_msg = ", make sure it is not attached to any ACL"
+                else:
+                    err_msg = ": " + str(e)
+                ansible_module.fail_json(
+                    msg="Could not delete object group{0}".format(err_msg)
+                )
     else:
         if not exists:
             try:
@@ -244,9 +267,7 @@ def main():
             for idx, addr in addresses_dict.items():
                 try:
                     object_group.get()
-                    modified = object_group.update_ip_entry_to_group(
-                        idx, addr
-                    )
+                    modified = object_group.update_ip_entry_to_group(idx, addr)
                 except Exception as e:
                     ansible_module.fail_json(msg=str(e))
 
