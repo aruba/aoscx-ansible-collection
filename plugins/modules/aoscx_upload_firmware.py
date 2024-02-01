@@ -186,6 +186,7 @@ def main():
                     use_proxy=False,
                 )
                 _result = device.get_firmware_status()
+                session.close()
             status = _result["status"]
             if status == "in_progress":
                 sleep(60)
@@ -203,6 +204,7 @@ def main():
             use_proxy=False,
         )
         curr_firmware = device.get_firmware_info()
+        session.close()
 
     # Changed
     result["changed"] = success and (
