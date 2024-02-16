@@ -140,13 +140,29 @@ def main():
 
     try:
         session = get_pyaoscx_session(ansible_module)
+        proxy = session.proxy.get("https", None)
+        # Ansible is closing connection while
+        # while firmware is still being uploaded,
+        # as a workaround the conection will be
+        # reopened
+        session.close()
+        session.open(
+            username=session.username(),
+            password=session.password(),
+            use_proxy=proxy is not None,
+        )
     except Exception as e:
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
     device = Device(session)
-    prev_firmware = device.get_firmware_info()
+    try:
+        prev_firmware = device.get_firmware_info()
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Error getting firmware info: {0}".format(str(e))
+        )
 
     # 4100i and 6X00 have problems with library requests
     # PYAOSCX will try to use pycurl if available
@@ -172,21 +188,12 @@ def main():
             try_pycurl=needs_pycurl,
         )
     except Exception as e:
+        session.close()
         ansible_module.fail_json(msg="{0}{1}".format(e, w_message))
 
     if wait:
         for retry in range(10):
-            try:
-                _result = device.get_firmware_status()
-            except Exception:
-                # Reconnect and retry
-                session.open(
-                    username=session.username(),
-                    password=session.password(),
-                    use_proxy=False,
-                )
-                _result = device.get_firmware_status()
-                session.close()
+            _result = device.get_firmware_status()
             status = _result["status"]
             if status == "in_progress":
                 sleep(60)
@@ -196,15 +203,11 @@ def main():
 
     try:
         curr_firmware = device.get_firmware_info()
-    except Exception:
-        # Reconnect and retry
-        session.open(
-            username=session.username(),
-            password=session.password(),
-            use_proxy=False,
-        )
-        curr_firmware = device.get_firmware_info()
+    except Exception as e:
         session.close()
+        ansible_module.fail_json(
+            msg="Error getting firmware info: {0}".format(str(e))
+        )
 
     # Changed
     result["changed"] = success and (
@@ -212,6 +215,7 @@ def main():
     )
 
     # Exit
+    session.close()
     ansible_module.exit_json(**result)
 
 
