@@ -63,6 +63,7 @@ EXAMPLES = """
   aoscx_upload_firmware:
     partition_name: primary
     remote_firmware_file_path: http://192.168.1.2:8000/TL_10_04_0030P.swi
+    wait_firmware_upload: true
     vrf: 'mgmt'
 
 - name: Upload firmware to secondary through local
