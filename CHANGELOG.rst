@@ -5,6 +5,26 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.3.2
+======
+
+Release Summary
+---------------
+
+Fixes for aoscx_upload_firmware
+
+Major Changes
+-------------
+
+- Fix error for aoscx_upload_firmware 401 Authorization Required Aruba CX 6200f / 6300M (https://github.com/aruba/aoscx-ansible-collection/issues/78)
+- Fix error for aoscx_upload_firmware processing the command Code 502 (https://github.com/aruba/aoscx-ansible-collection/issues/94)
+- Fix errors for aoscx_upload_firmware when a non mgmt VRF is used
+
+Minor Changes
+-------------
+
+- Fix error in sanity tests for Ansible 2.16
+
 v4.3.1
 ======
 
