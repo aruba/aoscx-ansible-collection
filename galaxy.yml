@@ -2,7 +2,7 @@ namespace: "arubanetworks"
 
 name: "aoscx"
 
-version: "4.3.1"
+version: "4.3.2"
 
 authors:
   - "Madhusudan Pranav Venugopal"
