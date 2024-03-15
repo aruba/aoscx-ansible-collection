@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -92,15 +92,21 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
 
 
 def main():
-    module_args = dict(
-        config_name=dict(type="str", default="running-config"),
-        config_json=dict(type="str", default=None),
-        config_file=dict(type="str", default=None),
-        remote_config_file_tftp_path=dict(type="str", default=None),
-        vrf=dict(type="str"),
-    )
+    module_args = {
+        "config_name": {"type": "str", "default": "running-config"},
+        "config_json": {"type": "str", "default": None},
+        "config_file": {"type": "str", "default": None},
+        "remote_config_file_tftp_path": {"type": "str", "default": None},
+        "vrf": {"type": "str"},
+    }
     ansible_module = AnsibleModule(
-        argument_spec=module_args, supports_check_mode=True
+        argument_spec=module_args,
+        supports_check_mode=True,
+        mutually_exclusive=[
+            ("remote_config_file_tftp_path", "config_file"),
+            ("remote_config_file_tftp_path", "config_json"),
+            ("config_json", "config_file"),
+        ],
     )
 
     # Set Variables
@@ -110,7 +116,7 @@ def main():
     config_json = ansible_module.params["config_json"]
     config_file = ansible_module.params["config_file"]
 
-    result = dict(changed=False)
+    result = {"changed": False}
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
