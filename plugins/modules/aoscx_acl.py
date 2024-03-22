@@ -471,14 +471,27 @@ def main():
     if state == "delete" and acl_exists:
         #  If there are entries in configuration, delete them
         if acl_entries:
-            for seq_num, acl_entry in acl.cfg_aces.items():
-                if seq_num in acl_entries:
-                    acl_entry.delete()
-                    modified_op = True
+            orig_aces = acl.cfg_aces.copy()
+            for seq_num, acl_entry in orig_aces.items():
+                if str(seq_num) in acl_entries:
+                    try:
+                        acl_entry.delete()
+                        modified_op = True
+                    except Exception as e:
+                        ansible_module.fail_json(
+                            msg="Could not delete entry {0}: {1}".format(
+                                seq_num, str(e)
+                            )
+                        )
         else:
             # Delete ACL
-            acl.delete()
-            modified_op = True
+            try:
+                acl.delete()
+                modified_op = True
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not delete ACL: {0}".format(str(e))
+                )
     elif state in ["create", "update"]:
         if not acl_exists:
             acl.create()
