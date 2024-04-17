@@ -200,14 +200,16 @@ options:
         type: str
         required: false
         description: >
-          String with source MAC matching attribute. Two formats are allowed
-          (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ).
+          String with source MAC matching attribute. Any EUI format is allowed
+          (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF
+          or AABBCC:DDEEFF)
       dst_mac:
         type: str
         required: false
         description: >
-          String with destination MAC matching attribute. Two formats are
-          allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ).
+          String with destination MAC matching attribute. Any EUI format is
+          allowed (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF,
+          AABBCCDDEEFF or AABBCC:DDEEFF)
       action:
         type: str
         required: false
@@ -332,6 +334,17 @@ EXAMPLES = """
         count: True
         protocol: tcp
         src_ip: 2001:db8::/32
+
+# Simple MAC example
+- name: Configure MAC ACL
+  aoscx_acl:
+    name: test_mac
+    type: mac
+    acl_entries:
+      1:
+        action: permit
+        src_mac: 00-CA-FE-CA-FE-01
+        dst_mac: 00:AC:DC:AC:DC:02
 
 # Simple L4 example
 # The following example shows how to configure rules with L4 ports. It will

@@ -123,8 +123,8 @@ portal](https://developer.arubanetworks.com/aruba-aoscx/reference#acl_entry).
 | `src_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W). To match any address the field can be left empty or use the 'any' keyword.                                                                               |
 | `dst_ip_group`      | str  | Name of the ACL object group resource. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The object group must be of type `ipv4` or `ipv6`.                                                                                                                                                                                                          |
 | `dst_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W). To match any address the field can be left empty or use the 'any' keyword.                                                                  |
-| `src_mac`           | str  | String with source MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                                                              |
-| `dst_mac`           | str  | String with destination MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                                                         |
+| `src_mac`           | str  | String with source MAC matching attribute. Any EUI format is allowed (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF or AABBCC:DDEEFF). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                        |
+| `dst_mac`           | str  | String with destination MAC matching attribute. Any EUI format is allowed (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF or AABBCC:DDEEFF). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                   |
 | `action`            | str  | Define the action to take on an ACL match. There are two options: `permit`, and `deny`. `permit`: packets will be forwarded. `deny`: packets will be dropped. ACE will only be activated when an associated action is provided.                                                                                                                                                                                                               |
 | `count`             | bool | When true, increment hit count for packets that match this ACL.                                                                                                                                                                                                                                                                                                                                                                               |
 | `dscp`              | str  | Different Services Code Point matching attribute. See [dscp](#dscp_table)                                                                                                                                                                                                                                                                                                                                                                     |
@@ -448,7 +448,27 @@ access-list ipv6 deny_network
     10 deny tcp 2001:db8::/48 any count
 vlan 1,124
 ```
+## Simple MAC example
 
+Playbook:
+```YAML
+- name: Configure MAC ACL
+  aoscx_acl:
+    name: test_mac
+    type: mac
+    acl_entries:
+      1:
+        action: permit
+        src_mac: 00-CA-FE-CA-FE-01
+        dst_mac: 00:AC:DC:AC:DC:02
+```
+
+After Device Configuration:
+```
+access-list mac test_mac
+    1 permit 00CA.FECA.FE01 00AC.DCAC.DC02 any
+
+```
 ## Simple L4 example
 
 The following example shows how to configure rules with L4 ports. It will allow
