@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -117,9 +117,7 @@ def main():
     state = ansible_module.params["state"]
     result = dict(changed=False)
     warnings = []
-    warnings.append(
-       "This module is deprecated, use aoscx_vlan instead"
-    )
+    warnings.append("This module is deprecated, use aoscx_vlan instead")
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -152,7 +150,10 @@ def main():
             result["changed"] = modified
 
     # Exit
-    ansible_module.exit_json(**result, warnings=warnings)
+    if warnings:
+        result["warnings"] = warnings
+
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":
