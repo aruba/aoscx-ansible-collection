@@ -85,3 +85,12 @@ releases:
       - Fix error in sanity tests for Ansible 2.16
       release_summary: Fixes for aoscx_upload_firmware
     release_date: '2024-03-01'
+  4.4.0:
+    changes:
+      major_changes:
+      - ACL module fixes and enhancements (Ports and protocols can be set by name, like in CLI; TCP flags can be specified in a list, modules ``aoscx_acl_interface`` and ``aoscx_acl_vlan`` are now deprecated and attaching ACL can be done with ``aoscx_interface``, ``aoscx_vlan`` and ``aoscx_vlan_interface`` as needed
+      - New module ``aoscx_object_group``
+      - Fixes for issues found internally
+      minor_changes:
+      release_summary: Bugfixes and ACL module enhancements
+    release_date: '2024-05-01'
