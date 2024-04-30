@@ -1,7 +1,9 @@
 # module: aoscx_acl_vlan
 
-description: This modules provides application management of Access Classifier
-Lists on VLANs on AOS-CX devices.
+description: This module provides application management of Access Classifier
+Lists on VLANs on AOS-CX devices. This modules is deprecated and will be
+removed in a future version, please use `aoscx_vlan` or `aoscx_vlan_interface`
+instead.
 
 ##### ARGUMENTS
 
@@ -71,4 +73,38 @@ Lists on VLANs on AOS-CX devices.
     acl_vlan_list:
       - 2
       - 4
+
+- name: Apply ipv4 ACL IN to VLAN (new method)
+  aoscx_vlan:
+    vlan_id: {{item}}
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+  loop: [2, 4]
+
+- name: Remove ipv4 ACL IN from VLAN (new method)
+  aoscx_vlan:
+    vlan_id: {{item}}
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+    state: delete
+  loop: [2, 4]
+
+- name: Apply ipv4 ACL ROUTED-IN to VLAN (new method)
+  aoscx_vlan_interface:
+    vlan_id: {{item}}
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: routed-in
+  loop: [2, 4]
+
+- name: Remove ipv4 ACL ROUTED-IN from VLAN (new method)
+  aoscx_vlan_interface:
+    vlan_id: {{item}}
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: routed-in
+    state: delete
+  loop: [2, 4]
 ```

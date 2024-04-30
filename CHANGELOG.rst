@@ -5,6 +5,23 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.4.0
+======
+
+Release Summary
+---------------
+
+Bugfixes and ACL module enhancements
+
+Major Changes
+-------------
+
+- ACL module fixes and enhancements (Ports and protocols can be set by name, like in CLI; TCP flags can be specified in a list, modules ``aoscx_acl_interface`` and ``aoscx_acl_vlan`` are now deprecated and attaching ACL can be done with ``aoscx_interface``, ``aoscx_vlan`` and ``aoscx_vlan_interface`` as needed
+- Fix Fault in aoscx_acl module, error when updating existing acl (https://github.com/aruba/aoscx-ansible-collection/issues/85)
+- Fix Fault in aoscx_acl, suboptions do not work (https://github.com/aruba/aoscx-ansible-collection/issues/84)
+- Fixes for issues found internally
+- New module ``aoscx_object_group``
+
 v4.3.2
 ======
 

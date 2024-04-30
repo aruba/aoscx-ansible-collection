@@ -102,43 +102,224 @@ portal](https://developer.arubanetworks.com/aruba-aoscx/reference#acl_entry).
 | Parameter           | Type | Comments                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 |:--------------------|:-----|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `comment`           | str  | Comment associated with the ACE.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `tcp_ack`           | bool | TCP Acknowledge flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `tcp_cwr`           | bool | TCP CWR flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `tcp_ece`           | bool | TCP ECE flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `tcp_established`   | bool | TCP established state (ACK or RST flag is set).                                                                                                                                                                                                                                                                                                                                                                                               |
-| `tcp_fin`           | bool | TCP FIN flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `tcp_psh`           | bool | TCP PSH flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `tcp_rst`           | bool | TCP RST flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `tcp_urg`           | bool | TCP URG flag matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
-| `src_l4_port_group` | str  | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and `src_l4_port_range_reverse` attributes, and if this attribute is configured, the other ones will be ignored. The referenced object group must be of type `l4port`. |
+| `tcp_flags`         | list | TCP Flags: `ack`, `cwr`, `ece`, `established`, `fin`, `psh`, `rst`, `syn`, `urg`                                                                                                                                                                                                                                                                                                                                                              |
+| `tcp_ack`           | bool | TCP Acknowledge flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                |
+| `tcp_cwr`           | bool | TCP CWR flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                        |
+| `tcp_ece`           | bool | TCP ECE flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                        |
+| `tcp_established`   | bool | TCP established state (ACK or RST flag is set). (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                         |
+| `tcp_fin`           | bool | TCP FIN flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                        |
+| `tcp_psh`           | bool | TCP PSH flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                        |
+| `tcp_rst`           | bool | TCP RST flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                        |
+| `tcp_urg`           | bool | TCP URG flag matching attribute. (Deprecated, use `tcp_flags` instead)                                                                                                                                                                                                                                                                                                                                                                        |
+| `src_l4_port_group` | str  | Name of the ACL object group. This attribute is mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and `src_l4_port_range_reverse` attributes, and if this attribute is configured, the other ones will be ignored. The object group must be of type `l4port`.                                                                                                                                                                 |
 | `src_l4_port_max`   | int  | Maximum L4 port to match on the packet. To match any port this field can be left empty. Use only if `src_l4_port` is not specified.                                                                                                                                                                                                                                                                                                           |
 | `src_l4_port_min`   | int  | Minimum L4 port to match on the packet. To match any port this field can be left empty. Use only if `src_l4_port` is not specified.                                                                                                                                                                                                                                                                                                           |
-| `src_l4_port`       | str  | Range of L4 ports or L4 source port to match on the packet. Use only if `src_l4_port_min` and `src_l4_port_max` are not specified.                                                                                                                                                                                                                                                                                                            |
-| `dst_l4_port_group` | str  | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and `dst_l4_port_range_reverse` attributes. If this attribute is configured, the others will be ignored. The referenced object group must be of type `l4port`.         |
+| `src_l4_port`       | str  | Range of L4 ports or L4 source port to match on the packet. Use only if `src_l4_port_min` and `src_l4_port_max` are not specified. See [ports](#ports_table)                                                                                                                                                                                                                                                                                  |
+| `dst_l4_port_group` | str  | Name of the ACL object group. This attribute is mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and `dst_l4_port_range_reverse` attributes. If this attribute is configured, the others will be ignored. The object group must be of type `l4port`.                                                                                                                                                                         |
 | `dst_l4_port_max`   | int  | Maximum IP destination port matching attribute. Used in conjunction with `dst_l4_port_min` and `dst_l4_port_range_reverse`. Use only if `dst_l4_port` is not specified.                                                                                                                                                                                                                                                                       |
 | `dst_l4_port_min`   | int  | Minimum IP destination port matching attribute. Used in conjunction with `dst_l4_port_max` and `dst_l4_port_range_reverse`. Use only if `dst_l4_port` is not specified.                                                                                                                                                                                                                                                                       |
-| `dst_l4_port`       | str  | Range of L4 ports or L4 destination port to match on the packet. Use only if `dst_l4_port_min` and `dst_l4_port_max` are not specified.                                                                                                                                                                                                                                                                                                       |
-| `src_ip_group`      | str  | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`.                                                        |
+| `dst_l4_port`       | str  | Range of L4 ports or L4 destination port to match on the packet. Use only if `dst_l4_port_min` and `dst_l4_port_max` are not specified. See [ports](#ports_table)                                                                                                                                                                                                                                                                             |
+| `src_ip_group`      | str  | Name of the ACL object group resource. This attribute is mutually exclusive with the source IP address attribute. If `src_ip_group` is configured, `src_ip` will be ignored. The object group must be of type `ipv4` or `ipv6`.                                                                                                                                                                                                               |
 | `src_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on source IP address. The following IPv4 and IPV6 formats are accepted. IPv4 format with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W). To match any address the field can be left empty or use the 'any' keyword.                                                                               |
-| `dst_ip_group`      | str  | URL in string format of the ACL object group resource. This URL refers to the REST API interface and has the following format: `"/system/acl_object_groups/{name},{object_type}"`. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The referenced object group must be of type `ipv4` or `ipv6`.                                                   |
+| `dst_ip_group`      | str  | Name of the ACL object group resource. This attribute is mutually exclusive with the destination IP address attribute. If `dst_ip_group` is configured, `dst_ip` will be ignored. The object group must be of type `ipv4` or `ipv6`.                                                                                                                                                                                                          |
 | `dst_ip`            | str  | String with source IP matching attribute. If no IP address is specified, the ACL Entry will not match on destination IP address. The following IPv4 and IPv6 address formats are accepted. IPv4 format with prefix length or subnet mask (A.B.C.D/W or A.B.C.D/W.X.Y.Z) IPv6 format (A:B::C:D/W). To match any address the field can be left empty or use the 'any' keyword.                                                                  |
-| `src_mac`           | str  | String with source MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                                                              |
-| `dst_mac`           | str  | String with destination MAC matching attribute. Two formats are allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                                                         |
+| `src_mac`           | str  | String with source MAC matching attribute. Any EUI format is allowed (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF or AABBCC:DDEEFF). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                        |
+| `dst_mac`           | str  | String with destination MAC matching attribute. Any EUI format is allowed (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF or AABBCC:DDEEFF). To match any address the field can be left empty or use the 'any' keyword.                                                                                                                                                                                                   |
 | `action`            | str  | Define the action to take on an ACL match. There are two options: `permit`, and `deny`. `permit`: packets will be forwarded. `deny`: packets will be dropped. ACE will only be activated when an associated action is provided.                                                                                                                                                                                                               |
 | `count`             | bool | When true, increment hit count for packets that match this ACL.                                                                                                                                                                                                                                                                                                                                                                               |
-| `dscp`              | int  | Different Services Code Point matching attribute.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `dscp`              | str  | Different Services Code Point matching attribute. See [dscp](#dscp_table)                                                                                                                                                                                                                                                                                                                                                                     |
 | `ecn`               | int  | Explicit Congestion Notification matching attribute.                                                                                                                                                                                                                                                                                                                                                                                          |
-| `ethertype`         | int  | Ethernet type matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `ethertype`         | str  | Ethernet type matching attribute. See [ethertype](#ethertype_table)                                                                                                                                                                                                                                                                                                                                                                           |
 | `fragment`          | bool | Fragment matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `icmp_code`         | int  | ICMP code matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| `icmp_type`         | int  | ICMP type matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `icmp_type`         | str  | ICMP type matching attribute. See [icmp](#icmp_types_table)                                                                                                                                                                                                                                                                                                                                                                                   |
 | `ip_precedence`     | int  | IP Precedence matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `log`               | bool | ACE attribute log action; when true, log information for packets that match ACL.                                                                                                                                                                                                                                                                                                                                                              |
 | `pcp`               | int  | Priority Code Point matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `protocol`          | int  | IPv4 protocol matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `protocol`          | str  | IPv4 protocol matching attribute. See [protocols](#protocols_table)                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `ttl`               | int  | Time-to-live matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                              |
 | `tos`               | int  | IP Type of service value matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `vlan`              | int  | VLAN ID matching attribute.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+# Tables
+
+## ethertype_table
+
+Valid Ethertypes names that can be passed as parameter; a numeric value can be
+used (hex or dec) even if the name is included in this table.
+
+### Valid Ethertypes names.
+
+| Valid Name       | Numeric Value  |
+|:-----------------|:---------------|
+| `aarp`           | 0x80F3 (33011) |
+| `appletalk`      | 0x809B (32923) |
+| `arp`            | 0x0806 (2054)  |
+| `fcoe`           | 0x8906 (35078) |
+| `fcoe-init`      | 0x8914 (35092) |
+| `ip`             | 0x0800 (2048)  |
+| `ipv6`           | 0x86DD (34525) |
+| `ipx-arpa`       | 0x8137 (33079) |
+| `ipx-non-arpa`   | 0x8138 (33080) |
+| `is-is`          | 0x22F4 (8948)  |
+| `lldp`           | 0x88CC (35020) |
+| `mpls-multicast` | 0x8847 (34887) |
+| `mpls-unicast`   | 0x8848 (34888) |
+| `q-in-q`         | 0x9100 (37120) |
+| `rbridge`        | 0x8946 (35142) |
+| `trill`          | 0x22F3 (8947)  |
+| `wake-on-lan`    | 0x0842 (2114)  |
+
+## protocols_table
+
+Valid IP protocol names that can be passed as parameter; a numeric value can be
+used even if the name is included in this table.
+
+### Valid IP protocols names.
+
+| Valid Name | Numeric Value  |
+|:-----------|:--------------:|
+| `ah`       | 51             |
+| `esp`      | 50             |
+| `gre`      | 47             |
+| `icmp`     | 1              |
+| `icmpv6`   | 58             |
+| `igmp`     | 2              |
+| `ospf`     | 89             |
+| `pim`      | 103            |
+| `sctp`     | 132            |
+| `tcp`      | 6              |
+| `udp`      | 17             |
+
+## icmp_types_table
+
+Valid ICMP type names that can be passed as parameter; a numeric value can be
+used even if the name is included in this table.
+
+### Valid ICMP type names.
+
+| Valid Name (ICMP v4)     | Numeric Value  |
+|:-------------------------|:--------------:|
+| `echo-reply`             | 0              |
+| `destination-unreachable`| 3              |
+| `source-quench`          | 4              |
+| `redirect`               | 5              |
+| `echo`                   | 8              |
+| `router-advertisement`   | 9              |
+| `router-selection`       | 10             |
+| `time-exceeded`          | 11             |
+| `parameter-problem`      | 12             |
+| `timestamp`              | 13             |
+| `timestamp-reply`        | 14             |
+| `information-request`    | 15             |
+| `information-reply`      | 16             |
+| `address-mask-request`   | 17             |
+| `address-mask-reply`     | 18             |
+| `traceroute`             | 30             |
+| `extended-echo`          | 42             |
+| `extended-echo-reply`    | 43             |
+
+
+| Valid Name (ICMP v6)                        | Numeric Value  |
+|:--------------------------------------------|:--------------:|
+| `echo-reply`                                | 0              |
+| `destination-unreachable`                   | 1              |
+| `packet-too-big`                            | 2              |
+| `time-exceeded`                             | 3              |
+| `parameter-problem`                         | 4              |
+| `echo`                                      | 128            |
+| `echo-reply`                                | 129            |
+| `multicast-listener-query`                  | 130            |
+| `multicast-listener-report`                 | 131            |
+| `multicast-listener-done`                   | 132            |
+| `router-solicitation`                       | 133            |
+| `router-advertisement`                      | 134            |
+| `neighbor-solicitation`                     | 135            |
+| `neighbor-advertisement`                    | 136            |
+| `redirect-message`                          | 137            |
+| `router-renumbering`                        | 138            |
+| `icmp-node-information-query`               | 139            |
+| `icmp-node-information-response`            | 140            |
+| `mobile-prefix-solicitation`                | 146            |
+| `mobile-prefix-advertisement`               | 147            |
+| `duplicate-address-request-code-suffix`     | 157            |
+| `duplicate-address-confirmation-code-suffix`| 158            |
+| `extended-echo`                             | 160            |
+| `extended-echo-reply`                       | 161            |
+
+## dscp_table
+
+Valid DSCP names that can be passed as parameter; a numeric value can be
+used even if the name is included in this table.
+
+### Valid DSCP names.
+
+| Valid Name | Numeric Value  |
+|:-----------|:--------------:|
+| `AF11`     | 10             |
+| `AF12`     | 12             |
+| `AF13`     | 14             |
+| `AF21`     | 18             |
+| `AF22`     | 20             |
+| `AF23`     | 22             |
+| `AF31`     | 26             |
+| `AF32`     | 28             |
+| `AF33`     | 30             |
+| `AF41`     | 34             |
+| `AF42`     | 36             |
+| `AF43`     | 38             |
+| `CS0`      | 0              |
+| `CS1`      | 8              |
+| `CS2`      | 16             |
+| `CS3`      | 24             |
+| `CS4`      | 32             |
+| `CS5`      | 40             |
+| `CS6`      | 48             |
+| `CS7`      | 56             |
+| `EF`       | 46             |
+
+## ports_table
+
+Valid L4 port names that can be passed as parameter; a numeric value can be
+used even if the name is included in this table.
+
+### Valid L4 Port names.
+
+| Valid Name     | Numeric Value  |
+|:---------------|:--------------:|
+| `ftp-data`     | 20             |
+| `ftp`          | 21             |
+| `ssh`          | 22             |
+| `telnet`       | 23             |
+| `smtp`         | 25             |
+| `tacacs`       | 49             |
+| `dns`          | 53             |
+| `dhcp-server`  | 67             |
+| `dhcp-client`  | 68             |
+| `tftp`         | 69             |
+| `http`         | 80             |
+| `https`        | 443            |
+| `pop3`         | 110            |
+| `nntp`         | 119            |
+| `ntp`          | 123            |
+| `dce-rpc`      | 135            |
+| `netbios-ns`   | 137            |
+| `netbios-dgm`  | 138            |
+| `netbios-ssn`  | 139            |
+| `snmp`         | 161            |
+| `snmp-trap`    | 162            |
+| `bgp`          | 179            |
+| `ldap`         | 389            |
+| `microsoft-ds` | 445            |
+| `isakmp`       | 500            |
+| `syslog`       | 514            |
+| `imap4`        | 585            |
+| `radius`       | 1812           |
+| `radius-acct`  | 1813           |
+| `iscsi`        | 3260           |
+| `rdp`          | 3389           |
+| `nat-t`        | 4500           |
+| `vxlan`        | 4789           |
 
 # Examples
 
@@ -267,7 +448,27 @@ access-list ipv6 deny_network
     10 deny tcp 2001:db8::/48 any count
 vlan 1,124
 ```
+## Simple MAC example
 
+Playbook:
+```YAML
+- name: Configure MAC ACL
+  aoscx_acl:
+    name: test_mac
+    type: mac
+    acl_entries:
+      1:
+        action: permit
+        src_mac: 00-CA-FE-CA-FE-01
+        dst_mac: 00:AC:DC:AC:DC:02
+```
+
+After Device Configuration:
+```
+access-list mac test_mac
+    1 permit 00CA.FECA.FE01 00AC.DCAC.DC02 any
+
+```
 ## Simple L4 example
 
 The following example shows how to configure rules with L4 ports. It will allow

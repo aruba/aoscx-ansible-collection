@@ -91,12 +91,17 @@ def main():
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
     try:
+        from pyaoscx.device import Device
+    except Exception as e:
+        ansible_module.fail_json(msg=str(e))
+
+    try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
-    # device = Device(session)
+    device = Device(session)
     Vrf = session.api.get_module_class(session, "Vrf")
     vrf = Vrf(session, vrf_name)
     modified = False
@@ -109,9 +114,41 @@ def main():
 
     if state == "delete":
         if vrf_exists:
-            vrf.delete()
-            # Changed
-            modified = True
+            list_interfaces = vrf.get_interfaces()
+            for interface in list_interfaces:
+                try:
+                    interface.get()
+                except Exception as e:
+                    ansible_module.fail_json(msg=str(e))
+
+                if interface.type == "vlan":
+                    interface.delete_vsx_configuration()
+                    interface.configure_svi(
+                        vlan=int(interface.name.split("n")[1]),
+                        ipv4=[],
+                        ipv6=[],
+                        vrf="default",
+                        description=None,
+                    )
+                    dhcp_relay = device.dhcp_relay(
+                        vrf=vrf_name, port=interface.name
+                    )
+                    try:
+                        dhcp_relay.delete()
+                    except Exception as e:
+                        ansible_module.fail_json(msg=str(e))
+                else:
+                    interface.configure_l3(
+                        ipv4=[],
+                        ipv6=[],
+                        vrf="default",
+                    )
+            try:
+                vrf.delete()
+                # change
+                modified = True
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
 
     if state == "create":
         # Create VRF with incoming attributes

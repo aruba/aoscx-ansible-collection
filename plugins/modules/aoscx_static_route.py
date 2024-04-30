@@ -183,21 +183,36 @@ def main():
     device = Device(session)
 
     if state == "delete":
-        static_route = device.static_route(vrf_name, prefix)
-        static_route.delete()
-        result["changed"] = True
+        try:
+            static_route = device.static_route(vrf_name, prefix)
+            static_route.delete()
+            result["changed"] = True
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Could not delete static route: {0}".format(str(e))
+            )
 
     if state in ("create", "update"):
         # Create Static Route object
-        static_route = device.static_route(vrf_name, prefix)
+        try:
+            static_route = device.static_route(vrf_name, prefix)
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Could not get static route: {0}".format(str(e))
+            )
 
         # Add Static Nexthop
-        static_route.add_static_nexthop(
-            next_hop_ip_address=next_hop_ip_address,
-            nexthop_type=route_type,
-            distance=distance,
-            next_hop_interface=next_hop_interface,
-        )
+        try:
+            static_route.add_static_nexthop(
+                next_hop_ip_address=next_hop_ip_address,
+                nexthop_type=route_type,
+                distance=distance,
+                next_hop_interface=next_hop_interface,
+            )
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Could not add static nexthop: {0}".format(str(e))
+            )
 
         # Verify if Static Route was created
         if static_route.was_modified():

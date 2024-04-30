@@ -77,6 +77,24 @@ options:
     description: VLAN description
     required: false
     type: str
+  acl_name:
+    description: Name of the ACL being applied or removed from the VLAN.
+    required: false
+    type: str
+  acl_type:
+    description: Type of ACL being applied or removed from the VLAN.
+    choices:
+      - ipv4
+      - ipv6
+    required: false
+    type: str
+  acl_direction:
+    description: Direction for which the ACL is to be applied or removed.
+    choices:
+      - routed-in
+      - routed-out
+    required: false
+    type: str
   active_gateway_ip:
     description: Configure IPv4 active-gateway for vlan interface.
     type: str
@@ -124,6 +142,21 @@ EXAMPLES = """
     aoscx_vlan_interface:
       vlan_id: 100
       state: delete
+
+  - name: Apply ipv4 ACL to VLAN
+    aoscx_vlan_interface:
+      vlan_id: 300
+      acl_name: ipv4_acl
+      acl_type: ipv4
+      acl_direction: routed-in
+
+  - name: Remove ipv4 ACL to VLAN
+    aoscx_vlan:
+      vlan_id: 300
+      acl_name: ipv4_acl
+      acl_type: ipv4
+      acl_direction: routed-in
+      state: delete
 """
 
 RETURN = r""" # """
@@ -145,11 +178,18 @@ def main():
         ipv6=dict(type="list", elements="str", default=None),
         vrf=dict(type="str", default=None),
         ip_helper_address=dict(type="list", elements="str", default=None),
+        acl_name=dict(type="str", required=False),
+        acl_type=dict(type="str", required=False, choices=["ipv4", "ipv6"]),
+        acl_direction=dict(
+            type="str", required=False, choices=["routed-in", "routed-out"]
+        ),
         active_gateway_ip=dict(type="str", default=None),
         active_gateway_mac_v4=dict(type="str", default=None),
     )
     ansible_module = AnsibleModule(
-        argument_spec=module_args, supports_check_mode=True
+        argument_spec=module_args,
+        supports_check_mode=True,
+        required_together=[["acl_name", "acl_type", "acl_direction"]],
     )
 
     vlan_id = ansible_module.params["vlan_id"]
@@ -159,6 +199,9 @@ def main():
     vrf = ansible_module.params["vrf"]
     description = ansible_module.params["description"]
     ip_helper_address = ansible_module.params["ip_helper_address"]
+    acl_name = ansible_module.params["acl_name"]
+    acl_type = ansible_module.params["acl_type"]
+    acl_direction = ansible_module.params["acl_direction"]
     active_gateway_ip = ansible_module.params["active_gateway_ip"]
     active_gateway_mac_v4 = ansible_module.params["active_gateway_mac_v4"]
     state = ansible_module.params["state"]
@@ -194,12 +237,21 @@ def main():
     vlan_interface = device.interface(vlan_interface_id)
     modified = vlan_interface.modified
     exists = not modified
+    modified_op = False
 
     if state == "delete":
-        # Delete it
-        vlan_interface.delete()
-        # Changed
-        result["changed"] = exists
+        if acl_type:
+            try:
+                result["changed"] = vlan_interface.clear_acl(
+                    acl_type, acl_direction
+                )
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
+        else:
+            # Delete it
+            vlan_interface.delete()
+            # Changed
+            result["changed"] = exists
 
     if state == "create" or state == "update":
         if admin_state:
@@ -214,16 +266,42 @@ def main():
                 else "default"
             )
             vrf = current_vrf if vrf is None else vrf
+            modified_op |= current_vrf != vrf
+            if current_vrf == "default" and vrf is None:
+                modified_op = False
+            if modified_op:
+                ipv4 = []
+                ipv6 = []
+                description = None
+                vlan_interface.delete_active_gateway()
+                dhcp_relay = device.dhcp_relay(
+                    vrf=current_vrf, port=vlan_interface_id
+                )
+                try:
+                    dhcp_relay.delete()
+                except Exception as e:
+                    ansible_module.fail_json(msg=str(e))
 
         # Configure SVI
         # Verify if object was changed
-        modified_op = vlan_interface.configure_svi(
-            vlan=int(vlan_id),
-            ipv4=ipv4,
-            ipv6=ipv6,
-            vrf=vrf,
-            description=description,
-        )
+        try:
+            modified_op = vlan_interface.configure_svi(
+                vlan=int(vlan_id),
+                ipv4=ipv4,
+                ipv6=ipv6,
+                vrf=vrf,
+                description=description,
+            )
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
+
+        if acl_type:
+            try:
+                modified_op |= vlan_interface.set_acl(
+                    acl_name, acl_type, acl_direction
+                )
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
 
         if active_gateway_ip and active_gateway_mac_v4:
             modified_op2 = vlan_interface.set_active_gateway(
@@ -233,8 +311,8 @@ def main():
 
         if ip_helper_address:
             # Create DHCP_Relay object
-            dhcp_relay = device.dhcp_relay(vrf=vrf, port=vlan_interface_id)
             # Add helper addresses
+            dhcp_relay = device.dhcp_relay(vrf=vrf, port=vlan_interface_id)
             modified_dhcp_relay = dhcp_relay.add_ipv4_addresses(
                 ip_helper_address
             )

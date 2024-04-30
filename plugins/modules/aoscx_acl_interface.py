@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# (C) Copyright 2019-2023 Hewlett Packard Enterprise Development LP.
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP.
 # GNU General Public License v3.0+
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
@@ -85,6 +85,23 @@ EXAMPLES = """
     acl_interface_list:
       - 1/1/2
       - 1/2/23
+
+- name: Apply ipv4 ACL to interfaces (new method)
+  aoscx_interface:
+    name: "{{item}}"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+  loop: ["1/1/2", "1/2/23"]
+
+- name: Remove ipv4 ACL from interfaces (new method)
+  aoscx_interface:
+    name: "{{item}}"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+    state: delete
+  loop: ["1/1/2", "1/2/23"]
 """
 
 RETURN = r""" # """
@@ -116,8 +133,9 @@ def main():
     acl_type = ansible_module.params["acl_type"]
     acl_direction = ansible_module.params["acl_direction"]
     state = ansible_module.params["state"]
-
     result = dict(changed=False)
+    warnings = []
+    warnings.append("This module is deprecated, use aoscx_interface instead")
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -136,35 +154,29 @@ def main():
 
     device = Device(session)
     for interface_name in acl_interface_list:
+        # Create Interface Object
+        interface = device.interface(interface_name)
         if state == "delete":
-            # Create ACL Object
-            interface = device.interface(interface_name)
             # Delete it
             interface.clear_acl(acl_type, acl_direction)
             # Changed
             result["changed"] = True
 
         if state == "create" or state == "update":
-            # Create ACL Object
-            interface = device.interface(interface_name)
             # Verify if interface was create
             if interface.was_modified():
                 # Changed
                 result["changed"] = True
 
-            # Modified variables
-            modified_op1 = False
-            modified_op2 = False
-            # Update ACL inside Interface
-            if acl_direction == "in":
-                modified_op1 = interface.update_acl_in(acl_name, acl_type)
-            if acl_direction == "out":
-                modified_op2 = interface.update_acl_out(acl_name, acl_type)
-            if modified_op1 or modified_op2:
+            modified = interface.set_acl(acl_name, acl_type, acl_direction)
+            if modified:
                 # Changed
                 result["changed"] = True
 
     # Exit
+    if warnings:
+        result["warnings"] = warnings
+
     ansible_module.exit_json(**result)
 
 

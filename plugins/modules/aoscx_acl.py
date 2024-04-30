@@ -64,6 +64,12 @@ options:
         type: str
         required: false
         description: Comment associated with the ACE
+      tcp_flags:
+        type: list
+        elements: str
+        required: false
+        description: >
+          TCP Flags: ack, cwr, ece, established, fin, psh, rst, syn, urg
       tcp_ack:
         type: bool
         required: false
@@ -100,13 +106,11 @@ options:
         type: str
         required: false
         description: >
-          URL in string format of the ACL object group resource. This URL
-          refers to the REST API interface and has the following format:
-          `/system/acl_object_groups/{name},{object_type}`. This attribute is
-          mutually exclusive with the `src_l4_port_min`, `src_l4_port_max`, and
+          Name of the ACL object group. This attribute is mutually
+          exclusive with the `src_l4_port_min`, `src_l4_port_max`, and
           `src_l4_port_range_reverse` attributes, and if this attribute is
-          configured, the other ones will be ignored. The referenced object
-          group must be of type `l4port`.
+          configured, the other ones will be ignored. The object group
+          must be of type `l4port`.
       src_l4_port_max:
         type: int
         required: false
@@ -130,13 +134,11 @@ options:
         type: str
         required: false
         description: >
-          URL in string format of the ACL object group resource. This URL
-          refers to the REST API interface and has the following format:
-          `/system/acl_object_groups/{name},{object_type}`. This attribute is
-          mutually exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and
+          Name of the ACL object group. This attribute is mutually
+          exclusive with the `dst_l4_port_min`, `dst_l4_port_max`, and
           `dst_l4_port_range_reverse` attributes. If this attribute is
-          configured, the others will be ignored. The referenced object group
-          must be of type `l4port`.
+          configured, the others will be ignored. The object group must be
+          of type `l4port`.
       dst_l4_port_max:
         type: int
         required: false
@@ -162,12 +164,10 @@ options:
         type: str
         required: false
         description: >
-          URL in string format of the ACL object group resource. This URL
-          refers to the REST API interface and has the following format:
-          `/system/acl_object_groups/{name},{object_type}`. This attribute is
+          Name of the ACL object group resource. This attribute is
           mutually exclusive with the source IP address attribute. If
           `src_ip_group` is configured, `src_ip` will be ignored. The
-          referenced object group must be of type `ipv4` or `ipv6`.
+          object group must be of type `ipv4` or `ipv6`.
       src_ip:
         type: str
         required: false
@@ -182,12 +182,10 @@ options:
         type: str
         required: false
         description: >
-          URL in string format of the ACL object group resource. This URL
-          refers to the REST API interface and has the following format:
-          `/system/acl_object_groups/{name},{object_type}`. This attribute is
+          Name of the ACL object group resource. This attribute is
           mutually exclusive with the destination IP address attribute. If
           `dst_ip_group` is configured, `dst_ip` will be ignored. The
-          referenced object group must be of type `ipv4` or `ipv6`.
+          object group must be of type `ipv4` or `ipv6`.
       dst_ip:
         type: str
         required: false
@@ -202,14 +200,16 @@ options:
         type: str
         required: false
         description: >
-          String with source MAC matching attribute. Two formats are allowed
-          (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ).
+          String with source MAC matching attribute. Any EUI format is allowed
+          (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF
+          or AABBCC:DDEEFF)
       dst_mac:
         type: str
         required: false
         description: >
-          String with destination MAC matching attribute. Two formats are
-          allowed (AAAA.BBBB.CCCC or AAAA.BBBB.CCCC/XXXX.YYYY.ZZZZ).
+          String with destination MAC matching attribute. Any EUI format is
+          allowed (AABB.CCDD.EEFF, AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF,
+          AABBCCDDEEFF or AABBCC:DDEEFF)
       action:
         type: str
         required: false
@@ -224,7 +224,7 @@ options:
         description: >
           When true, increment hit count for packets that match this ACL.
       dscp:
-        type: int
+        type: str
         required: false
         description: Different Services Code Point matching attribute.
       ecn:
@@ -232,7 +232,7 @@ options:
         required: false
         description: Explicit Congestion Notification matching attribute.
       ethertype:
-        type: int
+        type: str
         required: false
         description: Ethernet type matching attribute.
       fragment:
@@ -244,7 +244,7 @@ options:
         required: false
         description: ICMP code matching attribute.
       icmp_type:
-        type: int
+        type: str
         required: false
         description: ICMP type matching attribute.
       ip_precedence:
@@ -335,6 +335,17 @@ EXAMPLES = """
         protocol: tcp
         src_ip: 2001:db8::/32
 
+# Simple MAC example
+- name: Configure MAC ACL
+  aoscx_acl:
+    name: test_mac
+    type: mac
+    acl_entries:
+      1:
+        action: permit
+        src_mac: 00-CA-FE-CA-FE-01
+        dst_mac: 00:AC:DC:AC:DC:02
+
 # Simple L4 example
 # The following example shows how to configure rules with L4 ports. It will
 # allow traffic form ports 5000, 5001 and 5002 to port 3657. Note that when
@@ -412,48 +423,6 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
     get_pyaoscx_session,
 )
 
-protocol_dict = {
-    "ah": 51,
-    "esp": 50,
-    "gre": 47,
-    "icmp": 1,
-    "icmpv6": 58,
-    "igmp": 2,
-    "ospf": 89,
-    "pim": 103,
-    "sctp": 132,
-    "tcp": 6,
-    "udp": 17,
-}
-
-
-def translate_acl_entries_protocol(protocol_name):
-    if protocol_name in protocol_dict:
-        return protocol_dict[protocol_name]
-
-    if protocol_name in ("ip", "any", "ipv6"):
-        return ""
-
-    return None
-
-
-def _remove_invalid_addresses(parameters):
-    """
-    For user ease 'any' is accepted as an address, but for REST, to match any
-        address the field has to be empty.
-    """
-    param_names = [
-        "src_ip",
-        "dst_ip",
-        "src_mac",
-        "dst_mac",
-    ]
-    for name in param_names:
-        if name in parameters:
-            if parameters[name] == "any":
-                del parameters[name]
-    return parameters
-
 
 def get_argument_spec():
     argument_spec = {
@@ -515,15 +484,27 @@ def main():
     if state == "delete" and acl_exists:
         #  If there are entries in configuration, delete them
         if acl_entries:
-            aces = acl.cfg_aces[:]
-            for acl_entry in aces:
-                if acl_entry.sequence_number in acl_entries:
-                    acl_entry.delete()
-                    modified_op = True
+            orig_aces = acl.cfg_aces.copy()
+            for seq_num, acl_entry in orig_aces.items():
+                if str(seq_num) in acl_entries:
+                    try:
+                        acl_entry.delete()
+                        modified_op = True
+                    except Exception as e:
+                        ansible_module.fail_json(
+                            msg="Could not delete entry {0}: {1}".format(
+                                seq_num, str(e)
+                            )
+                        )
         else:
             # Delete ACL
-            acl.delete()
-            modified_op = True
+            try:
+                acl.delete()
+                modified_op = True
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not delete ACL: {0}".format(str(e))
+                )
     elif state in ["create", "update"]:
         if not acl_exists:
             acl.create()
@@ -531,87 +512,130 @@ def main():
 
         if acl_entries:
             AclEntry = session.api.get_module_class(session, "AclEntry")
-            sw_acl_entries = AclEntry.get_all(session, acl)
-            for sequence_number, config in acl_entries.items():
-                if sequence_number in sw_acl_entries:
-                    try:
+            sw_acl_entries = acl.cfg_aces.copy()
+            valid_tcp_flags = [
+                "ack",
+                "cwr",
+                "ece",
+                "established",
+                "fin",
+                "psh",
+                "rst",
+                "syn",
+                "urg",
+            ]
+            for sequence_number, config_cls in acl_entries.items():
+                sequence_number = int(sequence_number)
+                config = config_cls.copy()
+                # Need to convert tcp_flags list in {tcp_flag: True}
+                if "tcp_flags" in config:
+                    for flag in config["tcp_flags"]:
+                        if flag in valid_tcp_flags:
+                            config["tcp_" + flag] = True
+                        else:
+                            ansible_module.fail_json(
+                                msg=(
+                                    "Invalid TCP Flag {0}, "
+                                    "valid flags are: {1}"
+                                ).format(flag, ", ".join(valid_tcp_flags))
+                            )
+                    del config["tcp_flags"]
+                ObjectGroup = session.api.get_module_class(
+                    session, "ObjectGroup"
+                )
+                for l4_port in ["src_l4_port", "dst_l4_port"]:
+                    l4_port_grp_name = l4_port + "_group"
+                    if l4_port_grp_name in config:
+                        group_name = config[l4_port_grp_name]
+                        l4_port_group = ObjectGroup(
+                            session, group_name, "l4port"
+                        )
+                        try:
+                            l4_port_group.get()
+                        except Exception:
+                            ansible_module.fail_json(
+                                msg="{0} does not exist".format(
+                                    str(l4_port_group)
+                                )
+                            )
+                        config[l4_port_grp_name] = l4_port_group
+                        config.pop(l4_port, None)
+                        config.pop(l4_port + "_min", None)
+                        config.pop(l4_port + "_max", None)
+                for ip_param in ["src_ip", "dst_ip"]:
+                    ip_grp_name = ip_param + "_group"
+                    if ip_grp_name in config:
+                        group_name = config[ip_grp_name]
+                        ip_group = ObjectGroup(
+                            session, group_name, acl.list_type
+                        )
+                        try:
+                            ip_group.get()
+                        except Exception:
+                            ansible_module.fail_json(
+                                msg="{0} does not exist".format(str(ip_group))
+                            )
+                        config[ip_grp_name] = ip_group
+                        config.pop(ip_param, None)
+                # Need to translate L4 port name if any
+                if "src_l4_port" in config:
+                    l4_port = config["src_l4_port"]
+                    if isinstance(l4_port, int):
+                        config["src_l4_port_min"] = l4_port
+                        config["src_l4_port_max"] = l4_port
+                    elif "-" in l4_port:
+                        try:
+                            port_range = iter(l4_port.split("-"))
+                            config["src_l4_port_min"] = int(next(port_range))
+                            config["src_l4_port_max"] = int(next(port_range))
+                        except Exception as e:
+                            ansible_module.fail_json(
+                                msg="Unable to parse range: {0} ({1})".format(
+                                    l4_port, str(e)
+                                )
+                            )
+                    else:
+                        if l4_port.isnumeric():
+                            l4_port = int(l4_port)
+                        config["src_l4_port_min"] = l4_port
+                        config["src_l4_port_max"] = l4_port
+                    del config["src_l4_port"]
+                if "dst_l4_port" in config:
+                    l4_port = config["dst_l4_port"]
+                    if isinstance(l4_port, int):
+                        config["dst_l4_port_min"] = l4_port
+                        config["dst_l4_port_max"] = l4_port
+                    elif "-" in l4_port:
+                        try:
+                            port_range = iter(l4_port.split("-"))
+                            config["dst_l4_port_min"] = int(next(port_range))
+                            config["dst_l4_port_max"] = int(next(port_range))
+                        except Exception as e:
+                            ansible_module.fail_json(
+                                msg="Unable to parse range: {0} ({1})".format(
+                                    l4_port, str(e)
+                                )
+                            )
+                    else:
+                        if l4_port.isnumeric():
+                            l4_port = int(l4_port)
+                        config["dst_l4_port_min"] = l4_port
+                        config["dst_l4_port_max"] = l4_port
+                    del config["dst_l4_port"]
+
+                try:
+                    if sequence_number in sw_acl_entries:
+                        acl_entry = sw_acl_entries[sequence_number]
+                        for attr, value in config.items():
+                            setattr(acl_entry, attr, value)
+                    else:
                         acl_entry = AclEntry(
                             session,
                             sequence_number=int(sequence_number),
                             parent_acl=acl,
-                            **_remove_invalid_addresses(config)
+                            **config
                         )
-                        acl_entry.get(selector="configuration")
-                    except Exception as e:
-                        ansible_module.fail_json(msg=str(e))
-                    source = ["src_l4_port_min", "src_l4_port_max"]
-                    if "src_l4_port" in config:
-                        for s in source:
-                            if s in config:
-                                ansible_module.fail_json(
-                                    msg="Source L4 Port cannot be configured "
-                                    "with multiple parameters. Choose one of "
-                                    "these options: 1) {0} or 2) {1} and "
-                                    "{2}.".format(
-                                        "src_l4_port",
-                                        "src_l4_port_min",
-                                        "src_l4_port_max",
-                                    )
-                                )
-                    dest = ["dst_l4_port_min", "dst_l4_port_max"]
-                    if "dst_l4_port" in config:
-                        for s in dest:
-                            if s in config:
-                                ansible_module.fail_json(
-                                    msg="Destination L4 Port cannot be "
-                                    "configured with multiple parameters. "
-                                    "Choose one of these options: 1) {0} or "
-                                    "2) {1} and {2}.".format(
-                                        "dst_l4_port",
-                                        "dst_l4_port_min",
-                                        "dst_l4_port_max",
-                                    )
-                                )
-                    if "src_l4_port" in config:
-                        l4_port = str(config["src_l4_port"])
-                        if "-" in l4_port:
-                            l4_port = l4_port.split("-")
-                            config["src_l4_port_min"] = int(l4_port[0])
-                            config["src_l4_port_max"] = int(l4_port[1])
-                        else:
-                            config["src_l4_port_min"] = int(l4_port)
-                            config["src_l4_port_max"] = int(l4_port)
-                        del config["src_l4_port"]
-                    if "dst_l4_port" in config:
-                        l4_port = str(config["dst_l4_port"])
-                        if "-" in l4_port:
-                            l4_port = l4_port.split("-")
-                            config["dst_l4_port_min"] = int(l4_port[0])
-                            config["dst_l4_port_max"] = int(l4_port[1])
-                        else:
-                            config["dst_l4_port_min"] = int(l4_port)
-                            config["dst_l4_port_max"] = int(l4_port)
-                        del config["dst_l4_port"]
-                    if "protocol" in config:
-                        protocol = config["protocol"]
-                        config["protocol"] = translate_acl_entries_protocol(
-                            protocol
-                        )
-                    for conf in config:
-                        present = getattr(acl_entry, conf)
-                        if present != config[conf]:
-                            modified_op = True
-                else:
-                    modified_op = True
-
-                try:
-                    acl_entry = AclEntry(
-                        session,
-                        sequence_number=int(sequence_number),
-                        parent_acl=acl,
-                        **_remove_invalid_addresses(config)
-                    )
-                    acl_entry.apply()
+                    modified_op |= acl_entry.apply()
                 except Exception as e:
                     ansible_module.fail_json(msg=str(e))
 

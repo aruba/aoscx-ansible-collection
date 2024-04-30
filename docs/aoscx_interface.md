@@ -24,6 +24,9 @@ This module manages the interface attributes of Aruba AOSCX network devices.
 | `mtu`             | int  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Configure the MTU value in bytes in the range 46-9198.                                                                     |
 | `duplex`          | str  | [`full`, `half`]                                                                                                                                                                                                                                                                                                                                                                                                                                                           | [ ]      | Configure the interface for full duplex or half duplex. If `autoneg` is `on` this must be omitted.                         |
 | `speeds`          | list |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Configure the speeds of the interface in megabits per second. If `duplex` is defined only one speed may be specified.      |
+| `acl_name`        | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of the ACL being applied or removed from the VLAN.                                                                    |
+| `acl_type`        | str  | [`mac`, `ipv4`, `ipv6`]                                                                                                                                                                                                                                                                                                                                                                                                                                                    | [ ]      | Type of ACL being applied or removed from the VLAN.                                                                        |
+| `acl_direction`   | str  | [`in`, `out`, `routed-in`, `routed-out`]                                                                                                                                                                                                                                                                                                                                                                                                                                   | [ ]      | Direction for which the ACL is to be applied or removed.                                                                    |
 | `qos`             | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of existing QoS configuration to apply to the interface.                                                              |
 | `no_qos`          | bool |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Flag to remove the existing Qos of the interface. Use True to remove it.                                                   |
 | `queue_profile`   | str  |                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | [ ]      | Name of queue profile to apply to interface.                                                                               |
@@ -261,6 +264,33 @@ After Device Configuration:
 interface 1/1/2
     no shutdown
     vlan access 1
+```
+
+### Apply ipv4 ACL IN to an interface
+
+Before Device Configuration:
+```
+interface 1/1/2
+    no shutdown
+    vlan access 1
+```
+
+Playbook:
+```YAML
+- name: Apply ipv4 ACL to interfaces (new method)
+  aoscx_interface:
+    name: "1/1/2"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+```
+
+After Device Configuration:
+```
+interface 1/1/2
+    no shutdown
+    vlan access 1
+    apply access-list ip ipv4_acl in
 ```
 
 ### Administratively disable an interface

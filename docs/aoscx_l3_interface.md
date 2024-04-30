@@ -11,6 +11,19 @@ Version added: 2.8.0
 ## Synopsis
 
 This modules provides configuration management of Layer3 Interfaces on AOS-CX devices.
+There is an issue on platform 6200, so it is necessary to use REST version 10.09.
+There are two methods to configure REST version:
+- Parameter `ansible_aoscx_rest_version` in inventory file or variable in
+  the playbook.
+  Example:
+```
+ansible_aoscx_rest_version: 10.09
+```
+- Environment variable `ANSIBLE_AOSCX_REST_VERSION`.
+  Example:
+```
+export ANSIBLE_AOSCX_REST_VERSION=10.09
+```
 
 ## Parameters
 

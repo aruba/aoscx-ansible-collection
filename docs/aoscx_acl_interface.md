@@ -1,7 +1,8 @@
 # module: aoscx_acl_interface
 
-description: This modules provides application management of Access Classifier
-Lists on Interfaces on AOS-CX devices.
+description: This module provides application management of Access Classifier
+Lists on Interfaces on AOS-CX devices. This module is deprecated and will be
+removed in a future, please use `aoscx_interface` instead.
 
 ##### ARGUMENTS
 
@@ -68,4 +69,21 @@ Lists on Interfaces on AOS-CX devices.
     acl_interface_list:
       - 1/1/2
       - 1/2/23
+
+- name: Apply ipv4 ACL to interfaces (new method)
+  aoscx_interface:
+    name: "{{item}}"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+  loop: ["1/1/2", "1/2/23"]
+
+- name: Remove ipv4 ACL from interfaces (new method)
+  aoscx_interface:
+    name: "{{item}}"
+    acl_name: ipv4_acl
+    acl_type: ipv4
+    acl_direction: in
+    state: delete
+  loop: ["1/1/2", "1/2/23"]
 ```
