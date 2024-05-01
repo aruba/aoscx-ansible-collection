@@ -34,11 +34,14 @@ jobs:
           # It's important that Sanity is tested against all stable-X.Y branches
           # Testing against `devel` may fail as new tests are added.
         # - stable-2.9 # Only if your collection supports Ansible 2.9
-          - stable-2.10
-          - stable-2.11
+        #  - stable-2.10
+        #  - stable-2.11
           - stable-2.12
           - stable-2.13
           - stable-2.14
+          - stable-2.15
+          - stable-2.16
+          - stable-2.17
           - devel
     runs-on: >-
       ${{ contains(fromJson(
@@ -50,12 +53,12 @@ jobs:
       # .../ansible_collections/${{env.NAMESPACE}}/${{env.COLLECTION_NAME}}/
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: ansible_collections/${{env.NAMESPACE}}/${{env.COLLECTION_NAME}}
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
           # it is just required to run that once as "ansible-test sanity" in the docker image
           # will run on all python versions it supports.
