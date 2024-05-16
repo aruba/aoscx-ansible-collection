@@ -20,6 +20,7 @@ options:
     default: inventory_hostname
     vars:
       - name: ansible_host
+      - name: inventory_hostname
   port:
     type: int
     description: >
