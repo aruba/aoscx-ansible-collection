@@ -296,7 +296,7 @@ EXAMPLES = """
       - vlan
       - vsx_virtual
 
-- name: Set the MTU rate to the 1/1/1 Interface
+- name: Set the MTU rate to the 1/1/17 Interface
   aoscx_interface:
     name: 1/1/17
     mtu: 1300
