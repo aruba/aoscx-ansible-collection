@@ -186,6 +186,10 @@ options:
       - none
       - global
     required: false
+  ip_mtu:
+    description: Configure IP MTU value of the interface
+    type: int
+    required: false
   state:
     description: Create, Update or Delete the Interface.
     type: str
@@ -300,6 +304,11 @@ EXAMPLES = """
   aoscx_interface:
     name: 1/1/17
     mtu: 1300
+
+- name: Set the IP MTU 9000 to the vlan23 Interface
+  aoscx_interface:
+    name: vlan23
+    mtu: 9000
 """
 
 RETURN = r""" # """
@@ -449,6 +458,10 @@ def get_argument_spec():
                 },
             },
         },
+        "ip_mtu": {
+            "type": "int",
+            "required": False,
+        },
         "state": {
             "type": "str",
             "required": False,
@@ -539,6 +552,7 @@ def main():
     duplex = ansible_module.params["duplex"]
     speeds = ansible_module.params["speeds"]
 
+    ip_mtu = ansible_module.params["ip_mtu"]
     session = get_pyaoscx_session(ansible_module)
     device = Device(session)
 
@@ -598,6 +612,8 @@ def main():
             vsx_sync_features_mapping(feature) for feature in vsx_sync
         ]
         interface.vsx_sync = clean_vsx_features
+    if ip_mtu:
+        interface.ip_mtu_value = ip_mtu
 
     modified |= interface.apply()
     if acl_type:
