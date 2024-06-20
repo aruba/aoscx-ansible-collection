@@ -1,0 +1,2 @@
+[aoscx]
+10.200.4.110  ansible_connection=arubanetworks.aoscx.aoscx  ansible_network_os=arubanetworks.aoscx.aoscx ansible_user=admin ansible_password=Aruba123 #ArubaOS 10.10
