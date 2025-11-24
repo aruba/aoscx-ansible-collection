@@ -135,7 +135,9 @@ from ansible.plugins.connection import (
     NetworkConnectionBase,
     ensure_connect,
 )
-from ansible.module_utils.six import PY3
+import sys
+
+PY3 = sys.version_info.major >= 3
 
 try:
     from pyaoscx.session import Session
