@@ -250,16 +250,12 @@ def main():
             poe_interface.allocate_by_method = "usage"
         if class_number:
             if platform == "RL" or platform == "FL":
-                warning = (
+                ansible_module.warn(
                     "Currently there are limitations to delete the "
                     "assigned_class on platforms RL and FL. "
                     "The recommendation is to use a workaround explained on "
                     "the documentation of the Config Ansible module. "
                 )
-                if "warnings" in result:
-                    result["warnings"].append(warning)
-                else:
-                    result["warnings"] = [warning]
             # CR 249060 does not allow deleting platforms RL and FL.
             # After this issue is solved, remove this comment, remove the
             # warning above and uncomment the funcionality below.
@@ -303,14 +299,10 @@ def main():
             result["changed"] = True
             poe_interface.pd_class_override = pd_class_override
             poe_interface.allocate_by_method = "class"
-            warning = (
+            ansible_module.warn(
                 "Enabling pd-class-override will also change the allocate-by "
                 "setting to class."
             )
-            if "warnings" in result:
-                result["warnings"].append(warning)
-            else:
-                result["warnings"] = [warning]
         if (
             pre_standard_detect is not None
             and poe_interface.pre_standard_detect != pre_standard_detect

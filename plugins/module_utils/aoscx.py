@@ -88,13 +88,6 @@ def get_provider_argspec():
     return aoscx_provider_spec
 
 
-def check_args(module, warnings):
-    """
-    Checks the argument
-    """
-    pass
-
-
 def get_config(module, flags=None):
     """
     Obtains the switch configuration
@@ -463,7 +456,6 @@ class ArubaAnsibleModule:
             argument_spec=module_args, supports_check_mode=True
         )
 
-        self.warnings = list()
         self.changed = False
         self.original_config = None
         self.running_config = None
@@ -567,7 +559,7 @@ class ArubaAnsibleModule:
         """
         Update switch config
         """
-        self.result = dict(changed=self.changed, warnings=self.warnings)
+        self.result = dict(changed=self.changed)
 
         if self.original_config != self.running_config:
             self.upload_switch_config(self.running_config)

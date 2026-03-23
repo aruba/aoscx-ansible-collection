@@ -228,9 +228,8 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-    warnings = []
     if ansible_module.params["gather_subset"] == "!config":
-        warnings.append(
+        ansible_module.warn(
             "default value for `gather_subset` will be changed "
             "to `min` from `!config` v2.11 onwards"
         )
@@ -363,16 +362,19 @@ def main():
                 main_version > 10 or sub_version > 8
             ):
                 if str(session.api) in ["10.04", "10.08"]:
-                    w_message = (
-                        "Physical interfaces: "
-                        "REST v{0} is no longer supported "
-                        "for this version {1}-{2}.{3}. "
-                        "Add parameter 'ansible_aoscx_rest_version: 10.09'"
-                        " in your inventory file for this host. Or define "
-                        "environment variable ANSIBLE_AOSCX_REST_VERSION "
-                        "with value 10.09"
-                    ).format(session.api, platform, main_version, sub_version)
-                    warnings.append(w_message)
+                    ansible_module.warn(
+                        (
+                            "Physical interfaces: "
+                            "REST v{0} is no longer supported "
+                            "for this version {1}-{2}.{3}. "
+                            "Add parameter 'ansible_aoscx_rest_version: 10.09'"
+                            " in your inventory file for this host. Or define "
+                            "environment variable ANSIBLE_AOSCX_REST_VERSION "
+                            "with value 10.09"
+                        ).format(
+                            session.api, platform, main_version, sub_version
+                        )
+                    )
                 else:
                     use_data_planes = True
                     try:
@@ -386,11 +388,10 @@ def main():
         elif subset == "host_name":
             subset = "hostname"
         elif subset == "config":
-            w_message = (
+            ansible_module.warn(
                 "gather_subset:config is not available yet, it will "
                 "be available in a future release"
             )
-            warnings.append(w_message)
         str_subset = "ansible_net_" + subset
 
         # Check if current subset is inside the Device object
@@ -418,7 +419,7 @@ def main():
                     intfs = switch.subsystems[subsystem][subset]
                 ansible_facts[str_subset].update({subsystem: intfs})
 
-    ansible_module.exit_json(ansible_facts=ansible_facts, warnings=warnings)
+    ansible_module.exit_json(ansible_facts=ansible_facts)
 
 
 if __name__ == "__main__":

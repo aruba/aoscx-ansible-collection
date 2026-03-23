@@ -336,9 +336,6 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
     aoscx_argument_spec,
 )
-from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx import (  # NOQA
-    check_args as aoscx_check_args,
-)
 from ansible_collections.ansible.netcommon.plugins.module_utils.network.common.config import (  # NOQA
     NetworkConfig,
     dumps,
@@ -430,9 +427,7 @@ def main():
         supports_check_mode=True,
     )
 
-    warnings = list()
-    aoscx_check_args(module, warnings)
-    result = {"changed": False, "warnings": warnings}
+    result = {"changed": False}
 
     config = None
 

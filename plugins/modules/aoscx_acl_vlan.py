@@ -116,8 +116,8 @@ def main():
     acl_direction = ansible_module.params["acl_direction"]
     state = ansible_module.params["state"]
     result = dict(changed=False)
-    warnings = []
-    warnings.append("This module is deprecated, use aoscx_vlan instead")
+
+    ansible_module.warn("This module is deprecated, use aoscx_vlan instead")
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -150,9 +150,6 @@ def main():
             result["changed"] = modified
 
     # Exit
-    if warnings:
-        result["warnings"] = warnings
-
     ansible_module.exit_json(**result)
 
 

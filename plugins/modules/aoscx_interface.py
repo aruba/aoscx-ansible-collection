@@ -657,16 +657,13 @@ def main():
                 )
 
             if "forced_speeds" not in status_int.hw_intf_info:
-                warning = (
-                    "Interface {0} might not support the combination of "
-                    "speeds/duplex configured, check your hardware specifications "
-                    "and/or CLI to make sure."
-                ).format(name)
-                if "warnings" in result:
-                    result["warnings"].append(warning)
-                else:
-                    result["warnings"] = [warning]
-
+                module.warn(
+                    (
+                        "Interface {0} might not support the combination of "
+                        "speeds/duplex configured, check your hardware specifications "
+                        "and/or CLI to make sure."
+                    ).format(name)
+                )
             try:
                 interface.configure_speed_duplex(**_user_config)
             except Exception as exc:

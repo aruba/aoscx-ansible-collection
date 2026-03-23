@@ -277,9 +277,7 @@ def main():
 
     argument_spec.update(aoscx_argument_spec)
 
-    warnings = list()
-
-    result = {"changed": False, "warnings": warnings}
+    result = {"changed": False}
     module = AnsibleModule(
         argument_spec=argument_spec, supports_check_mode=True
     )
