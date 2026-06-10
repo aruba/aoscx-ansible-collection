@@ -39,6 +39,7 @@ options:
       to the desired time in seconds.
     required: true
     type: list
+    elements: str
   wait_for:
     description: >
       A list of conditions to wait to be satisfied before continuing execution.
@@ -264,7 +265,7 @@ def main():
     """
 
     argument_spec = dict(
-        commands=dict(type="list", required=True),
+        commands=dict(type="list", elements="str", required=True),
         wait_for=dict(type="list", elements="str", aliases=["waitfor"]),
         match=dict(default="all", choices=["any", "all"]),
         retries=dict(default=10, type="int"),
