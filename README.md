@@ -9,7 +9,7 @@ Requirements
 ------------
 
 * Python 3 or later
-* Ansible 2.9.0 or later
+* Ansible 2.19.10 or later
   * Refer to [Ansible's documentation](https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html) for installation steps
 * Minimum supported AOS-CX firmware version 10.04
 * Enable REST on your AOS-CX device with the following commands:
