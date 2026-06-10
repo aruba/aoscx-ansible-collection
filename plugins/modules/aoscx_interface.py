@@ -528,9 +528,7 @@ def main():
     qos = ansible_module.params["qos"]
     no_qos = ansible_module.params["no_qos"]
     queue_profile = ansible_module.params["queue_profile"]
-    use_global_queue_profile = ansible_module.params[
-        "use_global_queue_profile"
-    ]
+    use_global_queue_profile = ansible_module.params["use_global_queue_profile"]
     qos_trust_mode = ansible_module.params["qos_trust_mode"]
     qos_rate = ansible_module.params["qos_rate"]
 
@@ -560,15 +558,11 @@ def main():
         else:
             # physical interfaces cannot be deleted, in this case default
             # values are loaded
-            prev_intf_attrs = utils.get_attrs(
-                interface, interface.config_attrs
-            )
+            prev_intf_attrs = utils.get_attrs(interface, interface.config_attrs)
             interface.delete()
             interface = Interface(session, name)
             interface.get()
-            curr_intf_attrs = utils.get_attrs(
-                interface, interface.config_attrs
-            )
+            curr_intf_attrs = utils.get_attrs(interface, interface.config_attrs)
             # interfaces list members in dictionary are pointers to Interface
             # objects, so they are converted to str value to avoid false
             # negatives
@@ -608,9 +602,7 @@ def main():
                 ansible_module.fail_json(msg=str(e))
         else:
             try:
-                modified |= interface.set_acl(
-                    acl_name, acl_type, acl_direction
-                )
+                modified |= interface.set_acl(acl_name, acl_type, acl_direction)
             except Exception as e:
                 ansible_module.fail_json(msg=str(e))
     if configure_speed:
@@ -644,7 +636,9 @@ def main():
                 playbook_speeds = set(speeds)
                 if "speeds" in interface.user_config:
                     sw_str_speeds = interface.user_config["speeds"]
-                    switch_speeds = set([int(s) for s in sw_str_speeds.split(",")])
+                    switch_speeds = set(
+                        [int(s) for s in sw_str_speeds.split(",")]
+                    )
                     modified |= switch_speeds != playbook_speeds
                 else:
                     modified = True
@@ -657,7 +651,7 @@ def main():
                 )
 
             if "forced_speeds" not in status_int.hw_intf_info:
-                module.warn(
+                ansible_module.warn(
                     (
                         "Interface {0} might not support the combination of "
                         "speeds/duplex configured, check your hardware specifications "
