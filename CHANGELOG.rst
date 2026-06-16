@@ -5,6 +5,29 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.5.0
+======
+
+Release Summary
+---------------
+
+Bugfixes, documentation improvements, and compatibility updates with community contributions
+
+Major Changes
+-------------
+
+- Update required Ansible version to 2.19.10
+- Migrated warnings to use ``AnsibleModule.warn`` by kberstene (https://github.com/aruba/aoscx-ansible-collection/pull/135)
+- Added ``inventory_hostname`` as an acceptable connection variable by malicks (https://github.com/aruba/aoscx-ansible-collection/pull/101)
+- Fix ansible-test sanity: specify ``elements`` type for ``commands`` option in ``aoscx_command`` module
+
+Minor Changes
+-------------
+
+- Fix typo(s) on example about interface port in ``aoscx_interface`` documentation by alagoutte (https://github.com/aruba/aoscx-ansible-collection/pull/93)
+- Add ``wait_firmware_upload`` on example when using ``remote_firmware_file_path`` (HTTP/HTTPS) in ``aoscx_upload_firmware`` by alagoutte (https://github.com/aruba/aoscx-ansible-collection/pull/98)
+- Fix warning deprecation to use ``ansible_module.warn``
+
 v4.4.0
 ======
 
