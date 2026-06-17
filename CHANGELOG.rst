@@ -5,6 +5,19 @@ Arubanetworks.Aoscx Release Notes
 .. contents:: Topics
 
 
+v4.5.1
+======
+
+Release Summary
+---------------
+
+Bugfix for connection variable precedence
+
+Minor Changes
+-------------
+
+- Fix order of connection variables to prioritize ``inventory_hostname`` over ``ansible_host`` in the connection plugin by Arne Opdal (https://github.com/aruba/aoscx-ansible-collection/pull/139)
+
 v4.5.0
 ======
 
