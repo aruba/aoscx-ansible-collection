@@ -19,8 +19,8 @@ options:
       connection to.
     default: inventory_hostname
     vars:
-      - name: ansible_host
       - name: inventory_hostname
+      - name: ansible_host
   port:
     type: int
     description: >
