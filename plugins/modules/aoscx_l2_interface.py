@@ -151,6 +151,40 @@ options:
       connection). Only valid when port_security is enabled.
     type: int
     required: false
+  stp_admin_edge_port_enable:
+    description: >
+      Boolean to set admin type: admin-edge or admin-network (default)
+    type: bool
+    required: false
+  stp_bpdu_filter_enable:
+    description: >
+      Boolean to set BPDU filter (disable by default)
+    type: bool
+    required: false
+  stp_bpdu_guard_enable:
+    description: >
+      Boolean to set BPDU guard (disable by default)
+    type: bool
+    required: false
+  stp_link_type:
+    description: >
+      String to set link-type
+    type: str
+    choices:
+      - auto
+      - point_to_point
+      - shared
+    required: false
+  stp_loop_guard_enable:
+    description: >
+      Boolean to set Loop guard (disable by default)
+    type: bool
+    required: false
+  stp_root_guard_enable:
+    description: >
+      Boolean to set Root guard (disable by default)
+    type: bool
+    required: false
 """
 
 EXAMPLES = """
@@ -318,6 +352,18 @@ EXAMPLES = """
     vlan_mode: trunk
     trunk_allowed_all: true
     native_vlan_id: '200'
+
+- name: >
+    Configure Interface 1/1/7 - Enable Spanning tree on the port (admin_edge_port,
+      bpdu_filter/guard, loop/root guard and link_type).
+  aoscx_l2_interface:
+    interface: 1/1/7
+    stp_admin_edge_port_enable: true
+    stp_bpdu_filter_enable: true
+    stp_bpdu_guard_enable: true
+    stp_link_type: "point_to_point"
+    stp_loop_guard_enable: true
+    stp_root_guard_enable: true
 """
 
 RETURN = r""" # """
@@ -434,6 +480,36 @@ def get_argument_spec():
             "required": False,
             "default": None,
         },
+        "stp_admin_edge_port_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "stp_bpdu_filter_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "stp_bpdu_guard_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "stp_link_type": {
+            "type": "str",
+            "required": False,
+            "choices": ["auto", "point_to_point", "shared"]
+        },
+        "stp_loop_guard_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "stp_root_guard_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
     }
     return module_args
 
@@ -474,6 +550,12 @@ def main():
     port_security_recovery_time = ansible_module.params[
         "port_security_recovery_time"
     ]
+    stp_admin_edge_port_enable = ansible_module.params["stp_admin_edge_port_enable"]
+    stp_bpdu_filter_enable = ansible_module.params["stp_bpdu_filter_enable"]
+    stp_bpdu_guard_enable = ansible_module.params["stp_bpdu_guard_enable"]
+    stp_link_type = ansible_module.params["stp_link_type"]
+    stp_loop_guard_enable = ansible_module.params["stp_loop_guard_enable"]
+    stp_root_guard_enable = ansible_module.params["stp_root_guard_enable"]
 
     try:
         from pyaoscx.device import Device
@@ -660,6 +742,20 @@ def main():
             ansible_module.fail_json(msg=str(exc))
 
         modified_op |= _result
+
+    # Spanning Tree
+    try:
+        modified_op = interface.configure_spanning_tree(
+            admin_edge_port_enable=stp_admin_edge_port_enable,
+            bpdu_filter_enable=stp_bpdu_filter_enable,
+            bpdu_guard_enable=stp_bpdu_guard_enable,
+            link_type=stp_link_type,
+            loop_guard_enable=stp_loop_guard_enable,
+            root_guard_enable=stp_root_guard_enable
+        )
+    except Exception as e:
+        ansible_module.fail_json(str(e))
+
     if modified_op:
         result["changed"] = True
 
