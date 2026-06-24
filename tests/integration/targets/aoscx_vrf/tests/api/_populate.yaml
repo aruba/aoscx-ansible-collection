@@ -1,0 +1,5 @@
+---
+- name: Create VRF
+  aoscx_vrf:
+    name: ansible_test_1
+    state: create
