@@ -28,6 +28,10 @@ options:
     description: The name of the VRF
     required: true
     type: str
+  rd:
+    description: The Route Distinguisher (RD) of the VRF (use XXXXX:YYYYY for the format)
+    required: false
+    type: str
   state:
     description: Create or delete the VRF.
     required: false
@@ -42,6 +46,12 @@ EXAMPLES = """
 - name: Create a VRF
   aoscx_vrf:
     name: red
+    state: create
+
+- name: Create a VRF with RD
+  aoscx_vrf:
+    name: red
+    rd: 100:1
     state: create
 
 - name: Delete a VRF
@@ -64,6 +74,11 @@ def get_argument_spec():
             "type": "str",
             "required": True,
         },
+        "rd": {
+            "type": "str",
+            "required": False,
+        },
+
         "state": {
             "type": "str",
             "default": "create",
@@ -85,6 +100,7 @@ def main():
     # Get playbook's arguments
     vrf_name = ansible_module.params["name"]
     state = ansible_module.params["state"]
+    rd = ansible_module.params["rd"]
 
     result = dict(changed=False)
 
@@ -151,6 +167,7 @@ def main():
                 ansible_module.fail_json(msg=str(e))
 
     if state == "create":
+
         # Create VRF with incoming attributes
         if not vrf_exists:
             # Changed
@@ -160,6 +177,11 @@ def main():
             vrf.apply()
         except Exception as e:
             ansible_module.fail_json(msg=str(e))
+
+        # Configure RD (Route Distinguisher)
+        if rd:
+            vrf.rd = rd
+            modified |= vrf.apply()
 
     result["changed"] = modified
     ansible_module.exit_json(**result)
