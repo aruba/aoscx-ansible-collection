@@ -1,0 +1,129 @@
+# Integration tests for the aoscx_bgp_aspath_list module.
+#
+# Run with:
+#   ansible-test integration aoscx_bgp_aspath_list --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the BgpAspathFilter / BgpAspathFilterEntry
+# classes.
+
+- name: Make sure the test filter does not exist yet
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    state: delete
+  ignore_errors: true
+
+- name: Create a BGP AS-Path filter with two entries
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        regex: '^65000_'
+      - preference: 20
+        action: deny
+        regex: '_65001$'
+    state: create
+  register: create_result
+
+- name: Assert the filter was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply the exact same configuration (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        regex: '^65000_'
+      - preference: 20
+        action: deny
+        regex: '_65001$'
+    state: create
+  register: idempotent_result
+
+- name: Assert the second run reports no change
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+- name: Update an entry regex
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        regex: '^65002_'
+      - preference: 20
+        action: deny
+        regex: '_65001$'
+    state: update
+  register: update_result
+
+- name: Assert the update reports a change
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Prune the second entry
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        regex: '^65002_'
+    state: update
+  register: prune_result
+
+- name: Assert the prune reports a change
+  ansible.builtin.assert:
+    that:
+      - prune_result is changed
+
+- name: Attempt a duplicate preference (expected failure)
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    state: update
+    entries:
+      - preference: 10
+        action: permit
+        regex: 'a'
+      - preference: 10
+        action: deny
+        regex: 'b'
+  register: dup_result
+  ignore_errors: true
+
+- name: Assert the duplicate preference was refused
+  ansible.builtin.assert:
+    that:
+      - dup_result is failed
+      - "'Duplicate entry preference' in dup_result.msg"
+
+- name: Delete the filter
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    state: delete
+  register: delete_result
+
+- name: Assert the filter was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again to confirm idempotent removal
+  arubanetworks.aoscx.aoscx_bgp_aspath_list:
+    name: QA_ASPATH
+    state: delete
+  register: delete_again_result
+
+- name: Assert the second delete reports no change
+  ansible.builtin.assert:
+    that:
+      - delete_again_result is not changed
