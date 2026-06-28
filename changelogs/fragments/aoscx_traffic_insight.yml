@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - aoscx_traffic_insight - new module to create, update or delete the AOS-CX
+    Traffic Insight instance (system/traffic_insights).
+  - aoscx_traffic_insight_monitor - new module to create, update or delete
+    Traffic Insight monitors (system/traffic_insight_monitors).
+  - aoscx connection plugin - allow REST API version 10.13, which is required
+    by the IPFIX and Traffic Insight modules.
