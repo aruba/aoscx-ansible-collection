@@ -1,0 +1,43 @@
+# Integration tests for the aoscx_evpn module.
+#
+# Run with:
+#   ansible-test integration aoscx_evpn --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the Evpn class. EVPN is a singleton, so this
+# test changes the mac_move_timer and restores it to its original value.
+
+- name: Read the current global mac_move_timer
+  arubanetworks.aoscx.aoscx_facts:
+  register: facts_result
+  ignore_errors: true
+
+- name: Change the global mac_move_timer
+  arubanetworks.aoscx.aoscx_evpn:
+    mac_move_timer: 181
+  register: change_result
+
+- name: Assert change reported
+  ansible.builtin.assert:
+    that:
+      - change_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_evpn:
+    mac_move_timer: 181
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Restore the global mac_move_timer
+  arubanetworks.aoscx.aoscx_evpn:
+    mac_move_timer: 180
+  register: restore_result
+
+- name: Assert restore reported
+  ansible.builtin.assert:
+    that:
+      - restore_result is changed
