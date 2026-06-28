@@ -1,0 +1,60 @@
+# Integration tests for the aoscx_captive_portal_profile module.
+#
+# Run with:
+#   ansible-test integration aoscx_captive_portal_profile --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the CaptivePortalProfile class and a REST API version of 10.16.
+# Uses a temporary profile named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test profile does not exist yet
+  arubanetworks.aoscx.aoscx_captive_portal_profile:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a captive portal profile
+  arubanetworks.aoscx.aoscx_captive_portal_profile:
+    name: ansible-test
+    url: https://cp.example.com/login
+  register: result
+
+- name: Assert the profile was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the profile again (idempotent)
+  arubanetworks.aoscx.aoscx_captive_portal_profile:
+    name: ansible-test
+    url: https://cp.example.com/login
+    state: update
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the URL
+  arubanetworks.aoscx.aoscx_captive_portal_profile:
+    name: ansible-test
+    url: https://cp.example.com/login2
+    state: update
+  register: result
+
+- name: Assert the URL change was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the captive portal profile
+  arubanetworks.aoscx.aoscx_captive_portal_profile:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the profile was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
