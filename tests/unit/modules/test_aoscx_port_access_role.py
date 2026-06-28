@@ -31,6 +31,7 @@ MODULE = (
 )
 
 CPP_URI = "/rest/v10.16/system/captive_portal_profiles/cp1"
+GBP_URI = "/rest/v10.16/system/port_access_gbps/g1"
 
 
 class AnsibleExitJson(Exception):
@@ -79,9 +80,15 @@ def build_role(exists, **attrs):
     return role
 
 
-def build_session(existing, new_instance=None, cpp_exists=True):
+def build_session(
+    existing, new_instance=None, cpp_exists=True, ref_exists=True
+):
     session = MagicMock()
     session.resource_prefix = "/rest/v10.16/"
+
+    response = MagicMock()
+    response.ok = ref_exists
+    session.request.return_value = response
 
     def get_module(sess, module, index=None, **kwargs):
         if module == "PortAccessRole":
@@ -230,6 +237,52 @@ def test_delete():
     result = run_module({"name": "role1", "state": "delete"}, session)
     assert result["changed"] is True
     existing.delete.assert_called_once()
+
+
+def test_create_with_in_gbp():
+    existing = build_role(False)
+    new = build_role(False)
+    session = build_session(existing, new_instance=new, ref_exists=True)
+    result = run_module(
+        {
+            "name": "role1",
+            "vlan_mode": "access",
+            "in_gbp": "g1",
+        },
+        session,
+    )
+    assert result["changed"] is True
+    new.create.assert_called_once()
+    session.request.assert_called_with("GET", "system/port_access_gbps/g1")
+
+
+def test_create_in_gbp_missing_fails():
+    existing = build_role(False)
+    new = build_role(False)
+    session = build_session(existing, new_instance=new, ref_exists=False)
+    result = run_module(
+        {
+            "name": "role1",
+            "in_gbp": "g1",
+        },
+        session,
+    )
+    assert result["failed"] is True
+
+
+def test_update_in_gbp_idempotent():
+    existing = build_role(True, in_gbp={"g1": GBP_URI})
+    session = build_session(existing, ref_exists=True)
+    result = run_module(
+        {
+            "name": "role1",
+            "state": "update",
+            "in_gbp": "g1",
+        },
+        session,
+    )
+    assert result["changed"] is False
+    existing.update.assert_not_called()
 
 
 def test_delete_absent():

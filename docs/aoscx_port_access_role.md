@@ -5,8 +5,8 @@ on AOS-CX devices (system/port_access_roles). A port access role is the local
 user role applied to authenticated clients (for example a role returned by a
 RADIUS server such as ClearPass). It groups the VLAN assignment and the
 per-client access settings. This module requires REST API version 10.16 (set
-ansible_aoscx_rest_version to 10.16). The reference attributes in_abp, in_gbp,
-in_policy, macsec_policy and ipfix_flow_monitor are not managed by this module.
+ansible_aoscx_rest_version to 10.16). The reference attributes macsec_policy
+and ipfix_flow_monitor are not managed by this module.
 
 ##### ARGUMENTS
 
@@ -148,6 +148,26 @@ in_policy, macsec_policy and ipfix_flow_monitor are not managed by this module.
       profile must already exist.
     required: false
     type: str
+  in_gbp:
+    description: >
+      Name of an existing port access group based policy
+      (system/port_access_gbps) to apply to clients using this role. The
+      policy must already exist.
+    required: false
+    type: str
+  in_abp:
+    description: >
+      Name of an existing port access auth based policy
+      (system/port_access_abps) to apply to clients using this role. The
+      policy must already exist.
+    required: false
+    type: str
+  in_policy:
+    description: >
+      Name of an existing port access policy (system/port_access_policies) to
+      apply to clients using this role. The policy must already exist.
+    required: false
+    type: str
   state:
     description: Create, update or delete the port access role.
     required: false
@@ -176,6 +196,13 @@ in_policy, macsec_policy and ipfix_flow_monitor are not managed by this module.
     vlan_tag: 20
     captive_portal_profile: guest-portal
     client_inactivity_monitor: dynamic_timeout
+
+- name: Create a role applying an existing group based policy
+  aoscx_port_access_role:
+    name: employee
+    vlan_mode: access
+    vlan_tag: 10
+    in_gbp: employee_r2r_policy
 
 - name: Delete a port access role
   aoscx_port_access_role:
