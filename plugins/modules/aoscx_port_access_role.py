@@ -26,9 +26,8 @@ description: >
   role applied to authenticated clients (for example a role returned by a
   RADIUS server such as ClearPass). It groups the VLAN assignment and the
   per-client access settings. This module requires REST API version 10.16 (set
-  ansible_aoscx_rest_version to 10.16). The reference attributes in_abp,
-  in_gbp, in_policy, macsec_policy and ipfix_flow_monitor are not managed by
-  this module.
+  ansible_aoscx_rest_version to 10.16). The reference attributes macsec_policy
+  and ipfix_flow_monitor are not managed by this module.
 author: Aruba Networks (@ArubaNetworks)
 options:
   name:
@@ -168,6 +167,26 @@ options:
       profile must already exist.
     required: false
     type: str
+  in_gbp:
+    description: >
+      Name of an existing port access group based policy
+      (system/port_access_gbps) to apply to clients using this role. The
+      policy must already exist.
+    required: false
+    type: str
+  in_abp:
+    description: >
+      Name of an existing port access auth based policy
+      (system/port_access_abps) to apply to clients using this role. The
+      policy must already exist.
+    required: false
+    type: str
+  in_policy:
+    description: >
+      Name of an existing port access policy (system/port_access_policies) to
+      apply to clients using this role. The policy must already exist.
+    required: false
+    type: str
   state:
     description: Create, update or delete the port access role.
     required: false
@@ -194,6 +213,13 @@ EXAMPLES = """
     vlan_tag: 20
     captive_portal_profile: guest-portal
     client_inactivity_monitor: dynamic_timeout
+
+- name: Create a role applying an existing group based policy
+  aoscx_port_access_role:
+    name: employee
+    vlan_mode: access
+    vlan_tag: 10
+    in_gbp: employee_r2r_policy
 
 - name: Delete a port access role
   aoscx_port_access_role:
@@ -234,6 +260,13 @@ SCALAR_ATTRS = [
 
 LIST_ATTRS = ["vlan_trunks", "vlan_name_trunks"]
 
+# Reference attributes handled by name: param name -> resource collection.
+REFERENCE_ATTRS = {
+    "in_gbp": "system/port_access_gbps",
+    "in_abp": "system/port_access_abps",
+    "in_policy": "system/port_access_policies",
+}
+
 
 def captive_portal_uri(session, ansible_module, profile_name):
     """
@@ -253,6 +286,39 @@ def captive_portal_uri(session, ansible_module, profile_name):
     return "{0}system/captive_portal_profiles/{1}".format(
         session.resource_prefix, profile_name
     )
+
+
+def reference_uri(session, ansible_module, collection, item_name):
+    """
+    Validate that a referenced object exists under the given collection and
+    return its URI.
+    """
+    response = session.request("GET", "{0}/{1}".format(collection, item_name))
+    if not response.ok:
+        ansible_module.fail_json(
+            msg="Referenced object '{0}' does not exist under {1}".format(
+                item_name, collection
+            )
+        )
+    return "{0}{1}/{2}".format(session.resource_prefix, collection, item_name)
+
+
+def reconcile_reference(role, attr, desired_uri):
+    """
+    Compare the current reference (dict {name: uri} or URI string) with the
+    desired URI; update the role attribute if needed. Returns True if changed.
+    """
+    current_ref = getattr(role, attr, None)
+    if isinstance(current_ref, dict):
+        current_uri = next(iter(current_ref.values()), None)
+    else:
+        current_uri = current_ref
+    if current_uri != desired_uri:
+        setattr(role, attr, desired_uri)
+        if attr not in role.config_attrs:
+            role.config_attrs.append(attr)
+        return True
+    return False
 
 
 def main():
@@ -341,6 +407,9 @@ def main():
             type="bool", required=False, default=None
         ),
         captive_portal_profile=dict(type="str", required=False, default=None),
+        in_gbp=dict(type="str", required=False, default=None),
+        in_abp=dict(type="str", required=False, default=None),
+        in_policy=dict(type="str", required=False, default=None),
         state=dict(
             type="str",
             default="create",
@@ -408,11 +477,21 @@ def main():
     if cpp_name is not None:
         cpp_uri = captive_portal_uri(session, ansible_module, cpp_name)
 
+    # Resolve in_gbp / in_abp / in_policy references by name to their URIs.
+    reference_uris = {}
+    for attr, collection in REFERENCE_ATTRS.items():
+        item_name = ansible_module.params[attr]
+        if item_name is not None:
+            reference_uris[attr] = reference_uri(
+                session, ansible_module, collection, item_name
+            )
+
     # --------------------------------------------------------------- create
     if not exists:
         kwargs = dict(supplied)
         if cpp_uri is not None:
             kwargs["captive_portal_profile"] = cpp_uri
+        kwargs.update(reference_uris)
         role = session.api.get_module(
             session, "PortAccessRole", name, **kwargs
         )
@@ -449,6 +528,10 @@ def main():
             role.captive_portal_profile = cpp_uri
             if "captive_portal_profile" not in role.config_attrs:
                 role.config_attrs.append("captive_portal_profile")
+
+    for attr, desired_uri in reference_uris.items():
+        if reconcile_reference(role, attr, desired_uri):
+            changed = True
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:
