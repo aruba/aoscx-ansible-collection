@@ -1,0 +1,79 @@
+# Integration tests for the aoscx_dhcp_relay module.
+#
+# Run with:
+#   ansible-test integration aoscx_dhcp_relay --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the DhcpRelay class.
+
+- name: Make sure the test relay does not exist yet
+  arubanetworks.aoscx.aoscx_dhcp_relay:
+    port: 1/1/3
+    state: delete
+  ignore_errors: true
+
+- name: Create a DHCP relay with two IPv4 servers
+  arubanetworks.aoscx.aoscx_dhcp_relay:
+    port: 1/1/3
+    vrf: default
+    ipv4_ucast_server:
+      - 10.1.1.1
+      - 10.1.1.2
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_dhcp_relay:
+    port: 1/1/3
+    vrf: default
+    ipv4_ucast_server:
+      - 10.1.1.1
+      - 10.1.1.2
+    state: create
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Update the IPv4 server list
+  arubanetworks.aoscx.aoscx_dhcp_relay:
+    port: 1/1/3
+    state: update
+    ipv4_ucast_server:
+      - 10.1.1.1
+  register: update_result
+
+- name: Assert update changed
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Add a BOOTP gateway
+  arubanetworks.aoscx.aoscx_dhcp_relay:
+    port: 1/1/3
+    state: update
+    bootp_gateway: 10.1.1.254
+  register: gw_result
+
+- name: Assert BOOTP gateway change
+  ansible.builtin.assert:
+    that:
+      - gw_result is changed
+
+- name: Delete the relay
+  arubanetworks.aoscx.aoscx_dhcp_relay:
+    port: 1/1/3
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
