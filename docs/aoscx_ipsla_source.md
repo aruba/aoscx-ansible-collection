@@ -75,6 +75,30 @@ set when the source is created and cannot be changed afterwards.
     description: DNS server used to resolve the probe destination.
     required: false
     type: str
+  source_interface:
+    description: >
+      Name of the interface (for example 1/1/1) used as the source of the
+      probes. May be set on creation and changed on update.
+    required: false
+    type: str
+  http_sla:
+    description: >
+      HTTP probe options. A dictionary with the keys cache_disable (bool),
+      type (get or raw) and version_number (for example "1.0" or "1.1").
+    required: false
+    type: dict
+  https_sla:
+    description: >
+      HTTPS probe options. A dictionary with the keys cache_disable (bool),
+      type (get or raw) and version_number.
+    required: false
+    type: dict
+  voip_jitter_sla:
+    description: >
+      VoIP jitter probe options. A dictionary with the keys advantage_factor
+      (int) and codec_type (for example g711a or g729a).
+    required: false
+    type: dict
   state:
     description: Create, update or delete the IP SLA source.
     required: false
@@ -102,6 +126,26 @@ set when the source is created and cannot be changed afterwards.
     name: probe-gw
     state: update
     frequency: 60
+
+- name: Create an HTTP IP SLA source bound to an interface
+  aoscx_ipsla_source:
+    name: probe-http
+    type: http
+    vrf: default
+    source_interface: 1/1/1
+    http_sla:
+      cache_disable: true
+      type: get
+      version_number: "1.1"
+
+- name: Create a VoIP jitter IP SLA source
+  aoscx_ipsla_source:
+    name: probe-voip
+    type: udp_jitter_voip
+    vrf: default
+    voip_jitter_sla:
+      advantage_factor: 10
+      codec_type: g711a
 
 - name: Delete an IP SLA source
   aoscx_ipsla_source:

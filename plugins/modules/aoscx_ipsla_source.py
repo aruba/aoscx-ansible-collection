@@ -94,6 +94,32 @@ options:
     description: DNS server used to resolve the probe destination.
     required: false
     type: str
+  source_interface:
+    description: >
+      Name of the interface (for example 1/1/1) the probes are sourced from.
+    required: false
+    type: str
+  http_sla:
+    description: >
+      HTTP probe settings, applicable to the http probe type. Supported keys
+      are cache_disable (bool), type (get or raw) and version_number (str).
+      The supplied dictionary fully replaces the current settings.
+    required: false
+    type: dict
+  https_sla:
+    description: >
+      HTTPS probe settings, applicable to the https probe type. Supported keys
+      are cache_disable (bool), type (get or raw) and version_number (str).
+      The supplied dictionary fully replaces the current settings.
+    required: false
+    type: dict
+  voip_jitter_sla:
+    description: >
+      VoIP jitter probe settings, applicable to the udp_jitter_voip probe
+      type. Supported keys are advantage_factor (int) and codec_type (str).
+      The supplied dictionary fully replaces the current settings.
+    required: false
+    type: dict
   state:
     description: Create, update or delete the IP SLA source.
     required: false
@@ -120,6 +146,26 @@ EXAMPLES = """
     state: update
     frequency: 60
 
+- name: Create an HTTP IP SLA source from a given interface
+  aoscx_ipsla_source:
+    name: probe-web
+    type: http
+    vrf: default
+    source_interface: 1/1/1
+    http_sla:
+      cache_disable: true
+      type: get
+      version_number: "1.1"
+
+- name: Create a VoIP jitter IP SLA source
+  aoscx_ipsla_source:
+    name: probe-voip
+    type: udp_jitter_voip
+    vrf: default
+    voip_jitter_sla:
+      advantage_factor: 5
+      codec_type: g729a
+
 - name: Delete an IP SLA source
   aoscx_ipsla_source:
     name: probe-gw
@@ -128,10 +174,26 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from urllib.parse import quote
+
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
+
+
+def interface_uri(session, ansible_module, name):
+    """Validate an interface exists and return its URI for a request body."""
+    interface = session.api.get_module(session, "Interface", name)
+    try:
+        interface.get()
+    except Exception:
+        ansible_module.fail_json(
+            msg="Could not find interface {0}".format(name)
+        )
+    return "{0}system/interfaces/{1}".format(
+        session.resource_prefix, quote(name, safe="")
+    )
 
 
 def main():
@@ -162,6 +224,10 @@ def main():
         source_port_number=dict(type="int", required=False, default=None),
         tos=dict(type="int", required=False, default=None),
         domain_name_server=dict(type="str", required=False, default=None),
+        source_interface=dict(type="str", required=False, default=None),
+        http_sla=dict(type="dict", required=False, default=None),
+        https_sla=dict(type="dict", required=False, default=None),
+        voip_jitter_sla=dict(type="dict", required=False, default=None),
         state=dict(
             type="str",
             default="create",
@@ -176,6 +242,7 @@ def main():
     name = ansible_module.params["name"]
     vrf_name = ansible_module.params["vrf"]
     state = ansible_module.params["state"]
+    source_interface = ansible_module.params["source_interface"]
 
     scalar_attrs = [
         "type",
@@ -188,6 +255,9 @@ def main():
         "source_port_number",
         "tos",
         "domain_name_server",
+        "http_sla",
+        "https_sla",
+        "voip_jitter_sla",
     ]
     supplied = {
         attr: ansible_module.params[attr]
@@ -245,8 +315,13 @@ def main():
             ansible_module.fail_json(
                 msg="Could not find VRF, make sure it exists"
             )
+        create_kwargs = dict(supplied)
+        if source_interface is not None:
+            create_kwargs["source_interface"] = interface_uri(
+                session, ansible_module, source_interface
+            )
         source = session.api.get_module(
-            session, "IpslaSource", name, vrf=vrf, **supplied
+            session, "IpslaSource", name, vrf=vrf, **create_kwargs
         )
         result["changed"] = True
         if not ansible_module.check_mode:
@@ -268,6 +343,19 @@ def main():
             setattr(source, attr, value)
             if attr not in source.config_attrs:
                 source.config_attrs.append(attr)
+
+    if source_interface is not None:
+        desired_uri = interface_uri(session, ansible_module, source_interface)
+        current = getattr(source, "source_interface", None)
+        if isinstance(current, dict) and current:
+            current_uri = list(current.values())[0]
+        else:
+            current_uri = None
+        if current_uri != desired_uri:
+            changed = True
+            source.source_interface = desired_uri
+            if "source_interface" not in source.config_attrs:
+                source.config_attrs.append("source_interface")
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:

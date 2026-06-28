@@ -43,6 +43,12 @@ attributes, so any change is applied by recreating the responder.
     description: IP address the responder is bound to.
     required: false
     type: str
+  responder_interface:
+    description: >
+      Name of the interface (for example 1/1/1) the responder is bound to.
+      Set on creation only; changing it recreates the responder.
+    required: false
+    type: str
   persistence:
     description: Whether the responder survives a reboot.
     required: false
@@ -70,6 +76,14 @@ attributes, so any change is applied by recreating the responder.
     vrf: default
     responder_port_number: 5000
     responder_type: ipv4
+
+- name: Create a responder bound to a specific interface
+  aoscx_ipsla_responder:
+    name: responder-2
+    type: udp_echo
+    vrf: default
+    responder_port_number: 5000
+    responder_interface: 1/1/1
 
 - name: Delete an IP SLA responder
   aoscx_ipsla_responder:

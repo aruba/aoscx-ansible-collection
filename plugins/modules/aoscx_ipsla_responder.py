@@ -62,6 +62,12 @@ options:
     description: IP address the responder is bound to.
     required: false
     type: str
+  responder_interface:
+    description: >
+      Name of the interface (for example 1/1/1) the responder is bound to.
+      Set on creation only; changing it recreates the responder.
+    required: false
+    type: str
   persistence:
     description: Whether the responder survives a reboot.
     required: false
@@ -88,6 +94,14 @@ EXAMPLES = """
     responder_port_number: 5000
     responder_type: ipv4
 
+- name: Create a responder bound to a specific interface
+  aoscx_ipsla_responder:
+    name: responder-2
+    type: udp_echo
+    vrf: default
+    responder_port_number: 5000
+    responder_interface: 1/1/1
+
 - name: Delete an IP SLA responder
   aoscx_ipsla_responder:
     name: responder-1
@@ -96,10 +110,26 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
+from urllib.parse import quote
+
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
+
+
+def interface_uri(session, ansible_module, name):
+    """Validate an interface exists and return its URI for a request body."""
+    interface = session.api.get_module(session, "Interface", name)
+    try:
+        interface.get()
+    except Exception:
+        ansible_module.fail_json(
+            msg="Could not find interface {0}".format(name)
+        )
+    return "{0}system/interfaces/{1}".format(
+        session.resource_prefix, quote(name, safe="")
+    )
 
 
 def main():
@@ -120,6 +150,7 @@ def main():
             choices=["ipv4", "ipv6"],
         ),
         responder_ip=dict(type="str", required=False, default=None),
+        responder_interface=dict(type="str", required=False, default=None),
         persistence=dict(
             type="str",
             required=False,
@@ -140,6 +171,7 @@ def main():
     name = ansible_module.params["name"]
     vrf_name = ansible_module.params["vrf"]
     state = ansible_module.params["state"]
+    responder_interface = ansible_module.params["responder_interface"]
 
     scalar_attrs = [
         "type",
@@ -201,8 +233,13 @@ def main():
             ansible_module.fail_json(
                 msg="Could not find VRF, make sure it exists"
             )
+        kwargs = dict(supplied)
+        if responder_interface is not None:
+            kwargs["responder_interface"] = interface_uri(
+                session, ansible_module, responder_interface
+            )
         return session.api.get_module(
-            session, "IpslaResponder", name, vrf=vrf, **supplied
+            session, "IpslaResponder", name, vrf=vrf, **kwargs
         )
 
     if not exists:
@@ -231,6 +268,18 @@ def main():
         differs = True
     for attr, value in supplied.items():
         if getattr(responder, attr, None) != value:
+            differs = True
+
+    if responder_interface is not None:
+        desired_if = interface_uri(
+            session, ansible_module, responder_interface
+        )
+        current_if = getattr(responder, "responder_interface", None)
+        if isinstance(current_if, dict) and current_if:
+            current_if_uri = list(current_if.values())[0]
+        else:
+            current_if_uri = None
+        if current_if_uri != desired_if:
             differs = True
 
     result["changed"] = differs

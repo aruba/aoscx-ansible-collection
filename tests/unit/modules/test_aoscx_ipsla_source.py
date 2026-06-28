@@ -41,6 +41,9 @@ SCALAR_ATTRS = (
     "source_port_number",
     "tos",
     "domain_name_server",
+    "http_sla",
+    "https_sla",
+    "voip_jitter_sla",
 )
 
 
@@ -78,11 +81,12 @@ def patch_ansible_module():
         yield
 
 
-def build_source(exists, **attrs):
+def build_source(exists, source_interface=None, **attrs):
     source = MagicMock()
     source.config_attrs = []
     for attr in SCALAR_ATTRS:
         setattr(source, attr, attrs.get(attr))
+    source.source_interface = source_interface
     if exists:
         source.get.return_value = True
     else:
@@ -92,12 +96,17 @@ def build_source(exists, **attrs):
 
 def build_session(existing, new_instance=None):
     session = MagicMock()
+    session.resource_prefix = "/rest/v10.16/"
     vrf = MagicMock()
     vrf.get.return_value = True
+    interface = MagicMock()
+    interface.get.return_value = True
 
     def get_module(sess, module, index=None, **kwargs):
         if module == "Vrf":
             return vrf
+        if module == "Interface":
+            return interface
         if module == "IpslaSource":
             if "vrf" in kwargs and new_instance is not None:
                 return new_instance
@@ -178,6 +187,63 @@ def test_update_type_is_ignored():
     session = build_session(existing)
     result = run_module(
         {"name": "src1", "state": "update", "type": "udp_echo"},
+        session,
+    )
+    assert result["changed"] is False
+    existing.update.assert_not_called()
+
+
+def test_create_with_interface_and_sla():
+    existing = build_source(False)
+    new = build_source(False)
+    session = build_session(existing, new_instance=new)
+    result = run_module(
+        {
+            "name": "src1",
+            "type": "http",
+            "source_interface": "1/1/1",
+            "http_sla": {
+                "cache_disable": True,
+                "type": "get",
+                "version_number": "1.1",
+            },
+        },
+        session,
+    )
+    assert result["changed"] is True
+    new.create.assert_called_once()
+
+
+def test_update_source_interface():
+    uri = "/rest/v10.16/system/interfaces/1%2F1%2F1"
+    existing = build_source(True, source_interface={"1/1/1": uri})
+    session = build_session(existing)
+    result = run_module(
+        {"name": "src1", "state": "update", "source_interface": "1/1/2"},
+        session,
+    )
+    assert result["changed"] is True
+    existing.update.assert_called_once()
+
+
+def test_update_source_interface_idempotent():
+    uri = "/rest/v10.16/system/interfaces/1%2F1%2F1"
+    existing = build_source(True, source_interface={"1/1/1": uri})
+    session = build_session(existing)
+    result = run_module(
+        {"name": "src1", "state": "update", "source_interface": "1/1/1"},
+        session,
+    )
+    assert result["changed"] is False
+    existing.update.assert_not_called()
+
+
+def test_update_sla_idempotent():
+    sla = {"cache_disable": True, "type": "get", "version_number": "1.1"}
+    existing = build_source(True, http_sla=sla)
+    session = build_session(existing)
+    result = run_module(
+        {"name": "src1", "state": "update", "http_sla": dict(sla)},
         session,
     )
     assert result["changed"] is False

@@ -73,12 +73,15 @@ def patch_ansible_module():
         yield
 
 
-def build_responder(exists, vrf_name="default", **attrs):
+def build_responder(
+    exists, vrf_name="default", responder_interface=None, **attrs
+):
     responder = MagicMock()
     responder.config_attrs = []
     for attr in SCALAR_ATTRS:
         setattr(responder, attr, attrs.get(attr))
     responder.vrf = {vrf_name: "/rest/v10.16/system/vrfs/" + vrf_name}
+    responder.responder_interface = responder_interface
     if exists:
         responder.get.return_value = True
     else:
@@ -88,12 +91,17 @@ def build_responder(exists, vrf_name="default", **attrs):
 
 def build_session(existing, new_instance=None):
     session = MagicMock()
+    session.resource_prefix = "/rest/v10.16/"
     vrf = MagicMock()
     vrf.get.return_value = True
+    interface = MagicMock()
+    interface.get.return_value = True
 
     def get_module(sess, module, index=None, **kwargs):
         if module == "Vrf":
             return vrf
+        if module == "Interface":
+            return interface
         if module == "IpslaResponder":
             if "vrf" in kwargs and new_instance is not None:
                 return new_instance
@@ -126,6 +134,69 @@ def test_create():
     )
     assert result["changed"] is True
     new.create.assert_called_once()
+
+
+def test_create_with_interface():
+    existing = build_responder(False)
+    new = build_responder(False)
+    session = build_session(existing, new_instance=new)
+    result = run_module(
+        {
+            "name": "resp1",
+            "type": "udp_echo",
+            "responder_port_number": 5000,
+            "responder_interface": "1/1/1",
+        },
+        session,
+    )
+    assert result["changed"] is True
+    new.create.assert_called_once()
+
+
+def test_recreate_on_interface_change():
+    uri = "/rest/v10.16/system/interfaces/1%2F1%2F1"
+    existing = build_responder(
+        True,
+        type="udp_echo",
+        responder_port_number=5000,
+        responder_interface={"1/1/1": uri},
+    )
+    new = build_responder(False)
+    session = build_session(existing, new_instance=new)
+    result = run_module(
+        {
+            "name": "resp1",
+            "type": "udp_echo",
+            "responder_port_number": 5000,
+            "responder_interface": "1/1/2",
+        },
+        session,
+    )
+    assert result["changed"] is True
+    existing.delete.assert_called_once()
+    new.create.assert_called_once()
+
+
+def test_interface_idempotent():
+    uri = "/rest/v10.16/system/interfaces/1%2F1%2F1"
+    existing = build_responder(
+        True,
+        type="udp_echo",
+        responder_port_number=5000,
+        responder_interface={"1/1/1": uri},
+    )
+    session = build_session(existing)
+    result = run_module(
+        {
+            "name": "resp1",
+            "type": "udp_echo",
+            "responder_port_number": 5000,
+            "responder_interface": "1/1/1",
+        },
+        session,
+    )
+    assert result["changed"] is False
+    existing.delete.assert_not_called()
 
 
 def test_create_check_mode():
