@@ -273,7 +273,12 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
     get_pyaoscx_session,
 )
 
-COLLECTION = "system/classes"
+try:
+    from pyaoscx.class_entry import ClassEntry
+
+    HAS_PYAOSCX_CLASS = True
+except ImportError:
+    HAS_PYAOSCX_CLASS = False
 
 CLASS_TYPES = [
     "ipv4",
@@ -331,10 +336,6 @@ MATCH_FIELDS = [
 # Immutable fields compared to detect whether an existing entry must be
 # recreated. ``type`` (the match/ignore action) is immutable as well.
 IMMUTABLE_FIELDS = [{"name": "type", "type": "str"}] + MATCH_FIELDS
-
-
-def ok(response):
-    return response is not None and response.status_code < 400
 
 
 def build_argument_spec():
@@ -403,21 +404,22 @@ def _match_differs(want, current):
     return False
 
 
-def _get_entries(session, container_path):
-    response = session.request(
-        "GET",
-        "{0}/cfg_entries".format(container_path),
-        params={"depth": 2, "selector": "configuration"},
-    )
-    if not ok(response):
-        return {}
-    return {int(seq): data for seq, data in response.json().items()}
+def _get_entries(session, traffic_class):
+    entries = {}
+    for entry in ClassEntry.get_all(session, traffic_class).values():
+        entry.get(selector="configuration")
+        seq = int(entry.sequence_number)
+        data = {}
+        for field in IMMUTABLE_FIELDS:
+            data[field["name"]] = getattr(entry, field["name"], None)
+        data["comment"] = getattr(entry, "comment", None)
+        entries[seq] = data
+    return entries
 
 
 def _reconcile_entries(
-    ansible_module, session, container_path, desired, current, check_mode
+    ansible_module, session, traffic_class, desired, current, check_mode
 ):
-    base = "{0}/cfg_entries".format(container_path)
     changed = False
 
     # Remove entries that are no longer desired (full replace).
@@ -425,7 +427,7 @@ def _reconcile_entries(
         if seq not in desired:
             changed = True
             if not check_mode:
-                session.request("DELETE", "{0}/{1}".format(base, seq))
+                ClassEntry(session, seq, traffic_class).delete()
 
     for seq, want in desired.items():
         cur = current.get(seq)
@@ -435,14 +437,17 @@ def _reconcile_entries(
             changed = True
             if not check_mode:
                 if cur is not None:
-                    session.request("DELETE", "{0}/{1}".format(base, seq))
-                response = session.request(
-                    "POST", base, data=ansible_module.jsonify(want)
-                )
-                if not ok(response):
+                    ClassEntry(session, seq, traffic_class).delete()
+                attrs = {
+                    k: v for k, v in want.items() if k != "sequence_number"
+                }
+                entry = ClassEntry(session, seq, traffic_class, **attrs)
+                try:
+                    entry.create()
+                except Exception as e:
                     ansible_module.fail_json(
                         msg="Could not create entry {0}: {1}".format(
-                            seq, response.text
+                            seq, str(e)
                         )
                     )
             continue
@@ -452,11 +457,17 @@ def _reconcile_entries(
         if want_comment is not None and want_comment != cur.get("comment"):
             changed = True
             if not check_mode:
-                session.request(
-                    "PUT",
-                    "{0}/{1}".format(base, seq),
-                    data=ansible_module.jsonify({"comment": want_comment}),
+                entry = ClassEntry(
+                    session, seq, traffic_class, comment=want_comment
                 )
+                try:
+                    entry.update()
+                except Exception as e:
+                    ansible_module.fail_json(
+                        msg="Could not update entry {0}: {1}".format(
+                            seq, str(e)
+                        )
+                    )
 
     return changed
 
@@ -471,20 +482,33 @@ def run_module(ansible_module, session):
     entries = entries_param or []
     check_mode = ansible_module.check_mode
 
-    index = "{0}{1}{2}".format(
-        name, session.api.compound_index_separator, class_type
-    )
-    container_path = "{0}/{1}".format(COLLECTION, index)
-
     result = dict(changed=False)
-    exists = ok(session.request("GET", container_path))
+
+    try:
+        traffic_class = session.api.get_module(
+            session, "Class", name, type=class_type
+        )
+    except Exception as e:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support traffic classes. "
+                "Upgrade pyaoscx. {0}".format(str(e))
+            )
+        )
+
+    try:
+        traffic_class.get()
+        exists = True
+    except Exception:
+        exists = False
 
     if state == "delete":
         if exists and not check_mode:
-            response = session.request("DELETE", container_path)
-            if not ok(response):
+            try:
+                traffic_class.delete()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not delete {0}: {1}".format(name, response.text)
+                    msg="Could not delete {0}: {1}".format(name, str(e))
                 )
         result["changed"] = exists
         ansible_module.exit_json(**result)
@@ -497,20 +521,18 @@ def run_module(ansible_module, session):
     if not exists:
         changed = True
         if not check_mode:
-            response = session.request(
-                "POST",
-                COLLECTION,
-                data=ansible_module.jsonify(
-                    {"name": name, "type": class_type}
-                ),
+            traffic_class = session.api.get_module(
+                session, "Class", name, type=class_type
             )
-            if not ok(response):
+            try:
+                traffic_class.create()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not create {0}: {1}".format(name, response.text)
+                    msg="Could not create {0}: {1}".format(name, str(e))
                 )
         current = {}
     elif manage_entries:
-        current = _get_entries(session, container_path)
+        current = _get_entries(session, traffic_class)
     else:
         current = {}
 
@@ -519,7 +541,7 @@ def run_module(ansible_module, session):
             _reconcile_entries(
                 ansible_module,
                 session,
-                container_path,
+                traffic_class,
                 desired,
                 current,
                 check_mode,
@@ -536,6 +558,13 @@ def main():
         argument_spec=build_argument_spec(),
         supports_check_mode=True,
     )
+    if not HAS_PYAOSCX_CLASS:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support traffic classes. "
+                "Upgrade pyaoscx."
+            )
+        )
     try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:

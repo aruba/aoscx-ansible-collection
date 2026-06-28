@@ -5,8 +5,8 @@
 """
 Unit tests for the aoscx_class module.
 
-The pyaoscx session is fully mocked through session.request, so no switch is
-required.
+The pyaoscx SDK (Class via session.api.get_module and ClassEntry) is fully
+mocked, so no switch is required.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -28,11 +28,8 @@ from ansible_collections.arubanetworks.aoscx.plugins.modules import (
 
 MODULE = "ansible_collections.arubanetworks.aoscx.plugins.modules.aoscx_class"
 
-COLLECTION = "system/classes"
 NAME = "c1"
 TYPE = "ipv4"
-INDEX = "{0},{1}".format(NAME, TYPE)
-CPATH = "{0}/{1}".format(COLLECTION, INDEX)
 
 # Default representation of an entry as returned by selector=configuration.
 ENTRY_DEFAULTS = {
@@ -92,64 +89,100 @@ def patch_ansible_module():
         yield
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = {} if payload is None else payload
-        self.text = ""
+class FakeClass:
+    def __init__(self, session, name, type=None):
+        self.session = session
+        self.name = name
+        self.type = type
+        self.index = "{0},{1}".format(name, type)
 
-    def json(self):
-        return self._payload
+    def get(self, depth=None, selector=None):
+        if not self.session._exists:
+            raise Exception("not found")
+        return True
+
+    def create(self):
+        self.session._class_creates.append((self.name, self.type))
+
+    def delete(self):
+        self.session._class_deletes.append((self.name, self.type))
+
+
+class FakeClassEntry:
+    def __init__(self, session, sequence_number, parent_class, **kwargs):
+        self.session = session
+        self.sequence_number = sequence_number
+        self.parent_class = parent_class
+        self._attrs = kwargs
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def get(self, depth=None, selector=None):
+        data = self.session._existing_entries[int(self.sequence_number)]
+        for key, value in data.items():
+            setattr(self, key, value)
+        return True
+
+    def create(self):
+        self.session._writes.append(
+            ("create", int(self.sequence_number), self._attrs)
+        )
+
+    def update(self):
+        self.session._writes.append(
+            ("update", int(self.sequence_number), self._attrs)
+        )
+
+    def delete(self):
+        self.session._writes.append(
+            ("delete", int(self.sequence_number), None)
+        )
+
+    @classmethod
+    def get_all(cls, session, parent_class):
+        return {
+            str(seq): cls(session, str(seq), parent_class)
+            for seq in session._existing_entries
+        }
 
 
 def build_session(exists=False, entries=None):
     """
     entries: {seq(int): <full configuration dict>}
     """
-    entries = entries or {}
-    writes = []
-
     session = MagicMock()
-    session.resource_prefix = "/rest/v10.16/"
-    session.api.compound_index_separator = ","
+    session._exists = exists
+    session._existing_entries = entries or {}
+    session._class_creates = []
+    session._class_deletes = []
+    session._writes = []
 
-    def router(operation, path, params=None, data=None):
-        if operation != "GET":
-            writes.append((operation, path, data))
-            code = {"POST": 201, "PUT": 200, "DELETE": 204}[operation]
-            return FakeResponse(code)
-        if path == CPATH:
-            return FakeResponse(200 if exists else 404)
-        if path.endswith("/cfg_entries"):
-            payload = {str(seq): data for seq, data in entries.items()}
-            return FakeResponse(200, payload)
-        return FakeResponse(404)
+    def get_module(sess, name, index, **kwargs):
+        return FakeClass(session, index, kwargs.get("type"))
 
-    session.request.side_effect = router
-    session._writes = writes
+    session.api.get_module.side_effect = get_module
     return session
 
 
 def run(args, session):
     set_module_args(args)
-    with patch(MODULE + ".get_pyaoscx_session", return_value=session):
+    with patch(MODULE + ".get_pyaoscx_session", return_value=session), patch(
+        MODULE + ".ClassEntry", FakeClassEntry
+    ), patch(MODULE + ".HAS_PYAOSCX_CLASS", True):
         with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
             aoscx_class.main()
     return exc.value.args[0]
 
 
-def writes_of(session, operation):
-    return [w for w in session._writes if w[0] == operation]
+def entry_writes(session, op):
+    return [w for w in session._writes if w[0] == op]
 
 
 def test_create_empty_class():
     session = build_session(exists=False)
     result = run({"name": NAME, "type": TYPE}, session)
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert any(p[1] == COLLECTION for p in posts)
-    body = json.loads([p for p in posts if p[1] == COLLECTION][0][2])
-    assert body == {"name": NAME, "type": TYPE}
+    assert (NAME, TYPE) in session._class_creates
 
 
 def test_create_with_entry():
@@ -173,36 +206,35 @@ def test_create_with_entry():
         session,
     )
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    entry_posts = [p for p in posts if p[1].endswith("/cfg_entries")]
-    assert entry_posts
-    body = json.loads(entry_posts[0][2])
-    assert body["sequence_number"] == 10
-    assert body["type"] == "match"
-    assert body["protocol"] == 6
-    assert body["dst_ip"] == "10.0.0.0/255.255.255.0"
-    assert body["count"] is True
+    creates = entry_writes(session, "create")
+    assert creates
+    assert creates[0][1] == 10
+    attrs = creates[0][2]
+    assert attrs["type"] == "match"
+    assert attrs["protocol"] == 6
+    assert attrs["dst_ip"] == "10.0.0.0/255.255.255.0"
+    assert attrs["count"] is True
 
 
 def test_delete():
     session = build_session(exists=True)
     result = run({"name": NAME, "type": TYPE, "state": "delete"}, session)
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert any(d[1] == CPATH for d in deletes)
+    assert (NAME, TYPE) in session._class_deletes
 
 
 def test_delete_absent():
     session = build_session(exists=False)
     result = run({"name": NAME, "type": TYPE, "state": "delete"}, session)
     assert result["changed"] is False
+    assert not session._class_deletes
+    assert not session._class_creates
     assert not session._writes
 
 
 def test_idempotent_entry():
     entries = {
         10: full_entry(
-            sequence_number=10,
             protocol=6,
             dst_ip="10.0.0.0/255.255.255.0",
             dst_l4_port_min=443,
@@ -236,7 +268,7 @@ def test_idempotent_entry():
 
 
 def test_match_change_recreates_entry():
-    entries = {10: full_entry(sequence_number=10, protocol=6, comment="x")}
+    entries = {10: full_entry(protocol=6, comment="x")}
     session = build_session(exists=True, entries=entries)
     result = run(
         {
@@ -254,14 +286,12 @@ def test_match_change_recreates_entry():
         session,
     )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    posts = writes_of(session, "POST")
-    assert any(d[1].endswith("/cfg_entries/10") for d in deletes)
-    assert any(p[1].endswith("/cfg_entries") for p in posts)
+    assert ("delete", 10, None) in session._writes
+    assert any(w[1] == 10 for w in entry_writes(session, "create"))
 
 
 def test_comment_only_change_uses_put():
-    entries = {10: full_entry(sequence_number=10, protocol=6, comment="old")}
+    entries = {10: full_entry(protocol=6, comment="old")}
     session = build_session(exists=True, entries=entries)
     result = run(
         {
@@ -279,16 +309,15 @@ def test_comment_only_change_uses_put():
         session,
     )
     assert result["changed"] is True
-    puts = writes_of(session, "PUT")
-    assert any(p[1].endswith("/cfg_entries/10") for p in puts)
-    assert not writes_of(session, "DELETE")
-    assert not [
-        p for p in writes_of(session, "POST") if p[1].endswith("/cfg_entries")
-    ]
+    updates = entry_writes(session, "update")
+    assert any(w[1] == 10 for w in updates)
+    assert updates[0][2]["comment"] == "new"
+    assert not entry_writes(session, "delete")
+    assert not entry_writes(session, "create")
 
 
 def test_action_ignore_recreates():
-    entries = {10: full_entry(sequence_number=10, protocol=6)}
+    entries = {10: full_entry(protocol=6)}
     session = build_session(exists=True, entries=entries)
     result = run(
         {
@@ -306,28 +335,30 @@ def test_action_ignore_recreates():
         session,
     )
     assert result["changed"] is True
-    assert writes_of(session, "DELETE")
+    assert ("delete", 10, None) in session._writes
+    assert any(w[1] == 10 for w in entry_writes(session, "create"))
 
 
 def test_remove_all_entries():
-    entries = {10: full_entry(sequence_number=10, protocol=6)}
+    entries = {10: full_entry(protocol=6)}
     session = build_session(exists=True, entries=entries)
     result = run(
         {"name": NAME, "type": TYPE, "state": "update", "entries": []},
         session,
     )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert any(d[1].endswith("/cfg_entries/10") for d in deletes)
-    assert not any(d[1] == CPATH for d in deletes)
+    assert ("delete", 10, None) in session._writes
+    assert not session._class_deletes
 
 
 def test_entries_omitted_leaves_entries_untouched():
-    entries = {10: full_entry(sequence_number=10, protocol=6)}
+    entries = {10: full_entry(protocol=6)}
     session = build_session(exists=True, entries=entries)
     result = run({"name": NAME, "type": TYPE, "state": "update"}, session)
     assert result["changed"] is False
     assert not session._writes
+    assert not session._class_creates
+    assert not session._class_deletes
 
 
 def test_duplicate_sequence_fails():
@@ -348,8 +379,8 @@ def test_duplicate_sequence_fails():
 
 def test_remove_extra_keep_matching():
     entries = {
-        10: full_entry(sequence_number=10, protocol=6),
-        20: full_entry(sequence_number=20, protocol=17),
+        10: full_entry(protocol=6),
+        20: full_entry(protocol=17),
     }
     session = build_session(exists=True, entries=entries)
     result = run(
@@ -362,9 +393,6 @@ def test_remove_extra_keep_matching():
         session,
     )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert any(d[1].endswith("/cfg_entries/20") for d in deletes)
-    assert not any(d[1].endswith("/cfg_entries/10") for d in deletes)
-    assert not [
-        p for p in writes_of(session, "POST") if p[1].endswith("/cfg_entries")
-    ]
+    assert ("delete", 20, None) in session._writes
+    assert not any(w[0] == "delete" and w[1] == 10 for w in session._writes)
+    assert not entry_writes(session, "create")
