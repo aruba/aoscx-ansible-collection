@@ -1,0 +1,119 @@
+# Integration tests for the aoscx_class module.
+#
+# Run with:
+#   ansible-test integration aoscx_class --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a REST API version
+# of 10.16. Uses a temporary class named "ansible-test" (type ipv4) and cleans
+# up afterwards.
+
+- name: Make sure the test class does not exist yet
+  arubanetworks.aoscx.aoscx_class:
+    name: ansible-test
+    type: ipv4
+    state: delete
+  ignore_errors: true
+
+- name: Create an IPv4 class with two entries
+  arubanetworks.aoscx.aoscx_class:
+    name: ansible-test
+    type: ipv4
+    entries:
+      - sequence_number: 10
+        action: match
+        protocol: 6
+        dst_ip: 10.0.0.0/255.255.255.0
+        dst_l4_port_min: 443
+        dst_l4_port_max: 443
+        count: true
+        comment: web
+      - sequence_number: 20
+        action: ignore
+        src_ip: 192.168.0.0/255.255.0.0
+  register: result
+
+- name: Assert the class was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the class again (idempotent)
+  arubanetworks.aoscx.aoscx_class:
+    name: ansible-test
+    type: ipv4
+    state: update
+    entries:
+      - sequence_number: 10
+        action: match
+        protocol: 6
+        dst_ip: 10.0.0.0/255.255.255.0
+        dst_l4_port_min: 443
+        dst_l4_port_max: 443
+        count: true
+        comment: web
+      - sequence_number: 20
+        action: ignore
+        src_ip: 192.168.0.0/255.255.0.0
+  register: result
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Change only the comment of entry 10 (modify in place)
+  arubanetworks.aoscx.aoscx_class:
+    name: ansible-test
+    type: ipv4
+    state: update
+    entries:
+      - sequence_number: 10
+        action: match
+        protocol: 6
+        dst_ip: 10.0.0.0/255.255.255.0
+        dst_l4_port_min: 443
+        dst_l4_port_max: 443
+        count: true
+        comment: web-updated
+      - sequence_number: 20
+        action: ignore
+        src_ip: 192.168.0.0/255.255.0.0
+  register: result
+
+- name: Assert the comment change was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Change a match field and drop entry 20 (recreate entry 10)
+  arubanetworks.aoscx.aoscx_class:
+    name: ansible-test
+    type: ipv4
+    state: update
+    entries:
+      - sequence_number: 10
+        action: match
+        protocol: 17
+        dst_ip: 10.0.0.0/255.255.255.0
+        dst_l4_port_min: 443
+        dst_l4_port_max: 443
+        count: true
+        comment: web-updated
+  register: result
+
+- name: Assert the update was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the class
+  arubanetworks.aoscx.aoscx_class:
+    name: ansible-test
+    type: ipv4
+    state: delete
+  register: result
+
+- name: Assert the class was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed

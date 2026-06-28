@@ -2,6 +2,10 @@
 minor_changes:
   - aoscx_captive_portal_profile - new module to create, update or delete
     captive portal profiles (system/captive_portal_profiles).
+  - aoscx_class - new module to create, update or delete traffic classes
+    (system/classes), including their match and ignore entries; these classes
+    are referenced by the port access group based, application based and port
+    access policies.
   - aoscx_port_access_gbp - new module to create, update or delete port access
     group based policies (system/port_access_gbps), including their entries and
     drop or reflect action sets.
