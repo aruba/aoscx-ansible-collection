@@ -176,7 +176,7 @@ options:
     type: str
   in_abp:
     description: >
-      Name of an existing port access auth based policy
+      Name of an existing port access application based policy
       (system/port_access_abps) to apply to clients using this role. The
       policy must already exist.
     required: false
