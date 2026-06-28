@@ -1,0 +1,59 @@
+# Integration tests for the aoscx_aaa_server_group module.
+#
+# Run with:
+#   ansible-test integration aoscx_aaa_server_group --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the AaaServerGroup class and a REST API version of 10.16. Uses a
+# temporary group named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test group does not exist yet
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create an AAA server group
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    group_type: radius
+  register: result
+
+- name: Assert the group was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the group again (idempotent)
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    group_type: radius
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Change the group type
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    state: update
+    group_type: tacacs
+  register: result
+
+- name: Assert the group type changed
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the group
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the group was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed

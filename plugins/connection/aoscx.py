@@ -121,9 +121,10 @@ options:
   rest_version:
     description: >
       Configures REST version, default version is 10.04, but 10.08, 10.09 or
-      10.16 can be used in a specific host or globaly if it is set as an
+      10.16 can be used in a specific host or globally if it is set as an
       environment variable. REST version 10.16 is required by the Port Access
-      and AAA server modules.
+      and AAA server modules (aoscx_aaa_server_group, aoscx_radius_server,
+      aoscx_tacacs_server).
     default: '10.04'
     env:
       - name: ANSIBLE_AOSCX_REST_VERSION
