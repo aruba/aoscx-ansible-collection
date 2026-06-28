@@ -2,6 +2,9 @@
 minor_changes:
   - aoscx_captive_portal_profile - new module to create, update or delete
     captive portal profiles (system/captive_portal_profiles).
+  - aoscx_port_access_gbp - new module to create, update or delete port access
+    group based policies (system/port_access_gbps), including their entries and
+    drop or reflect action sets.
   - aoscx_port_access_role - new module to create, update or delete port access
     roles (system/port_access_roles), including the in_gbp, in_abp and
     in_policy references to existing port access policies.
