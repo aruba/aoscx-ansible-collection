@@ -1,0 +1,87 @@
+# Integration tests for the aoscx_mka_policy module.
+#
+# Run with:
+#   ansible-test integration aoscx_mka_policy --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a REST API version
+# of 10.16. Uses a temporary keychain and MKA policy named "ansible-test" and
+# cleans up afterwards.
+
+- name: Make sure the test MKA policy does not exist yet
+  arubanetworks.aoscx.aoscx_mka_policy:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create the referenced keychain
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    keys:
+      - key_id: 1
+        auth_type: sha256
+        auth_key: "S3cretKey123"
+        accept_start: 1577836800
+        accept_end: 2556143999
+        send_start: 1577836800
+        send_end: 2556143999
+        recv_id: 1
+        send_id: 1
+
+- name: Create an MKA policy referencing the keychain
+  arubanetworks.aoscx.aoscx_mka_policy:
+    name: ansible-test
+    mode: psk
+    keychain: ansible-test
+    cak: "00112233445566778899aabbccddeeff"
+    ckn: "11"
+    key_server_priority: 5
+    transmit_interval: 2
+  register: result
+
+- name: Assert the policy was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the policy again (idempotent on comparable fields)
+  arubanetworks.aoscx.aoscx_mka_policy:
+    name: ansible-test
+    state: update
+    mode: psk
+    keychain: ansible-test
+    key_server_priority: 5
+    transmit_interval: 2
+  register: result
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the transmit interval
+  arubanetworks.aoscx.aoscx_mka_policy:
+    name: ansible-test
+    state: update
+    transmit_interval: 6
+  register: result
+
+- name: Assert the update was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the MKA policy
+  arubanetworks.aoscx.aoscx_mka_policy:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the policy was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Clean up the keychain
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    state: delete
