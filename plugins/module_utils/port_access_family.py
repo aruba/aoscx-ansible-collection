@@ -29,12 +29,6 @@ from __future__ import absolute_import, division, print_function
 
 __metaclass__ = type
 
-CLASS_COLLECTION = "system/classes"
-
-
-def ok(response):
-    return response is not None and response.status_code < 400
-
 
 def build_argument_spec(class_type_choices, action_fields):
     """
@@ -76,65 +70,52 @@ def build_argument_spec(class_type_choices, action_fields):
     )
 
 
-def _container_exists(session, collection, name):
-    response = session.request("GET", "{0}/{1}".format(collection, name))
-    return ok(response)
-
-
 def _resolve_class_uri(session, ansible_module, class_name, class_type):
-    index = "{0}{1}{2}".format(
-        class_name, session.api.compound_index_separator, class_type
+    traffic_class = session.api.get_module(
+        session, "Class", class_name, type=class_type
     )
-    response = session.request(
-        "GET", "{0}/{1}".format(CLASS_COLLECTION, index)
-    )
-    if not ok(response):
+    try:
+        traffic_class.get()
+    except Exception:
         ansible_module.fail_json(
             msg="Traffic class '{0}' of type '{1}' does not exist".format(
                 class_name, class_type
             )
         )
-    return "{0}{1}/{2}".format(
-        session.resource_prefix, CLASS_COLLECTION, index
-    )
+    return traffic_class.get_uri()
 
 
-def _get_entries(session, collection, name):
-    response = session.request(
-        "GET",
-        "{0}/{1}/cfg_entries".format(collection, name),
-        params={"depth": 2, "selector": "configuration"},
-    )
-    if not ok(response):
-        return {}
-    result = {}
-    for seq, data in response.json().items():
-        result[int(seq)] = data
-    return result
-
-
-def _get_action_set(session, base, seq, action_key):
-    response = session.request(
-        "GET",
-        "{0}/{1}/{2}".format(base, seq, action_key),
-        params={"selector": "writable"},
-    )
-    if not ok(response):
-        return None
-    return response.json()
+def _get_entries(session, entry_cls, container):
+    entries = {}
+    for entry in entry_cls.get_all(session, container).values():
+        entry.get(selector="configuration")
+        seq = int(entry.sequence_number)
+        class_ref = getattr(entry, "class", None)
+        class_uri = None
+        if isinstance(class_ref, dict):
+            class_uri = next(iter(class_ref.values()), None)
+        entries[seq] = {
+            "class_uri": class_uri,
+            "comment": getattr(entry, "comment", None),
+        }
+    return entries
 
 
 def run_port_access_family(
-    ansible_module, session, collection, action_key, action_fields
+    ansible_module, session, container_cls, action_fields
 ):
     """
     Reconcile a port access policy family container and its entries.
 
     :param session: an established pyaoscx session.
-    :param collection: e.g. ``system/port_access_gbps``.
-    :param action_key: e.g. ``gbp_action_set``.
+    :param container_cls: the pyaoscx container class for this family
+        (e.g. ``PortAccessGbp``). Its ``entry_class`` and the entry's
+        ``action_set_class`` drive the entry and action set reconciliation.
     :param action_fields: the same list passed to build_argument_spec.
     """
+    entry_cls = container_cls.entry_class
+    action_set_cls = entry_cls.action_set_class
+
     params = ansible_module.params
     name = params["name"]
     state = params["state"]
@@ -145,17 +126,22 @@ def run_port_access_family(
     bool_names = {f["name"] for f in action_fields if f["type"] == "bool"}
 
     result = dict(changed=False)
-    exists = _container_exists(session, collection, name)
+
+    container = container_cls(session, name)
+    try:
+        container.get()
+        exists = True
+    except Exception:
+        exists = False
 
     # --------------------------------------------------------------- delete
     if state == "delete":
         if exists and not check_mode:
-            response = session.request(
-                "DELETE", "{0}/{1}".format(collection, name)
-            )
-            if not ok(response):
+            try:
+                container.delete()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not delete {0}: {1}".format(name, response.text)
+                    msg="Could not delete {0}: {1}".format(name, str(e))
                 )
         result["changed"] = exists
         ansible_module.exit_json(**result)
@@ -192,18 +178,15 @@ def run_port_access_family(
     if not exists:
         changed = True
         if not check_mode:
-            response = session.request(
-                "POST",
-                collection,
-                data=ansible_module.jsonify({"name": name}),
-            )
-            if not ok(response):
+            try:
+                container_cls(session, name).create()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not create {0}: {1}".format(name, response.text)
+                    msg="Could not create {0}: {1}".format(name, str(e))
                 )
         current = {}
     elif manage_entries:
-        current = _get_entries(session, collection, name)
+        current = _get_entries(session, entry_cls, container)
     else:
         current = {}
 
@@ -211,10 +194,10 @@ def run_port_access_family(
         changed = _reconcile_entries(
             ansible_module,
             session,
-            collection,
-            action_key,
+            container,
+            entry_cls,
+            action_set_cls,
             bool_names,
-            name,
             desired,
             current,
             check_mode,
@@ -228,76 +211,75 @@ def run_port_access_family(
 def _reconcile_entries(
     ansible_module,
     session,
-    collection,
-    action_key,
+    container,
+    entry_cls,
+    action_set_cls,
     bool_names,
-    name,
     desired,
     current,
     check_mode,
     changed,
 ):
-    base = "{0}/{1}/cfg_entries".format(collection, name)
-
     # Remove entries that are no longer desired (full replace).
     for seq in current:
         if seq not in desired:
             changed = True
             if not check_mode:
-                session.request("DELETE", "{0}/{1}".format(base, seq))
+                entry_cls(session, seq, container).delete()
 
     for seq, want in desired.items():
         cur = current.get(seq)
-        cur_class_uri = None
-        if cur is not None:
-            class_ref = cur.get("class")
-            if isinstance(class_ref, dict):
-                cur_class_uri = next(iter(class_ref.values()), None)
+        cur_class_uri = cur["class_uri"] if cur is not None else None
+        entry_existed = cur is not None
 
         # Create the entry, or recreate it when the class reference changed
         # (the class of an existing entry is immutable).
         if cur is None or cur_class_uri != want["class_uri"]:
             changed = True
+            entry_existed = False
             if not check_mode:
                 if cur is not None:
-                    session.request("DELETE", "{0}/{1}".format(base, seq))
-                body = {
-                    "sequence_number": seq,
-                    "class": want["class_uri"],
-                }
+                    entry_cls(session, seq, container).delete()
+                attrs = {"class": want["class_uri"]}
                 if want["comment"] is not None:
-                    body["comment"] = want["comment"]
-                response = session.request(
-                    "POST", base, data=ansible_module.jsonify(body)
-                )
-                if not ok(response):
+                    attrs["comment"] = want["comment"]
+                entry = entry_cls(session, seq, container, **attrs)
+                try:
+                    entry.create()
+                except Exception as e:
                     ansible_module.fail_json(
                         msg="Could not create entry {0}: {1}".format(
-                            seq, response.text
+                            seq, str(e)
                         )
                     )
-            cur = None
         elif want["comment"] is not None and want["comment"] != cur.get(
             "comment"
         ):
             changed = True
             if not check_mode:
-                session.request(
-                    "PUT",
-                    "{0}/{1}".format(base, seq),
-                    data=ansible_module.jsonify({"comment": want["comment"]}),
-                )
+                entry = entry_cls(session, seq, container)
+                entry.comment = want["comment"]
+                entry.config_attrs = ["comment"]
+                try:
+                    entry.update()
+                except Exception as e:
+                    ansible_module.fail_json(
+                        msg="Could not update entry {0}: {1}".format(
+                            seq, str(e)
+                        )
+                    )
 
         if want["action"]:
             changed = _reconcile_action_set(
                 ansible_module,
                 session,
-                base,
-                action_key,
+                container,
+                entry_cls,
+                action_set_cls,
                 bool_names,
                 seq,
                 want["action"],
-                cur,
+                entry_existed,
                 check_mode,
                 changed,
             )
@@ -308,19 +290,27 @@ def _reconcile_entries(
 def _reconcile_action_set(
     ansible_module,
     session,
-    base,
-    action_key,
+    container,
+    entry_cls,
+    action_set_cls,
     bool_names,
     seq,
     want_action,
-    cur,
+    entry_existed,
     check_mode,
     changed,
 ):
-    cur_action = None
-    if cur is not None:
-        cur_action = _get_action_set(session, base, seq, action_key)
-    cur_action = cur_action or {}
+    entry = entry_cls(session, seq, container)
+    cur_action = {}
+    present = False
+    if entry_existed:
+        probe = action_set_cls(session, entry)
+        try:
+            probe.get(selector="writable")
+            cur_action = dict(probe._original_attributes)
+            present = True
+        except Exception:
+            present = False
 
     need = False
     for field, value in want_action.items():
@@ -336,16 +326,19 @@ def _reconcile_action_set(
         if not check_mode:
             merged = dict(cur_action)
             merged.update(want_action)
-            verb = "PUT" if cur_action else "POST"
-            response = session.request(
-                verb,
-                "{0}/{1}/{2}".format(base, seq, action_key),
-                data=ansible_module.jsonify(merged),
-            )
-            if not ok(response):
+            action = action_set_cls(session, entry)
+            for key, value in merged.items():
+                setattr(action, key, value)
+            action.config_attrs = list(merged.keys())
+            try:
+                if present:
+                    action.update()
+                else:
+                    action.create()
+            except Exception as e:
                 ansible_module.fail_json(
                     msg="Could not set action for entry {0}: {1}".format(
-                        seq, response.text
+                        seq, str(e)
                     )
                 )
 

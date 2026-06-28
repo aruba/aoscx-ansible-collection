@@ -86,9 +86,11 @@ def build_session(
     session = MagicMock()
     session.resource_prefix = "/rest/v10.16/"
 
-    response = MagicMock()
-    response.ok = ref_exists
-    session.request.return_value = response
+    ref_base_uris = {
+        "PortAccessGbp": "system/port_access_gbps",
+        "PortAccessAbp": "system/port_access_abps",
+        "PortAccessPolicy": "system/port_access_policies",
+    }
 
     def get_module(sess, module, index=None, **kwargs):
         if module == "PortAccessRole":
@@ -102,6 +104,16 @@ def build_session(
             else:
                 cpp.get.side_effect = Exception("not found")
             return cpp
+        if module in ref_base_uris:
+            ref = MagicMock()
+            if ref_exists:
+                ref.get.return_value = True
+            else:
+                ref.get.side_effect = Exception("not found")
+            ref.get_uri.return_value = "{0}{1}/{2}".format(
+                session.resource_prefix, ref_base_uris[module], index
+            )
+            return ref
         raise AssertionError("unexpected module {0}".format(module))
 
     session.api.get_module.side_effect = get_module
@@ -253,7 +265,7 @@ def test_create_with_in_gbp():
     )
     assert result["changed"] is True
     new.create.assert_called_once()
-    session.request.assert_called_with("GET", "system/port_access_gbps/g1")
+    assert session.api.get_module.call_count >= 2
 
 
 def test_create_in_gbp_missing_fails():

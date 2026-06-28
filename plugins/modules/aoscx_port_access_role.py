@@ -260,11 +260,11 @@ SCALAR_ATTRS = [
 
 LIST_ATTRS = ["vlan_trunks", "vlan_name_trunks"]
 
-# Reference attributes handled by name: param name -> resource collection.
+# Reference attributes handled by name: param name -> pyaoscx SDK class.
 REFERENCE_ATTRS = {
-    "in_gbp": "system/port_access_gbps",
-    "in_abp": "system/port_access_abps",
-    "in_policy": "system/port_access_policies",
+    "in_gbp": "PortAccessGbp",
+    "in_abp": "PortAccessAbp",
+    "in_policy": "PortAccessPolicy",
 }
 
 
@@ -288,19 +288,21 @@ def captive_portal_uri(session, ansible_module, profile_name):
     )
 
 
-def reference_uri(session, ansible_module, collection, item_name):
+def reference_uri(session, ansible_module, sdk_class, item_name):
     """
-    Validate that a referenced object exists under the given collection and
-    return its URI.
+    Validate that a referenced object exists by loading it through its pyaoscx
+    SDK class and return its URI.
     """
-    response = session.request("GET", "{0}/{1}".format(collection, item_name))
-    if not response.ok:
+    referenced = session.api.get_module(session, sdk_class, item_name)
+    try:
+        referenced.get()
+    except Exception:
         ansible_module.fail_json(
-            msg="Referenced object '{0}' does not exist under {1}".format(
-                item_name, collection
+            msg="Referenced object '{0}' does not exist ({1})".format(
+                item_name, sdk_class
             )
         )
-    return "{0}{1}/{2}".format(session.resource_prefix, collection, item_name)
+    return referenced.get_uri()
 
 
 def reconcile_reference(role, attr, desired_uri):
@@ -479,11 +481,11 @@ def main():
 
     # Resolve in_gbp / in_abp / in_policy references by name to their URIs.
     reference_uris = {}
-    for attr, collection in REFERENCE_ATTRS.items():
+    for attr, sdk_class in REFERENCE_ATTRS.items():
         item_name = ansible_module.params[attr]
         if item_name is not None:
             reference_uris[attr] = reference_uri(
-                session, ansible_module, collection, item_name
+                session, ansible_module, sdk_class, item_name
             )
 
     # --------------------------------------------------------------- create
