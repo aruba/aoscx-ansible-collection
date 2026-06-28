@@ -119,9 +119,6 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
     get_pyaoscx_session,
 )
 
-COLLECTION = "system/mka_policies"
-KEYCHAIN_COLLECTION = "system/keychains"
-
 # Comparable scalar fields used to decide whether an update is needed. cak and
 # ckn are excluded because they are write-only and cannot be read back.
 SCALAR_FIELDS = [
@@ -138,10 +135,6 @@ SCALAR_FIELDS = [
 ]
 
 SECRET_FIELDS = ["cak", "ckn"]
-
-
-def ok(response):
-    return response is not None and response.status_code < 400
 
 
 def build_argument_spec():
@@ -166,14 +159,7 @@ def build_argument_spec():
     return spec
 
 
-def _keychain_uri(session, name):
-    return "{0}{1}/{2}".format(
-        session.resource_prefix, KEYCHAIN_COLLECTION, name
-    )
-
-
-def _current_keychain_uri(current):
-    value = current.get("keychain")
+def _current_keychain_uri(value):
     if isinstance(value, dict):
         return next(iter(value.values()), None)
     return value
@@ -194,95 +180,17 @@ def _build_desired(ansible_module, session):
 
     keychain_uri = None
     if params.get("keychain") is not None:
-        name = params["keychain"]
-        if not ok(
-            session.request("GET", "{0}/{1}".format(KEYCHAIN_COLLECTION, name))
-        ):
+        kc_name = params["keychain"]
+        keychain = session.api.get_module(session, "Keychain", kc_name)
+        try:
+            keychain.get()
+        except Exception:
             ansible_module.fail_json(
-                msg="Referenced keychain {0} does not exist".format(name)
+                msg="Referenced keychain {0} does not exist".format(kc_name)
             )
-        keychain_uri = _keychain_uri(session, name)
+        keychain_uri = keychain.get_uri()
 
     return scalars, secrets, keychain_uri
-
-
-def _differs(current, scalars, keychain_uri):
-    for field, value in scalars.items():
-        if current.get(field) != value:
-            return True
-    if keychain_uri is not None:
-        if _current_keychain_uri(current) != keychain_uri:
-            return True
-    return False
-
-
-def run_module(ansible_module, session):
-    params = ansible_module.params
-    name = params["name"]
-    state = params["state"]
-    check_mode = ansible_module.check_mode
-    path = "{0}/{1}".format(COLLECTION, name)
-
-    result = dict(changed=False)
-    get_response = session.request(
-        "GET", path, params={"selector": "writable"}
-    )
-    exists = ok(get_response)
-
-    if state == "delete":
-        if exists and not check_mode:
-            response = session.request("DELETE", path)
-            if not ok(response):
-                ansible_module.fail_json(
-                    msg="Could not delete {0}: {1}".format(name, response.text)
-                )
-        result["changed"] = exists
-        ansible_module.exit_json(**result)
-
-    scalars, secrets, keychain_uri = _build_desired(ansible_module, session)
-
-    if not exists:
-        body = {"name": name}
-        body.update(scalars)
-        body.update(secrets)
-        if keychain_uri is not None:
-            body["keychain"] = keychain_uri
-        result["changed"] = True
-        if not check_mode:
-            response = session.request(
-                "POST", COLLECTION, data=ansible_module.jsonify(body)
-            )
-            if not ok(response):
-                ansible_module.fail_json(
-                    msg="Could not create {0}: {1}".format(name, response.text)
-                )
-        ansible_module.exit_json(**result)
-
-    current = get_response.json()
-    if not _differs(current, scalars, keychain_uri):
-        ansible_module.exit_json(**result)
-
-    body = dict(current)
-    body.pop("origin", None)
-    body["keychain"] = (
-        keychain_uri
-        if keychain_uri is not None
-        else _current_keychain_uri(current)
-    )
-    if body.get("keychain") is None:
-        body.pop("keychain", None)
-    body.update(scalars)
-    body.update(secrets)
-    result["changed"] = True
-    if not check_mode:
-        response = session.request(
-            "PUT", path, data=ansible_module.jsonify(body)
-        )
-        if not ok(response):
-            ansible_module.fail_json(
-                msg="Could not update {0}: {1}".format(name, response.text)
-            )
-    ansible_module.exit_json(**result)
 
 
 def main():
@@ -290,13 +198,96 @@ def main():
         argument_spec=build_argument_spec(),
         supports_check_mode=True,
     )
+    params = ansible_module.params
+    name = params["name"]
+    state = params["state"]
+    result = dict(changed=False)
+
     try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
-    run_module(ansible_module, session)
+
+    try:
+        policy = session.api.get_module(session, "MkaPolicy", name)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support MKA policies. "
+                "Upgrade pyaoscx. Details: {0}".format(str(e))
+            )
+        )
+
+    try:
+        policy.get(selector="writable")
+        exists = True
+    except Exception:
+        exists = False
+
+    if state == "delete":
+        if exists and not ansible_module.check_mode:
+            try:
+                policy.delete()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not delete {0}: {1}".format(name, str(e))
+                )
+        result["changed"] = exists
+        ansible_module.exit_json(**result)
+
+    scalars, secrets, keychain_uri = _build_desired(ansible_module, session)
+
+    if not exists:
+        create_kwargs = dict(scalars)
+        create_kwargs.update(secrets)
+        if keychain_uri is not None:
+            create_kwargs["keychain"] = keychain_uri
+        policy = session.api.get_module(
+            session, "MkaPolicy", name, **create_kwargs
+        )
+        result["changed"] = True
+        if not ansible_module.check_mode:
+            try:
+                policy.create()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not create {0}: {1}".format(name, str(e))
+                )
+        ansible_module.exit_json(**result)
+
+    changed = False
+    for field, value in scalars.items():
+        if getattr(policy, field, None) != value:
+            changed = True
+            setattr(policy, field, value)
+            if field not in policy.config_attrs:
+                policy.config_attrs.append(field)
+    if keychain_uri is not None:
+        current_uri = _current_keychain_uri(getattr(policy, "keychain", None))
+        if current_uri != keychain_uri:
+            changed = True
+            setattr(policy, "keychain", keychain_uri)
+            if "keychain" not in policy.config_attrs:
+                policy.config_attrs.append("keychain")
+
+    if changed:
+        for secret, value in secrets.items():
+            setattr(policy, secret, value)
+            if secret not in policy.config_attrs:
+                policy.config_attrs.append(secret)
+
+    result["changed"] = changed
+    if changed and not ansible_module.check_mode:
+        try:
+            policy.update()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Could not update {0}: {1}".format(name, str(e))
+            )
+
+    ansible_module.exit_json(**result)
 
 
 if __name__ == "__main__":

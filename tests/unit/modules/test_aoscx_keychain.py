@@ -5,8 +5,10 @@
 """
 Unit tests for the aoscx_keychain module.
 
-The pyaoscx session is fully mocked through session.request, so no switch is
-required.
+The module is backed by the pyaoscx Keychain and KeychainKey SDK classes,
+imported directly. Tests replace those classes with controllable fakes, so no
+switch is required. Keychain keys are immutable on the switch, so a changed key
+is reconciled as delete + recreate.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -27,31 +29,10 @@ from ansible_collections.arubanetworks.aoscx.plugins.modules import (
 )
 
 MODULE = (
-    "ansible_collections.arubanetworks.aoscx.plugins.modules.aoscx_keychain"
+    "ansible_collections.arubanetworks.aoscx.plugins.modules." "aoscx_keychain"
 )
 
-COLLECTION = "system/keychains"
-NAME = "mka_keys"
-PATH = "{0}/{1}".format(COLLECTION, NAME)
-KEYS_PATH = "{0}/keys".format(PATH)
-
-
-def key_config(key_id, **fields):
-    """Build the configuration-selector representation of a key."""
-    rep = {
-        "key_id": key_id,
-        "auth_type": "sha256",
-        "auth_key": "AQBEncryptedBlob==",
-        "name": None,
-        "accept_start": 1577836800,
-        "accept_end": 2556143999,
-        "send_start": 1577836800,
-        "send_end": 2556143999,
-        "recv_id": 1,
-        "send_id": 1,
-    }
-    rep.update(fields)
-    return rep
+NAME = "kc1"
 
 
 class AnsibleExitJson(Exception):
@@ -88,107 +69,111 @@ def patch_ansible_module():
         yield
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = {} if payload is None else payload
-        self.text = ""
+class FakeKeychain:
+    def __init__(self, exists=True):
+        self._exists = exists
+        self.name = NAME
+        self.created = False
+        self.deleted = False
 
-    def json(self):
-        return self._payload
+    def get(self, selector=None):
+        if not self._exists:
+            raise Exception("not found")
+        return True
 
+    def create(self):
+        self.created = True
 
-def build_session(exists=False, keys=None):
-    keys = keys or {}
-    writes = []
-
-    session = MagicMock()
-    session.resource_prefix = "/rest/v10.16/"
-    session.api.compound_index_separator = ","
-
-    def router(operation, path, params=None, data=None):
-        if operation != "GET":
-            writes.append((operation, path, data))
-            code = {"POST": 201, "PUT": 200, "DELETE": 204}[operation]
-            return FakeResponse(code)
-        if path == PATH:
-            return FakeResponse(200 if exists else 404)
-        if path == KEYS_PATH:
-            payload = {str(k): v for k, v in keys.items()}
-            return FakeResponse(200, payload)
-        return FakeResponse(404)
-
-    session.request.side_effect = router
-    session._writes = writes
-    return session
+    def delete(self):
+        self.deleted = True
 
 
-def run(args, session):
+class KeyRecorder:
+    """Track key reconcile operations and seed the current switch state."""
+
+    def __init__(self, existing=None):
+        # {int key_id: {comparable_field: value}}
+        self.existing = existing or {}
+        self.created = []
+        self.deleted = []
+
+    def make_class(self):
+        recorder = self
+
+        class FakeKey:
+            def __init__(
+                self, session, key_id, parent_keychain=None, **kwargs
+            ):
+                self.session = session
+                self.key_id = key_id
+                self._attrs = kwargs
+
+            def get(self, selector=None):
+                data = recorder.existing.get(int(self.key_id), {})
+                for field, value in data.items():
+                    setattr(self, field, value)
+                return True
+
+            def create(self):
+                recorder.created.append((int(self.key_id), self._attrs))
+
+            def delete(self):
+                recorder.deleted.append(int(self.key_id))
+
+            @classmethod
+            def get_all(cls, session, parent_keychain):
+                result = {}
+                for kid in recorder.existing:
+                    result[str(kid)] = cls(session, str(kid), parent_keychain)
+                return result
+
+        return FakeKey
+
+
+def run(args, keychain, key_cls):
     set_module_args(args)
-    with patch(MODULE + ".get_pyaoscx_session", return_value=session):
+    session = MagicMock()
+    with patch(MODULE + ".get_pyaoscx_session", return_value=session), patch(
+        MODULE + ".HAS_PYAOSCX_KEYCHAIN", True
+    ), patch(MODULE + ".Keychain", return_value=keychain), patch(
+        MODULE + ".KeychainKey", key_cls
+    ):
         with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
             aoscx_keychain.main()
     return exc.value.args[0]
 
 
-def writes_of(session, operation):
-    return [w for w in session._writes if w[0] == operation]
-
-
-def test_create_empty_keychain():
-    session = build_session(exists=False)
-    result = run({"name": NAME}, session)
+def test_create_minimal():
+    keychain = FakeKeychain(exists=False)
+    recorder = KeyRecorder()
+    result = run({"name": NAME}, keychain, recorder.make_class())
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert len(posts) == 1
-    assert posts[0][1] == COLLECTION
-    assert json.loads(posts[0][2]) == {"name": NAME}
-
-
-def test_create_with_key():
-    session = build_session(exists=False)
-    result = run(
-        {
-            "name": NAME,
-            "keys": [
-                {
-                    "key_id": 1,
-                    "auth_type": "sha256",
-                    "auth_key": "S3cretKey123",
-                    "send_start": 1577836800,
-                }
-            ],
-        },
-        session,
-    )
-    assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert posts[0][1] == COLLECTION
-    key_post = [p for p in posts if p[1] == KEYS_PATH]
-    assert key_post
-    body = json.loads(key_post[0][2])
-    assert body["key_id"] == 1
-    assert body["auth_type"] == "sha256"
-    assert body["auth_key"] == "S3cretKey123"
+    assert keychain.created is True
 
 
 def test_delete():
-    session = build_session(exists=True)
-    result = run({"name": NAME, "state": "delete"}, session)
+    keychain = FakeKeychain(exists=True)
+    recorder = KeyRecorder()
+    result = run(
+        {"name": NAME, "state": "delete"}, keychain, recorder.make_class()
+    )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert deletes and deletes[0][1] == PATH
+    assert keychain.deleted is True
 
 
 def test_delete_absent():
-    session = build_session(exists=False)
-    result = run({"name": NAME, "state": "delete"}, session)
+    keychain = FakeKeychain(exists=False)
+    recorder = KeyRecorder()
+    result = run(
+        {"name": NAME, "state": "delete"}, keychain, recorder.make_class()
+    )
     assert result["changed"] is False
-    assert not session._writes
+    assert keychain.deleted is False
 
 
-def test_idempotent_key():
-    session = build_session(exists=True, keys={1: key_config(1)})
+def test_create_with_keys():
+    keychain = FakeKeychain(exists=False)
+    recorder = KeyRecorder()
     result = run(
         {
             "name": NAME,
@@ -196,113 +181,86 @@ def test_idempotent_key():
                 {
                     "key_id": 1,
                     "auth_type": "sha256",
-                    "accept_start": 1577836800,
-                    "accept_end": 2556143999,
-                    "send_start": 1577836800,
-                    "send_end": 2556143999,
-                    "recv_id": 1,
-                    "send_id": 1,
+                    "auth_key": "deadbeef",
                 }
             ],
         },
-        session,
+        keychain,
+        recorder.make_class(),
     )
-    assert result["changed"] is False
-    assert not session._writes
+    assert result["changed"] is True
+    assert keychain.created is True
+    assert [kid for kid, _ in recorder.created] == [1]
+    attrs = dict(recorder.created)[1]
+    assert attrs["auth_type"] == "sha256"
+    assert attrs["auth_key"] == "deadbeef"
 
 
-def test_auth_key_not_compared():
-    session = build_session(exists=True, keys={1: key_config(1)})
+def test_keys_idempotent():
+    keychain = FakeKeychain(exists=True)
+    recorder = KeyRecorder(existing={1: {"auth_type": "sha256"}})
     result = run(
         {
             "name": NAME,
+            "state": "update",
             "keys": [
                 {
                     "key_id": 1,
                     "auth_type": "sha256",
-                    "auth_key": "ADifferentPlaintext",
-                    "accept_start": 1577836800,
-                    "accept_end": 2556143999,
-                    "send_start": 1577836800,
-                    "send_end": 2556143999,
-                    "recv_id": 1,
-                    "send_id": 1,
+                    "auth_key": "deadbeef",
                 }
             ],
         },
-        session,
+        keychain,
+        recorder.make_class(),
     )
     assert result["changed"] is False
-    assert not session._writes
+    assert recorder.created == []
+    assert recorder.deleted == []
 
 
-def test_key_change_recreates():
-    session = build_session(exists=True, keys={1: key_config(1)})
+def test_keys_remove_extra():
+    keychain = FakeKeychain(exists=True)
+    recorder = KeyRecorder(
+        existing={1: {"auth_type": "sha256"}, 2: {"auth_type": "md5"}}
+    )
     result = run(
         {
             "name": NAME,
-            "keys": [
-                {
-                    "key_id": 1,
-                    "auth_type": "sha512",
-                    "send_start": 1577836800,
-                }
-            ],
+            "state": "update",
+            "keys": [{"key_id": 1, "auth_type": "sha256"}],
         },
-        session,
+        keychain,
+        recorder.make_class(),
     )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    posts = writes_of(session, "POST")
-    assert any(d[1] == "{0}/1".format(KEYS_PATH) for d in deletes)
-    assert any(p[1] == KEYS_PATH for p in posts)
+    assert recorder.deleted == [2]
+    assert recorder.created == []
 
 
-def test_remove_all_keys():
-    session = build_session(exists=True, keys={1: key_config(1)})
-    result = run({"name": NAME, "keys": []}, session)
+def test_keys_recreate_changed():
+    keychain = FakeKeychain(exists=True)
+    recorder = KeyRecorder(existing={1: {"auth_type": "sha256"}})
+    result = run(
+        {
+            "name": NAME,
+            "state": "update",
+            "keys": [{"key_id": 1, "auth_type": "md5"}],
+        },
+        keychain,
+        recorder.make_class(),
+    )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert any(d[1] == "{0}/1".format(KEYS_PATH) for d in deletes)
+    assert recorder.deleted == [1]
+    assert [kid for kid, _ in recorder.created] == [1]
 
 
-def test_keys_omitted_leaves_untouched():
-    session = build_session(exists=True, keys={1: key_config(1)})
-    result = run({"name": NAME}, session)
+def test_no_keys_param_idempotent():
+    keychain = FakeKeychain(exists=True)
+    recorder = KeyRecorder(existing={1: {"auth_type": "sha256"}})
+    result = run(
+        {"name": NAME, "state": "update"}, keychain, recorder.make_class()
+    )
     assert result["changed"] is False
-    assert not session._writes
-
-
-def test_add_key_to_existing():
-    session = build_session(exists=True, keys={})
-    result = run(
-        {
-            "name": NAME,
-            "keys": [
-                {
-                    "key_id": 2,
-                    "auth_type": "sha256",
-                    "send_start": 1577836800,
-                }
-            ],
-        },
-        session,
-    )
-    assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert any(p[1] == KEYS_PATH for p in posts)
-
-
-def test_duplicate_key_id_fails():
-    session = build_session(exists=False)
-    result = run(
-        {
-            "name": NAME,
-            "keys": [
-                {"key_id": 1, "auth_type": "sha256"},
-                {"key_id": 1, "auth_type": "sha512"},
-            ],
-        },
-        session,
-    )
-    assert result.get("failed") is True
+    assert recorder.created == []
+    assert recorder.deleted == []

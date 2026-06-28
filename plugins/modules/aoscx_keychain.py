@@ -146,7 +146,13 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
     get_pyaoscx_session,
 )
 
-COLLECTION = "system/keychains"
+try:
+    from pyaoscx.keychain import Keychain
+    from pyaoscx.keychain_key import KeychainKey
+
+    HAS_PYAOSCX_KEYCHAIN = True
+except ImportError:
+    HAS_PYAOSCX_KEYCHAIN = False
 
 # Comparable (immutable) key fields used to decide whether an existing key
 # must be recreated. auth_key is excluded because it is write-only and cannot
@@ -184,10 +190,6 @@ KEY_FIELDS = [
     {"name": "recv_id", "type": "int"},
     {"name": "send_id", "type": "int"},
 ]
-
-
-def ok(response):
-    return response is not None and response.status_code < 400
 
 
 def build_argument_spec():
@@ -239,28 +241,27 @@ def _key_differs(want, current):
     return False
 
 
-def _get_keys(session, container_path):
-    response = session.request(
-        "GET",
-        "{0}/keys".format(container_path),
-        params={"depth": 2, "selector": "configuration"},
-    )
-    if not ok(response):
-        return {}
-    return {int(kid): data for kid, data in response.json().items()}
+def _get_keys(session, keychain):
+    keys = {}
+    for key in KeychainKey.get_all(session, keychain).values():
+        key.get()
+        key_id = int(key.key_id)
+        keys[key_id] = {
+            field: getattr(key, field, None) for field in COMPARABLE_KEY_FIELDS
+        }
+    return keys
 
 
 def _reconcile_keys(
-    ansible_module, session, container_path, desired, current, check_mode
+    ansible_module, session, keychain, desired, current, check_mode
 ):
-    base = "{0}/keys".format(container_path)
     changed = False
 
     for key_id in current:
         if key_id not in desired:
             changed = True
             if not check_mode:
-                session.request("DELETE", "{0}/{1}".format(base, key_id))
+                KeychainKey(session, key_id, parent_keychain=keychain).delete()
 
     for key_id, want in desired.items():
         cur = current.get(key_id)
@@ -268,21 +269,30 @@ def _reconcile_keys(
             changed = True
             if not check_mode:
                 if cur is not None:
-                    session.request("DELETE", "{0}/{1}".format(base, key_id))
-                response = session.request(
-                    "POST", base, data=ansible_module.jsonify(want)
+                    KeychainKey(
+                        session, key_id, parent_keychain=keychain
+                    ).delete()
+                attrs = {k: v for k, v in want.items() if k != "key_id"}
+                key = KeychainKey(
+                    session, key_id, parent_keychain=keychain, **attrs
                 )
-                if not ok(response):
+                try:
+                    key.create()
+                except Exception as e:
                     ansible_module.fail_json(
                         msg="Could not create key {0}: {1}".format(
-                            key_id, response.text
+                            key_id, str(e)
                         )
                     )
 
     return changed
 
 
-def run_module(ansible_module, session):
+def main():
+    ansible_module = AnsibleModule(
+        argument_spec=build_argument_spec(),
+        supports_check_mode=True,
+    )
     params = ansible_module.params
     name = params["name"]
     state = params["state"]
@@ -290,17 +300,38 @@ def run_module(ansible_module, session):
     manage_keys = keys_param is not None
     keys = keys_param or []
     check_mode = ansible_module.check_mode
-    container_path = "{0}/{1}".format(COLLECTION, name)
 
     result = dict(changed=False)
-    exists = ok(session.request("GET", container_path))
+
+    if not HAS_PYAOSCX_KEYCHAIN:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support keychains. "
+                "Upgrade pyaoscx."
+            )
+        )
+
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
+
+    keychain = Keychain(session, name)
+    try:
+        keychain.get()
+        exists = True
+    except Exception:
+        exists = False
 
     if state == "delete":
         if exists and not check_mode:
-            response = session.request("DELETE", container_path)
-            if not ok(response):
+            try:
+                keychain.delete()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not delete {0}: {1}".format(name, response.text)
+                    msg="Could not delete {0}: {1}".format(name, str(e))
                 )
         result["changed"] = exists
         ansible_module.exit_json(**result)
@@ -313,18 +344,15 @@ def run_module(ansible_module, session):
     if not exists:
         changed = True
         if not check_mode:
-            response = session.request(
-                "POST",
-                COLLECTION,
-                data=ansible_module.jsonify({"name": name}),
-            )
-            if not ok(response):
+            try:
+                keychain.create()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not create {0}: {1}".format(name, response.text)
+                    msg="Could not create {0}: {1}".format(name, str(e))
                 )
         current = {}
     elif manage_keys:
-        current = _get_keys(session, container_path)
+        current = _get_keys(session, keychain)
     else:
         current = {}
 
@@ -333,7 +361,7 @@ def run_module(ansible_module, session):
             _reconcile_keys(
                 ansible_module,
                 session,
-                container_path,
+                keychain,
                 desired,
                 current,
                 check_mode,
@@ -343,20 +371,6 @@ def run_module(ansible_module, session):
 
     result["changed"] = changed
     ansible_module.exit_json(**result)
-
-
-def main():
-    ansible_module = AnsibleModule(
-        argument_spec=build_argument_spec(),
-        supports_check_mode=True,
-    )
-    try:
-        session = get_pyaoscx_session(ansible_module)
-    except Exception as e:
-        ansible_module.fail_json(
-            msg="Could not get PYAOSCX Session: {0}".format(str(e))
-        )
-    run_module(ansible_module, session)
 
 
 if __name__ == "__main__":

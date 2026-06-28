@@ -5,8 +5,9 @@
 """
 Unit tests for the aoscx_macsec_policy module.
 
-The pyaoscx session is fully mocked through session.request, so no switch is
-required.
+The module is backed by the pyaoscx MacsecPolicy SDK class, obtained through
+session.api.get_module. Tests replace get_module with a fake that returns a
+controllable policy object, so no switch or real SDK call is required.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -31,38 +32,7 @@ MODULE = (
     "aoscx_macsec_policy"
 )
 
-COLLECTION = "system/macsec_policies"
 NAME = "mp1"
-PATH = "{0}/{1}".format(COLLECTION, NAME)
-
-# Default writable representation returned by the switch for a fresh policy.
-WRITABLE_DEFAULTS = {
-    "bypass": {"ieee_bpdu_enabled": False},
-    "cipher_suites": {
-        "gcm_aes_128_enabled": False,
-        "gcm_aes_256_enabled": False,
-        "gcm_aes_xpn_128_enabled": False,
-        "gcm_aes_xpn_256_enabled": False,
-    },
-    "clear_tag_mode": "none",
-    "confidentiality_disable": False,
-    "confidentiality_offset": "byte_0",
-    "data_delay_protection_enable": False,
-    "include_sci_disable": False,
-    "replay_protect_disable": False,
-    "replay_window": 0,
-    "secure_mode": "must-secure",
-}
-
-
-def writable(**overrides):
-    rep = json.loads(json.dumps(WRITABLE_DEFAULTS))
-    for key, value in overrides.items():
-        if isinstance(value, dict) and isinstance(rep.get(key), dict):
-            rep[key].update(value)
-        else:
-            rep[key] = value
-    return rep
 
 
 class AnsibleExitJson(Exception):
@@ -99,37 +69,46 @@ def patch_ansible_module():
         yield
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = {} if payload is None else payload
-        self.text = ""
+class FakePolicy:
+    def __init__(self, exists=True, attrs=None):
+        self._exists = exists
+        self.config_attrs = []
+        self.created = False
+        self.updated = False
+        self.deleted = False
+        for key, value in (attrs or {}).items():
+            setattr(self, key, value)
 
-    def json(self):
-        return self._payload
+    def get(self, selector=None):
+        if not self._exists:
+            raise Exception("not found")
+        return True
+
+    def create(self):
+        self.created = True
+
+    def update(self):
+        self.updated = True
+
+    def delete(self):
+        self.deleted = True
 
 
-def build_session(exists=False, current=None):
-    writes = []
+def make_session(exists=True, attrs=None):
+    policy = FakePolicy(exists=exists, attrs=attrs)
+    calls = []
+
+    def get_module(session, class_name, index, **kwargs):
+        calls.append((class_name, index, kwargs))
+        for key, value in kwargs.items():
+            setattr(policy, key, value)
+            if key not in policy.config_attrs:
+                policy.config_attrs.append(key)
+        return policy
 
     session = MagicMock()
-    session.resource_prefix = "/rest/v10.16/"
-    session.api.compound_index_separator = ","
-
-    def router(operation, path, params=None, data=None):
-        if operation != "GET":
-            writes.append((operation, path, data))
-            code = {"POST": 201, "PUT": 200, "DELETE": 204}[operation]
-            return FakeResponse(code)
-        if path == PATH:
-            if exists:
-                return FakeResponse(200, current or writable())
-            return FakeResponse(404)
-        return FakeResponse(404)
-
-    session.request.side_effect = router
-    session._writes = writes
-    return session
+    session.api.get_module.side_effect = get_module
+    return session, policy, calls
 
 
 def run(args, session):
@@ -140,22 +119,20 @@ def run(args, session):
     return exc.value.args[0]
 
 
-def writes_of(session, operation):
-    return [w for w in session._writes if w[0] == operation]
+def create_kwargs(calls):
+    creates = [c for c in calls if c[2]]
+    return creates[-1][2] if creates else {}
 
 
 def test_create_minimal():
-    session = build_session(exists=False)
+    session, policy, calls = make_session(exists=False)
     result = run({"name": NAME}, session)
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert posts and posts[0][1] == COLLECTION
-    body = json.loads(posts[0][2])
-    assert body == {"name": NAME}
+    assert policy.created is True
 
 
 def test_create_with_fields():
-    session = build_session(exists=False)
+    session, policy, calls = make_session(exists=False)
     result = run(
         {
             "name": NAME,
@@ -167,59 +144,58 @@ def test_create_with_fields():
         session,
     )
     assert result["changed"] is True
-    body = json.loads(writes_of(session, "POST")[0][2])
-    assert body["secure_mode"] == "should-secure"
-    assert body["replay_window"] == 100
-    assert body["cipher_suites"] == {"gcm_aes_256_enabled": True}
-    assert body["bypass"] == {"ieee_bpdu_enabled": True}
+    assert policy.created is True
+    kwargs = create_kwargs(calls)
+    assert kwargs["secure_mode"] == "should-secure"
+    assert kwargs["replay_window"] == 100
+    assert kwargs["cipher_suites"] == {"gcm_aes_256_enabled": True}
+    assert kwargs["bypass"] == {"ieee_bpdu_enabled": True}
 
 
 def test_delete():
-    session = build_session(exists=True)
+    session, policy, calls = make_session(exists=True)
     result = run({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is True
-    assert writes_of(session, "DELETE")
+    assert policy.deleted is True
 
 
 def test_delete_absent():
-    session = build_session(exists=False)
+    session, policy, calls = make_session(exists=False)
     result = run({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is False
-    assert not session._writes
+    assert policy.deleted is False
 
 
 def test_idempotent():
-    current = writable(secure_mode="should-secure")
-    session = build_session(exists=True, current=current)
+    session, policy, calls = make_session(
+        exists=True, attrs={"secure_mode": "should-secure"}
+    )
     result = run(
         {"name": NAME, "state": "update", "secure_mode": "should-secure"},
         session,
     )
     assert result["changed"] is False
-    assert not session._writes
+    assert policy.updated is False
 
 
 def test_update_scalar():
-    current = writable(secure_mode="must-secure")
-    session = build_session(exists=True, current=current)
+    session, policy, calls = make_session(
+        exists=True, attrs={"secure_mode": "must-secure"}
+    )
     result = run(
         {"name": NAME, "state": "update", "secure_mode": "should-secure"},
         session,
     )
     assert result["changed"] is True
-    puts = writes_of(session, "PUT")
-    assert puts and puts[0][1] == PATH
-    body = json.loads(puts[0][2])
-    assert body["secure_mode"] == "should-secure"
-    # other fields preserved from current
-    assert body["replay_window"] == 0
+    assert policy.updated is True
+    assert policy.secure_mode == "should-secure"
+    assert "secure_mode" in policy.config_attrs
 
 
 def test_update_nested_merges():
-    current = writable(
-        cipher_suites={"gcm_aes_128_enabled": True},
+    session, policy, calls = make_session(
+        exists=True, attrs={"cipher_suites": {"gcm_aes_128_enabled": True}}
     )
-    session = build_session(exists=True, current=current)
     result = run(
         {
             "name": NAME,
@@ -229,15 +205,15 @@ def test_update_nested_merges():
         session,
     )
     assert result["changed"] is True
-    body = json.loads(writes_of(session, "PUT")[0][2])
-    # supplied key set and previously-set key preserved
-    assert body["cipher_suites"]["gcm_aes_256_enabled"] is True
-    assert body["cipher_suites"]["gcm_aes_128_enabled"] is True
+    assert policy.updated is True
+    assert policy.cipher_suites["gcm_aes_256_enabled"] is True
+    assert policy.cipher_suites["gcm_aes_128_enabled"] is True
 
 
 def test_idempotent_nested():
-    current = writable(bypass={"ieee_bpdu_enabled": True})
-    session = build_session(exists=True, current=current)
+    session, policy, calls = make_session(
+        exists=True, attrs={"bypass": {"ieee_bpdu_enabled": True}}
+    )
     result = run(
         {
             "name": NAME,
@@ -247,4 +223,4 @@ def test_idempotent_nested():
         session,
     )
     assert result["changed"] is False
-    assert not session._writes
+    assert policy.updated is False

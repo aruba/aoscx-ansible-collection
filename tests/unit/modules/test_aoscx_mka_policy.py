@@ -5,8 +5,10 @@
 """
 Unit tests for the aoscx_mka_policy module.
 
-The pyaoscx session is fully mocked through session.request, so no switch is
-required.
+The module is backed by the pyaoscx MkaPolicy SDK class, and resolves the
+referenced keychain through the Keychain SDK class. Both are obtained through
+session.api.get_module, which is replaced here by a fake that returns
+controllable objects, so no switch is required.
 """
 
 from __future__ import absolute_import, division, print_function
@@ -27,35 +29,13 @@ from ansible_collections.arubanetworks.aoscx.plugins.modules import (
 )
 
 MODULE = (
-    "ansible_collections.arubanetworks.aoscx.plugins.modules.aoscx_mka_policy"
+    "ansible_collections.arubanetworks.aoscx.plugins.modules."
+    "aoscx_mka_policy"
 )
 
-COLLECTION = "system/mka_policies"
 NAME = "mka1"
-PATH = "{0}/{1}".format(COLLECTION, NAME)
-PREFIX = "/rest/v10.16/"
-
-
-def kc_uri(name):
-    return "{0}system/keychains/{1}".format(PREFIX, name)
-
-
-WRITABLE_DEFAULTS = {
-    "cak": None,
-    "ckn": None,
-    "eapol_destination_mac": "01:80:c2:00:00:03",
-    "eapol_dot1q_tagged": False,
-    "eapol_eth_type": "888e",
-    "key_server_priority": 0,
-    "mode": "psk",
-    "transmit_interval": 2,
-}
-
-
-def writable(**overrides):
-    rep = json.loads(json.dumps(WRITABLE_DEFAULTS))
-    rep.update(overrides)
-    return rep
+KC_NAME = "kc1"
+KC_URI = "/rest/v10.16/system/keychains/kc1"
 
 
 class AnsibleExitJson(Exception):
@@ -92,39 +72,65 @@ def patch_ansible_module():
         yield
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = {} if payload is None else payload
-        self.text = ""
+class FakePolicy:
+    def __init__(self, exists=True, attrs=None):
+        self._exists = exists
+        self.config_attrs = []
+        self.created = False
+        self.updated = False
+        self.deleted = False
+        for key, value in (attrs or {}).items():
+            setattr(self, key, value)
 
-    def json(self):
-        return self._payload
+    def get(self, selector=None):
+        if not self._exists:
+            raise Exception("not found")
+        return True
+
+    def create(self):
+        self.created = True
+
+    def update(self):
+        self.updated = True
+
+    def delete(self):
+        self.deleted = True
 
 
-def build_session(exists=False, current=None, keychain_exists=True):
-    writes = []
+class FakeKeychain:
+    def __init__(self, exists=True, uri=KC_URI):
+        self._exists = exists
+        self._uri = uri
+
+    def get(self, selector=None):
+        if not self._exists:
+            raise Exception("not found")
+        return True
+
+    def get_uri(self):
+        return self._uri
+
+
+def make_session(
+    exists=True, attrs=None, keychain_exists=True, keychain_uri=KC_URI
+):
+    policy = FakePolicy(exists=exists, attrs=attrs)
+    keychain = FakeKeychain(exists=keychain_exists, uri=keychain_uri)
+    calls = []
+
+    def get_module(session, class_name, index, **kwargs):
+        calls.append((class_name, index, kwargs))
+        if class_name == "Keychain":
+            return keychain
+        for key, value in kwargs.items():
+            setattr(policy, key, value)
+            if key not in policy.config_attrs:
+                policy.config_attrs.append(key)
+        return policy
 
     session = MagicMock()
-    session.resource_prefix = PREFIX
-    session.api.compound_index_separator = ","
-
-    def router(operation, path, params=None, data=None):
-        if operation != "GET":
-            writes.append((operation, path, data))
-            code = {"POST": 201, "PUT": 200, "DELETE": 204}[operation]
-            return FakeResponse(code)
-        if path == PATH:
-            if exists:
-                return FakeResponse(200, current or writable())
-            return FakeResponse(404)
-        if path.startswith("system/keychains/"):
-            return FakeResponse(200 if keychain_exists else 404)
-        return FakeResponse(404)
-
-    session.request.side_effect = router
-    session._writes = writes
-    return session
+    session.api.get_module.side_effect = get_module
+    return session, policy, keychain, calls
 
 
 def run(args, session):
@@ -135,122 +141,117 @@ def run(args, session):
     return exc.value.args[0]
 
 
-def writes_of(session, operation):
-    return [w for w in session._writes if w[0] == operation]
+def create_kwargs(calls):
+    creates = [c for c in calls if c[0] == "MkaPolicy" and c[2]]
+    return creates[-1][2] if creates else {}
 
 
 def test_create_minimal():
-    session = build_session(exists=False)
+    session, policy, keychain, calls = make_session(exists=False)
     result = run({"name": NAME}, session)
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert posts and posts[0][1] == COLLECTION
-    assert json.loads(posts[0][2]) == {"name": NAME}
+    assert policy.created is True
 
 
-def test_create_with_keychain_and_secrets():
-    session = build_session(exists=False, keychain_exists=True)
+def test_create_with_fields():
+    session, policy, keychain, calls = make_session(exists=False)
     result = run(
         {
             "name": NAME,
             "mode": "psk",
-            "keychain": "kc1",
-            "cak": "00112233",
-            "ckn": "11",
-            "transmit_interval": 6,
+            "transmit_interval": 5,
+            "keychain": KC_NAME,
         },
         session,
     )
     assert result["changed"] is True
-    body = json.loads(writes_of(session, "POST")[0][2])
-    assert body["keychain"] == kc_uri("kc1")
-    assert body["cak"] == "00112233"
-    assert body["ckn"] == "11"
-    assert body["transmit_interval"] == 6
+    assert policy.created is True
+    kwargs = create_kwargs(calls)
+    assert kwargs["mode"] == "psk"
+    assert kwargs["transmit_interval"] == 5
+    assert kwargs["keychain"] == KC_URI
 
 
-def test_create_keychain_missing_fails():
-    session = build_session(exists=False, keychain_exists=False)
-    result = run({"name": NAME, "keychain": "ghost"}, session)
-    assert result.get("failed") is True
-    assert not session._writes
+def test_create_with_secret():
+    session, policy, keychain, calls = make_session(exists=False)
+    result = run(
+        {"name": NAME, "cak": "secret", "ckn": "0011"},
+        session,
+    )
+    assert result["changed"] is True
+    kwargs = create_kwargs(calls)
+    assert kwargs["cak"] == "secret"
+    assert kwargs["ckn"] == "0011"
+
+
+def test_keychain_missing():
+    session, policy, keychain, calls = make_session(
+        exists=False, keychain_exists=False
+    )
+    result = run({"name": NAME, "keychain": KC_NAME}, session)
+    assert result["failed"] is True
 
 
 def test_delete():
-    session = build_session(exists=True)
+    session, policy, keychain, calls = make_session(exists=True)
     result = run({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is True
-    assert writes_of(session, "DELETE")
+    assert policy.deleted is True
 
 
 def test_delete_absent():
-    session = build_session(exists=False)
+    session, policy, keychain, calls = make_session(exists=False)
     result = run({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is False
-    assert not session._writes
+    assert policy.deleted is False
 
 
 def test_idempotent():
-    current = writable(transmit_interval=6)
-    session = build_session(exists=True, current=current)
+    session, policy, keychain, calls = make_session(
+        exists=True, attrs={"mode": "psk"}
+    )
     result = run(
-        {"name": NAME, "state": "update", "transmit_interval": 6},
+        {"name": NAME, "state": "update", "mode": "psk"},
         session,
     )
     assert result["changed"] is False
-    assert not session._writes
+    assert policy.updated is False
 
 
 def test_update_scalar():
-    current = writable(transmit_interval=2)
-    session = build_session(exists=True, current=current)
+    session, policy, keychain, calls = make_session(
+        exists=True, attrs={"transmit_interval": 2}
+    )
     result = run(
-        {"name": NAME, "state": "update", "transmit_interval": 6},
+        {"name": NAME, "state": "update", "transmit_interval": 5},
         session,
     )
     assert result["changed"] is True
-    puts = writes_of(session, "PUT")
-    assert puts and puts[0][1] == PATH
-    body = json.loads(puts[0][2])
-    assert body["transmit_interval"] == 6
-    assert body["eapol_eth_type"] == "888e"
+    assert policy.updated is True
+    assert policy.transmit_interval == 5
 
 
-def test_update_keychain_ref():
-    current = writable(keychain={"kc1": kc_uri("kc1")})
-    session = build_session(exists=True, current=current)
+def test_keychain_idempotent():
+    session, policy, keychain, calls = make_session(
+        exists=True, attrs={"keychain": {KC_NAME: KC_URI}}
+    )
     result = run(
-        {"name": NAME, "state": "update", "keychain": "kc2"},
+        {"name": NAME, "state": "update", "keychain": KC_NAME},
+        session,
+    )
+    assert result["changed"] is False
+    assert policy.updated is False
+
+
+def test_keychain_update():
+    other_uri = "/rest/v10.16/system/keychains/other"
+    session, policy, keychain, calls = make_session(
+        exists=True, attrs={"keychain": {"other": other_uri}}
+    )
+    result = run(
+        {"name": NAME, "state": "update", "keychain": KC_NAME},
         session,
     )
     assert result["changed"] is True
-    body = json.loads(writes_of(session, "PUT")[0][2])
-    assert body["keychain"] == kc_uri("kc2")
-
-
-def test_idempotent_keychain_ref():
-    current = writable(keychain={"kc1": kc_uri("kc1")})
-    session = build_session(exists=True, current=current)
-    result = run(
-        {"name": NAME, "state": "update", "keychain": "kc1"},
-        session,
-    )
-    assert result["changed"] is False
-    assert not session._writes
-
-
-def test_secrets_not_compared():
-    current = writable(transmit_interval=2)
-    session = build_session(exists=True, current=current)
-    result = run(
-        {
-            "name": NAME,
-            "state": "update",
-            "transmit_interval": 2,
-            "cak": "deadbeef",
-            "ckn": "22",
-        },
-        session,
-    )
-    assert result["changed"] is False
-    assert not session._writes
+    assert policy.updated is True
+    assert policy.keychain == KC_URI

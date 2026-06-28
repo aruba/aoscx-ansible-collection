@@ -168,8 +168,6 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
     get_pyaoscx_session,
 )
 
-COLLECTION = "system/macsec_policies"
-
 SCALAR_FIELDS = [
     {"name": "clear_tag_mode", "type": "str", "choices": ["none", "dot1q"]},
     {"name": "confidentiality_disable", "type": "bool"},
@@ -198,10 +196,6 @@ NESTED_FIELDS = {
         "gcm_aes_xpn_256_enabled",
     ],
 }
-
-
-def ok(response):
-    return response is not None and response.status_code < 400
 
 
 def build_argument_spec():
@@ -247,38 +241,46 @@ def _build_desired(params):
     return scalars, nested
 
 
-def _differs(current, scalars, nested):
-    for field, value in scalars.items():
-        if current.get(field) != value:
-            return True
-    for obj, picked in nested.items():
-        current_obj = current.get(obj) or {}
-        for key, value in picked.items():
-            if current_obj.get(key) != value:
-                return True
-    return False
-
-
-def run_module(ansible_module, session):
+def main():
+    ansible_module = AnsibleModule(
+        argument_spec=build_argument_spec(),
+        supports_check_mode=True,
+    )
     params = ansible_module.params
     name = params["name"]
     state = params["state"]
-    check_mode = ansible_module.check_mode
-    path = "{0}/{1}".format(COLLECTION, name)
-
-    current_response = session.request(
-        "GET", path, params={"selector": "writable"}
-    )
-    exists = ok(current_response)
-
     result = dict(changed=False)
 
+    try:
+        session = get_pyaoscx_session(ansible_module)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not get PYAOSCX Session: {0}".format(str(e))
+        )
+
+    try:
+        policy = session.api.get_module(session, "MacsecPolicy", name)
+    except Exception as e:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support MACsec policies. "
+                "Upgrade pyaoscx. Details: {0}".format(str(e))
+            )
+        )
+
+    try:
+        policy.get(selector="writable")
+        exists = True
+    except Exception:
+        exists = False
+
     if state == "delete":
-        if exists and not check_mode:
-            response = session.request("DELETE", path)
-            if not ok(response):
+        if exists and not ansible_module.check_mode:
+            try:
+                policy.delete()
+            except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not delete {0}: {1}".format(name, response.text)
+                    msg="Could not delete {0}: {1}".format(name, str(e))
                 )
         result["changed"] = exists
         ansible_module.exit_json(**result)
@@ -286,54 +288,49 @@ def run_module(ansible_module, session):
     scalars, nested = _build_desired(params)
 
     if not exists:
-        if not check_mode:
-            body = {"name": name}
-            body.update(scalars)
-            for obj, picked in nested.items():
-                body[obj] = picked
-            response = session.request(
-                "POST", COLLECTION, data=ansible_module.jsonify(body)
-            )
-            if not ok(response):
-                ansible_module.fail_json(
-                    msg="Could not create {0}: {1}".format(name, response.text)
-                )
+        create_kwargs = dict(scalars)
+        for obj, picked in nested.items():
+            create_kwargs[obj] = picked
+        policy = session.api.get_module(
+            session, "MacsecPolicy", name, **create_kwargs
+        )
         result["changed"] = True
+        if not ansible_module.check_mode:
+            try:
+                policy.create()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not create {0}: {1}".format(name, str(e))
+                )
         ansible_module.exit_json(**result)
 
-    current = current_response.json()
-    if _differs(current, scalars, nested):
-        result["changed"] = True
-        if not check_mode:
-            body = dict(current)
-            body.update(scalars)
-            for obj, picked in nested.items():
-                merged = dict(current.get(obj) or {})
-                merged.update(picked)
-                body[obj] = merged
-            response = session.request(
-                "PUT", path, data=ansible_module.jsonify(body)
+    changed = False
+    for field, value in scalars.items():
+        if getattr(policy, field, None) != value:
+            changed = True
+            setattr(policy, field, value)
+            if field not in policy.config_attrs:
+                policy.config_attrs.append(field)
+    for obj, picked in nested.items():
+        current_obj = getattr(policy, obj, None) or {}
+        merged = dict(current_obj)
+        merged.update(picked)
+        if merged != current_obj:
+            changed = True
+            setattr(policy, obj, merged)
+            if obj not in policy.config_attrs:
+                policy.config_attrs.append(obj)
+
+    result["changed"] = changed
+    if changed and not ansible_module.check_mode:
+        try:
+            policy.update()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Could not update {0}: {1}".format(name, str(e))
             )
-            if not ok(response):
-                ansible_module.fail_json(
-                    msg="Could not update {0}: {1}".format(name, response.text)
-                )
 
     ansible_module.exit_json(**result)
-
-
-def main():
-    ansible_module = AnsibleModule(
-        argument_spec=build_argument_spec(),
-        supports_check_mode=True,
-    )
-    try:
-        session = get_pyaoscx_session(ansible_module)
-    except Exception as e:
-        ansible_module.fail_json(
-            msg="Could not get PYAOSCX Session: {0}".format(str(e))
-        )
-    run_module(ansible_module, session)
 
 
 if __name__ == "__main__":
