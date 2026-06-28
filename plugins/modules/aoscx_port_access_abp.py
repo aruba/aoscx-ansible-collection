@@ -140,8 +140,13 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.port_access_fa
     run_port_access_family,
 )
 
-COLLECTION = "system/port_access_abps"
-ACTION_KEY = "abp_action_set"
+try:
+    from pyaoscx.port_access_abp import PortAccessAbp
+
+    HAS_PYAOSCX_PORT_ACCESS = True
+except ImportError:
+    HAS_PYAOSCX_PORT_ACCESS = False
+
 CLASS_TYPES = ["abp-ipv4", "abp-ipv6"]
 ACTION_FIELDS = [
     {"name": "drop", "type": "bool"},
@@ -156,6 +161,13 @@ def main():
         argument_spec=build_argument_spec(CLASS_TYPES, ACTION_FIELDS),
         supports_check_mode=True,
     )
+    if not HAS_PYAOSCX_PORT_ACCESS:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support port access policies. "
+                "Upgrade pyaoscx."
+            )
+        )
     try:
         session = get_pyaoscx_session(ansible_module)
     except Exception as e:
@@ -163,7 +175,7 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
     run_port_access_family(
-        ansible_module, session, COLLECTION, ACTION_KEY, ACTION_FIELDS
+        ansible_module, session, PortAccessAbp, ACTION_FIELDS
     )
 
 

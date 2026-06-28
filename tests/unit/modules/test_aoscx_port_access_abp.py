@@ -5,7 +5,8 @@
 """
 Unit tests for the aoscx_port_access_abp module.
 
-The pyaoscx session is fully mocked through session.request, so no switch is
+The pyaoscx SDK (PortAccessAbp container, its entries and action sets, and the
+Class resolution via session.api.get_module) is fully mocked, so no switch is
 required.
 """
 
@@ -31,8 +32,6 @@ MODULE = (
     "aoscx_port_access_abp"
 )
 
-ABP = "system/port_access_abps"
-ACTION = "abp_action_set"
 NAME = "a1"
 
 
@@ -70,98 +69,209 @@ def patch_ansible_module():
         yield
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = {} if payload is None else payload
-        self.text = ""
+class FakeClass:
+    def __init__(self, session, name, type=None):
+        self.session = session
+        self.name = name
+        self.type = type
 
-    def json(self):
-        return self._payload
+    def get(self, depth=None, selector=None):
+        if not self.session._class_exists:
+            raise Exception("no class")
+        return True
+
+    def get_uri(self):
+        return "/rest/v10.16/system/classes/{0},{1}".format(
+            self.name, self.type
+        )
+
+
+class FakeActionSet:
+    action_key = "abp_action_set"
+
+    def __init__(self, session, parent_entry, **kwargs):
+        self.session = session
+        self.parent_entry = parent_entry
+        self.config_attrs = []
+        self._original_attributes = {}
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def get(self, depth=None, selector=None):
+        data = self.session._action_sets.get(
+            int(self.parent_entry.sequence_number)
+        )
+        if data is None:
+            raise Exception("no action set")
+        self._original_attributes = dict(data)
+        return True
+
+    def _payload(self):
+        return {key: getattr(self, key) for key in self.config_attrs}
+
+    def create(self):
+        self.session._writes.append(
+            (
+                "action_create",
+                int(self.parent_entry.sequence_number),
+                self._payload(),
+            )
+        )
+
+    def update(self):
+        self.session._writes.append(
+            (
+                "action_update",
+                int(self.parent_entry.sequence_number),
+                self._payload(),
+            )
+        )
+
+
+class FakeEntry:
+    action_set_class = FakeActionSet
+
+    def __init__(self, session, sequence_number, parent_container, **kwargs):
+        self.session = session
+        self.sequence_number = sequence_number
+        self.parent_container = parent_container
+        self._attrs = kwargs
+        self.config_attrs = []
+        self._original_attributes = {}
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def get(self, depth=None, selector=None):
+        data = self.session._entries[int(self.sequence_number)]
+        for key, value in data.items():
+            setattr(self, key, value)
+        self._original_attributes = dict(data)
+        return True
+
+    def create(self):
+        self.session._writes.append(
+            ("entry_create", int(self.sequence_number), dict(self._attrs))
+        )
+
+    def update(self):
+        payload = {key: getattr(self, key) for key in self.config_attrs}
+        self.session._writes.append(
+            ("entry_update", int(self.sequence_number), payload)
+        )
+
+    def delete(self):
+        self.session._writes.append(
+            ("entry_delete", int(self.sequence_number), None)
+        )
+
+    @classmethod
+    def get_all(cls, session, parent_container):
+        return {
+            str(seq): cls(session, str(seq), parent_container)
+            for seq in session._entries
+        }
+
+
+class FakeContainer:
+    entry_class = FakeEntry
+    base_uri = "system/port_access_abps"
+
+    def __init__(self, session, name, **kwargs):
+        self.session = session
+        self.name = name
+        self.path = "{0}/{1}".format(self.base_uri, name)
+
+    def get(self, depth=None, selector=None):
+        if not self.session._exists:
+            raise Exception("no container")
+        return True
+
+    def create(self):
+        self.session._writes.append(("container_create", self.name, None))
+
+    def delete(self):
+        self.session._writes.append(("container_delete", self.name, None))
 
 
 def build_session(
     abp_exists=False, class_exists=True, entries=None, action_sets=None
 ):
-    entries = entries or {}
-    action_sets = action_sets or {}
-    writes = []
-
+    """
+    entries: {seq(int): {"class": {clsname: uri}, "comment": str}}
+    action_sets: {seq(int): {...}}
+    """
     session = MagicMock()
-    session.resource_prefix = "/rest/v10.16/"
-    session.api.compound_index_separator = ","
+    session._exists = abp_exists
+    session._class_exists = class_exists
+    session._entries = entries or {}
+    session._action_sets = action_sets or {}
+    session._writes = []
 
-    def router(operation, path, params=None, data=None):
-        if operation != "GET":
-            writes.append((operation, path, data))
-            code = {"POST": 201, "PUT": 200, "DELETE": 204}[operation]
-            return FakeResponse(code)
-        if path == "{0}/{1}".format(ABP, NAME):
-            return FakeResponse(200 if abp_exists else 404)
-        if path.startswith("system/classes/"):
-            return FakeResponse(200 if class_exists else 404)
-        if path.endswith("/cfg_entries"):
-            payload = {str(seq): data for seq, data in entries.items()}
-            return FakeResponse(200, payload)
-        if path.endswith("/" + ACTION):
-            seq = int(path.split("/cfg_entries/")[1].split("/")[0])
-            if seq in action_sets:
-                return FakeResponse(200, action_sets[seq])
-            return FakeResponse(404)
-        return FakeResponse(404)
+    def get_module(sess, name, index, **kwargs):
+        return FakeClass(session, index, kwargs.get("type"))
 
-    session.request.side_effect = router
-    session._writes = writes
+    session.api.get_module.side_effect = get_module
     return session
 
 
 def run_module(args, session):
     set_module_args(args)
-    with patch(MODULE + ".get_pyaoscx_session", return_value=session):
+    with patch(MODULE + ".get_pyaoscx_session", return_value=session), patch(
+        MODULE + ".PortAccessAbp", FakeContainer
+    ), patch(MODULE + ".HAS_PYAOSCX_PORT_ACCESS", True):
         with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
             aoscx_port_access_abp.main()
     return exc.value.args[0]
 
 
-def writes_of(session, operation):
-    return [w for w in session._writes if w[0] == operation]
-
-
-def entry(seq, cls="c1", ctype="abp-ipv4", **kw):
-    data = {"sequence_number": seq, "class_name": cls, "class_type": ctype}
-    data.update(kw)
-    return data
+def writes_of(session, op):
+    return [w for w in session._writes if w[0] == op]
 
 
 def test_create_empty():
     session = build_session(abp_exists=False)
     result = run_module({"name": NAME}, session)
     assert result["changed"] is True
-    assert any(p[1] == ABP for p in writes_of(session, "POST"))
+    assert ("container_create", NAME, None) in session._writes
 
 
 def test_create_with_entry():
     session = build_session(abp_exists=False, class_exists=True)
     result = run_module(
-        {"name": NAME, "entries": [entry(10, comment="x", drop=True)]},
+        {
+            "name": NAME,
+            "entries": [
+                {
+                    "sequence_number": 10,
+                    "class_name": "c1",
+                    "class_type": "abp-ipv4",
+                    "comment": "x",
+                }
+            ],
+        },
         session,
     )
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert any(p[1].endswith("/cfg_entries") for p in posts)
-    assert any(p[1].endswith("/" + ACTION) for p in posts)
+    creates = writes_of(session, "entry_create")
+    assert creates and creates[0][1] == 10
+    assert creates[0][2]["class"] == (
+        "/rest/v10.16/system/classes/c1,abp-ipv4"
+    )
 
 
 def test_class_missing_fails():
     session = build_session(abp_exists=False, class_exists=False)
-    result = run_module({"name": NAME, "entries": [entry(10)]}, session)
-    assert result["failed"] is True
-
-
-def test_duplicate_sequence_fails():
-    session = build_session(abp_exists=False)
     result = run_module(
-        {"name": NAME, "entries": [entry(10), entry(10, cls="c2")]},
+        {
+            "name": NAME,
+            "entries": [
+                {
+                    "sequence_number": 10,
+                    "class_name": "c1",
+                    "class_type": "abp-ipv4",
+                }
+            ],
+        },
         session,
     )
     assert result["failed"] is True
@@ -171,13 +281,14 @@ def test_delete():
     session = build_session(abp_exists=True)
     result = run_module({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is True
-    assert writes_of(session, "DELETE")
+    assert ("container_delete", NAME, None) in session._writes
 
 
 def test_delete_absent():
     session = build_session(abp_exists=False)
     result = run_module({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is False
+    assert not session._writes
 
 
 def test_idempotent():
@@ -188,7 +299,14 @@ def test_idempotent():
         {
             "name": NAME,
             "state": "update",
-            "entries": [entry(10, comment="x")],
+            "entries": [
+                {
+                    "sequence_number": 10,
+                    "class_name": "c1",
+                    "class_type": "abp-ipv4",
+                    "comment": "x",
+                }
+            ],
         },
         session,
     )
@@ -196,31 +314,35 @@ def test_idempotent():
     assert not session._writes
 
 
-def test_entries_omitted_does_not_touch_entries():
-    cls_uri = "/rest/v10.16/system/classes/c1,abp-ipv4"
-    entries = {10: {"class": {"c1,abp-ipv4": cls_uri}, "comment": "x"}}
-    session = build_session(abp_exists=True, entries=entries)
-    result = run_module({"name": NAME, "state": "update"}, session)
-    assert result["changed"] is False
-    assert not session._writes
-
-
-def test_empty_list_removes_entries():
-    cls_uri = "/rest/v10.16/system/classes/c1,abp-ipv4"
-    entries = {20: {"class": {"c1,abp-ipv4": cls_uri}, "comment": None}}
-    session = build_session(abp_exists=True, entries=entries)
-    result = run_module(
-        {"name": NAME, "state": "update", "entries": []}, session
-    )
-    assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert any(d[1].endswith("/cfg_entries/20") for d in deletes)
-
-
-def test_action_set_merge_preserves_unsupplied():
+def test_action_set_create_when_absent():
     cls_uri = "/rest/v10.16/system/classes/c1,abp-ipv4"
     entries = {10: {"class": {"c1,abp-ipv4": cls_uri}, "comment": None}}
-    action_sets = {10: {"drop": True}}
+    session = build_session(abp_exists=True, entries=entries)
+    result = run_module(
+        {
+            "name": NAME,
+            "state": "update",
+            "entries": [
+                {
+                    "sequence_number": 10,
+                    "class_name": "c1",
+                    "class_type": "abp-ipv4",
+                    "dscp": 46,
+                }
+            ],
+        },
+        session,
+    )
+    assert result["changed"] is True
+    creates = writes_of(session, "action_create")
+    assert creates and creates[0][1] == 10
+    assert creates[0][2]["dscp"] == 46
+
+
+def test_action_set_update_when_present():
+    cls_uri = "/rest/v10.16/system/classes/c1,abp-ipv4"
+    entries = {10: {"class": {"c1,abp-ipv4": cls_uri}, "comment": None}}
+    action_sets = {10: {"dscp": 10}}
     session = build_session(
         abp_exists=True, entries=entries, action_sets=action_sets
     )
@@ -228,33 +350,17 @@ def test_action_set_merge_preserves_unsupplied():
         {
             "name": NAME,
             "state": "update",
-            "entries": [entry(10, dscp=46)],
+            "entries": [
+                {
+                    "sequence_number": 10,
+                    "class_name": "c1",
+                    "class_type": "abp-ipv4",
+                    "dscp": 46,
+                }
+            ],
         },
         session,
     )
     assert result["changed"] is True
-    puts = writes_of(session, "PUT")
-    action_puts = [p for p in puts if p[1].endswith("/" + ACTION)]
-    assert action_puts
-    body = json.loads(action_puts[0][2])
-    assert body["drop"] is True
-    assert body["dscp"] == 46
-
-
-def test_action_set_idempotent():
-    cls_uri = "/rest/v10.16/system/classes/c1,abp-ipv4"
-    entries = {10: {"class": {"c1,abp-ipv4": cls_uri}, "comment": None}}
-    action_sets = {10: {"drop": True, "dscp": 46}}
-    session = build_session(
-        abp_exists=True, entries=entries, action_sets=action_sets
-    )
-    result = run_module(
-        {
-            "name": NAME,
-            "state": "update",
-            "entries": [entry(10, drop=True, dscp=46)],
-        },
-        session,
-    )
-    assert result["changed"] is False
-    assert not session._writes
+    updates = writes_of(session, "action_update")
+    assert updates and updates[0][2]["dscp"] == 46

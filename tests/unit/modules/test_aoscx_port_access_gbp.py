@@ -5,7 +5,8 @@
 """
 Unit tests for the aoscx_port_access_gbp module.
 
-The pyaoscx session is fully mocked through session.request, so no switch is
+The pyaoscx SDK (PortAccessGbp container, its entries and action sets, and the
+Class resolution via session.api.get_module) is fully mocked, so no switch is
 required.
 """
 
@@ -31,7 +32,6 @@ MODULE = (
     "aoscx_port_access_gbp"
 )
 
-GBP = "system/port_access_gbps"
 NAME = "g1"
 
 
@@ -69,14 +69,128 @@ def patch_ansible_module():
         yield
 
 
-class FakeResponse:
-    def __init__(self, status_code, payload=None):
-        self.status_code = status_code
-        self._payload = {} if payload is None else payload
-        self.text = ""
+class FakeClass:
+    def __init__(self, session, name, type=None):
+        self.session = session
+        self.name = name
+        self.type = type
 
-    def json(self):
-        return self._payload
+    def get(self, depth=None, selector=None):
+        if not self.session._class_exists:
+            raise Exception("no class")
+        return True
+
+    def get_uri(self):
+        return "/rest/v10.16/system/classes/{0},{1}".format(
+            self.name, self.type
+        )
+
+
+class FakeActionSet:
+    action_key = "gbp_action_set"
+
+    def __init__(self, session, parent_entry, **kwargs):
+        self.session = session
+        self.parent_entry = parent_entry
+        self.config_attrs = []
+        self._original_attributes = {}
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def get(self, depth=None, selector=None):
+        data = self.session._action_sets.get(
+            int(self.parent_entry.sequence_number)
+        )
+        if data is None:
+            raise Exception("no action set")
+        self._original_attributes = dict(data)
+        return True
+
+    def _payload(self):
+        return {key: getattr(self, key) for key in self.config_attrs}
+
+    def create(self):
+        self.session._writes.append(
+            (
+                "action_create",
+                int(self.parent_entry.sequence_number),
+                self._payload(),
+            )
+        )
+
+    def update(self):
+        self.session._writes.append(
+            (
+                "action_update",
+                int(self.parent_entry.sequence_number),
+                self._payload(),
+            )
+        )
+
+
+class FakeEntry:
+    action_set_class = FakeActionSet
+
+    def __init__(self, session, sequence_number, parent_container, **kwargs):
+        self.session = session
+        self.sequence_number = sequence_number
+        self.parent_container = parent_container
+        self._attrs = kwargs
+        self.config_attrs = []
+        self._original_attributes = {}
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def get(self, depth=None, selector=None):
+        data = self.session._entries[int(self.sequence_number)]
+        for key, value in data.items():
+            setattr(self, key, value)
+        self._original_attributes = dict(data)
+        return True
+
+    def create(self):
+        self.session._writes.append(
+            ("entry_create", int(self.sequence_number), dict(self._attrs))
+        )
+
+    def update(self):
+        payload = {key: getattr(self, key) for key in self.config_attrs}
+        self.session._writes.append(
+            ("entry_update", int(self.sequence_number), payload)
+        )
+
+    def delete(self):
+        self.session._writes.append(
+            ("entry_delete", int(self.sequence_number), None)
+        )
+
+    @classmethod
+    def get_all(cls, session, parent_container):
+        return {
+            str(seq): cls(session, str(seq), parent_container)
+            for seq in session._entries
+        }
+
+
+class FakeContainer:
+    entry_class = FakeEntry
+    base_uri = "system/port_access_gbps"
+
+    def __init__(self, session, name, **kwargs):
+        self.session = session
+        self.name = name
+        self.path = "{0}/{1}".format(self.base_uri, name)
+
+    def get(self, depth=None, selector=None):
+        if not self.session._exists:
+            raise Exception("no container")
+        return True
+
+    def create(self):
+        self.session._writes.append(("container_create", self.name, None))
+
+    def delete(self):
+        self.session._writes.append(("container_delete", self.name, None))
 
 
 def build_session(
@@ -86,57 +200,39 @@ def build_session(
     entries: {seq(int): {"class": {clsname: uri}, "comment": str}}
     action_sets: {seq(int): {"drop": bool, "reflect": bool}}
     """
-    entries = entries or {}
-    action_sets = action_sets or {}
-    writes = []
-
     session = MagicMock()
-    session.resource_prefix = "/rest/v10.16/"
-    session.api.compound_index_separator = ","
+    session._exists = gbp_exists
+    session._class_exists = class_exists
+    session._entries = entries or {}
+    session._action_sets = action_sets or {}
+    session._writes = []
 
-    def router(operation, path, params=None, data=None):
-        if operation != "GET":
-            writes.append((operation, path, data))
-            code = {"POST": 201, "PUT": 200, "DELETE": 204}[operation]
-            return FakeResponse(code)
-        # GET routing
-        if path == "{0}/{1}".format(GBP, NAME):
-            return FakeResponse(200 if gbp_exists else 404)
-        if path.startswith("system/classes/"):
-            return FakeResponse(200 if class_exists else 404)
-        if path.endswith("/cfg_entries"):
-            payload = {str(seq): data for seq, data in entries.items()}
-            return FakeResponse(200, payload)
-        if path.endswith("/gbp_action_set"):
-            seq = int(path.split("/cfg_entries/")[1].split("/")[0])
-            if seq in action_sets:
-                return FakeResponse(200, action_sets[seq])
-            return FakeResponse(404)
-        return FakeResponse(404)
+    def get_module(sess, name, index, **kwargs):
+        return FakeClass(session, index, kwargs.get("type"))
 
-    session.request.side_effect = router
-    session._writes = writes
+    session.api.get_module.side_effect = get_module
     return session
 
 
 def run_module(args, session):
     set_module_args(args)
-    with patch(MODULE + ".get_pyaoscx_session", return_value=session):
+    with patch(MODULE + ".get_pyaoscx_session", return_value=session), patch(
+        MODULE + ".PortAccessGbp", FakeContainer
+    ), patch(MODULE + ".HAS_PYAOSCX_PORT_ACCESS", True):
         with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
             aoscx_port_access_gbp.main()
     return exc.value.args[0]
 
 
-def writes_of(session, operation):
-    return [w for w in session._writes if w[0] == operation]
+def writes_of(session, op):
+    return [w for w in session._writes if w[0] == op]
 
 
 def test_create_empty():
     session = build_session(gbp_exists=False)
     result = run_module({"name": NAME}, session)
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert any(p[1] == GBP for p in posts)
+    assert ("container_create", NAME, None) in session._writes
 
 
 def test_create_with_entry():
@@ -156,8 +252,12 @@ def test_create_with_entry():
         session,
     )
     assert result["changed"] is True
-    posts = writes_of(session, "POST")
-    assert any(p[1].endswith("/cfg_entries") for p in posts)
+    creates = writes_of(session, "entry_create")
+    assert creates and creates[0][1] == 10
+    assert creates[0][2]["class"] == (
+        "/rest/v10.16/system/classes/c1,gbp-ipv4"
+    )
+    assert creates[0][2]["comment"] == "x"
 
 
 def test_class_missing_fails():
@@ -182,13 +282,14 @@ def test_delete():
     session = build_session(gbp_exists=True)
     result = run_module({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is True
-    assert writes_of(session, "DELETE")
+    assert ("container_delete", NAME, None) in session._writes
 
 
 def test_delete_absent():
     session = build_session(gbp_exists=False)
     result = run_module({"name": NAME, "state": "delete"}, session)
     assert result["changed"] is False
+    assert not session._writes
 
 
 def test_idempotent():
@@ -223,8 +324,7 @@ def test_remove_extra_entry():
         session,
     )
     assert result["changed"] is True
-    deletes = writes_of(session, "DELETE")
-    assert any(d[1].endswith("/cfg_entries/20") for d in deletes)
+    assert ("entry_delete", 20, None) in session._writes
 
 
 def test_action_set_change():
@@ -250,5 +350,6 @@ def test_action_set_change():
         session,
     )
     assert result["changed"] is True
-    puts = writes_of(session, "PUT")
-    assert any(p[1].endswith("/gbp_action_set") for p in puts)
+    updates = writes_of(session, "action_update")
+    assert updates and updates[0][1] == 10
+    assert updates[0][2]["drop"] is True
