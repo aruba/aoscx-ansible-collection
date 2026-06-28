@@ -1,0 +1,12 @@
+---
+minor_changes:
+  - Add aoscx_ipfix_flow_record module to manage IPFIX flow records (match and
+    collect fields). Requires REST API version 10.13 or later.
+  - Add aoscx_ipfix_flow_exporter module to manage IPFIX flow exporters
+    (collector or Traffic Insight destinations). Requires REST API version
+    10.13 or later.
+  - Add aoscx_ipfix_flow_monitor module to manage IPFIX flow monitors that bind
+    a flow record to one or more flow exporters. Requires REST API version
+    10.13 or later.
+  - Allow REST API version 10.13 in the aoscx connection plugin, required by
+    the IPFIX modules.

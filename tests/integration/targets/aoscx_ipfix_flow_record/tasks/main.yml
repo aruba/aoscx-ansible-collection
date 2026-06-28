@@ -1,0 +1,76 @@
+# Integration tests for the aoscx_ipfix_flow_record module.
+#
+# Run with:
+#   ansible-test integration aoscx_ipfix_flow_record --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the IpfixFlowRecord class and a REST API version of 10.13 or
+# later. Uses a temporary flow record named "ansible-test" and cleans up
+# afterwards.
+
+- name: Make sure the test flow record does not exist yet
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a flow record
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    description: ansible record
+    match:
+      ipv4_source_address: true
+      ipv4_destination_address: true
+    collect:
+      counter_bytes: true
+      counter_packets: true
+  register: result
+
+- name: Assert the record was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Re-apply the same configuration (idempotent)
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    state: update
+    description: ansible record
+    match:
+      ipv4_source_address: true
+      ipv4_destination_address: true
+    collect:
+      counter_bytes: true
+      counter_packets: true
+  register: result
+
+- name: Assert nothing changed
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the collected fields
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    state: update
+    collect:
+      counter_bytes: true
+      counter_packets: true
+      application_name: true
+  register: result
+
+- name: Assert the record changed
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the flow record
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the record was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
