@@ -115,6 +115,12 @@ options:
     choices:
       - status-server
       - keep-alive
+  default_group_priority:
+    description: >
+      Priority of the server within the default server group. Some firmware
+      versions require this value when creating a standalone RADIUS server.
+    required: false
+    type: int
   server_group:
     description: >
       Mapping of AAA server group names to their priority for this server,
@@ -234,6 +240,7 @@ def main():
             default=None,
             choices=["status-server", "keep-alive"],
         ),
+        default_group_priority=dict(type="int", required=False, default=None),
         server_group=dict(type="dict", required=False, default=None),
         state=dict(
             type="str",
@@ -264,6 +271,7 @@ def main():
         "tracking_method",
         "tracking_mode",
         "port_access",
+        "default_group_priority",
     ]
     supplied = {
         attr: ansible_module.params[attr]
