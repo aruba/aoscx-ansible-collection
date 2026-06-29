@@ -149,7 +149,7 @@ def main():
         current = getattr(policy, attr, None)
         if isinstance(current, dict):
             current = next(iter(current.values()), "")
-        if str(current).rstrip("/").split("/")[-1] != value.rstrip("/").split("/")[-1]:
+        if str(current).rstrip("/").rsplit("/", 1)[-1] != value.rstrip("/").rsplit("/", 1)[-1]:
             setattr(policy, attr, value)
             if attr not in policy.config_attrs:
                 policy.config_attrs.append(attr)
