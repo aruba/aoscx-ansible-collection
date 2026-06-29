@@ -25,6 +25,9 @@ description: >
   AOS-CX devices (system/ntp_keys). An NTP key is identified by a numeric
   key_id and is used to authenticate NTP associations.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When C(key_password) is supplied the module reports changed on every run
+    because the secret cannot be read back from the switch for comparison.
 options:
   key_id:
     description: >
