@@ -212,7 +212,16 @@ def main():
     if exists:
         assoc.get()
         for key, value in kwargs.items():
-            setattr(assoc, key, value)
+            # association_attributes is a nested dict; the switch returns more
+            # keys than supplied, so merge to keep idempotency.
+            if key == "association_attributes" and isinstance(
+                getattr(assoc, key, None), dict
+            ):
+                merged = dict(getattr(assoc, key))
+                merged.update(value)
+                setattr(assoc, key, merged)
+            else:
+                setattr(assoc, key, value)
     result["changed"] = assoc.apply()
 
     ansible_module.exit_json(**result)
