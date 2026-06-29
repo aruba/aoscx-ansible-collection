@@ -186,6 +186,63 @@ options:
       - none
       - global
     required: false
+  pause:
+    description: Flow control (pause) mode applied to the interface.
+    type: str
+    required: false
+  eee:
+    description: Enable or disable Energy Efficient Ethernet on the interface.
+    type: bool
+    required: false
+  error_control:
+    description: Forward error correction (FEC) mode of the interface.
+    type: str
+    choices:
+      - auto
+      - none
+      - base-r-fec
+      - rs-fec
+    required: false
+  speed_downshift:
+    description: Enable or disable speed downshift on the interface.
+    type: bool
+    required: false
+  udld_enable:
+    description: Enable or disable UDLD on the interface.
+    type: bool
+    required: false
+  udld_interval:
+    description: UDLD probe interval in milliseconds.
+    type: int
+    required: false
+  udld_retries:
+    description: Number of UDLD retries before a port is marked down.
+    type: int
+    required: false
+  loop_protect_enable:
+    description: Enable or disable loop protection on the interface.
+    type: bool
+    required: false
+  loop_protect_action:
+    description: Action taken when a loop is detected.
+    type: str
+    choices:
+      - do-not-disable
+      - tx-disable
+      - tx-rx-disable
+    required: false
+  urpf_check:
+    description: Unicast Reverse Path Forwarding mode on the interface.
+    type: str
+    choices:
+      - disable
+      - loose
+      - strict
+    required: false
+  ip_mtu:
+    description: IP MTU of the interface.
+    type: int
+    required: false
   state:
     description: Create, Update or Delete the Interface.
     type: str
@@ -430,6 +487,64 @@ def get_argument_spec():
             "required": False,
             "choices": ["cos", "dscp", "none", "global"],
         },
+        "pause": {
+            "type": "str",
+            "required": False,
+            "default": None,
+        },
+        "eee": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "error_control": {
+            "type": "str",
+            "required": False,
+            "default": None,
+            "choices": ["auto", "none", "base-r-fec", "rs-fec"],
+        },
+        "speed_downshift": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "udld_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "udld_interval": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
+        "udld_retries": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
+        "loop_protect_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "loop_protect_action": {
+            "type": "str",
+            "required": False,
+            "default": None,
+            "choices": ["do-not-disable", "tx-disable", "tx-rx-disable"],
+        },
+        "urpf_check": {
+            "type": "str",
+            "required": False,
+            "default": None,
+            "choices": ["disable", "loose", "strict"],
+        },
+        "ip_mtu": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
         "qos_rate": {
             "type": "dict",
             "required": False,
@@ -532,6 +647,18 @@ def main():
     qos_trust_mode = ansible_module.params["qos_trust_mode"]
     qos_rate = ansible_module.params["qos_rate"]
 
+    pause = ansible_module.params["pause"]
+    eee = ansible_module.params["eee"]
+    error_control = ansible_module.params["error_control"]
+    speed_downshift = ansible_module.params["speed_downshift"]
+    udld_enable = ansible_module.params["udld_enable"]
+    udld_interval = ansible_module.params["udld_interval"]
+    udld_retries = ansible_module.params["udld_retries"]
+    loop_protect_enable = ansible_module.params["loop_protect_enable"]
+    loop_protect_action = ansible_module.params["loop_protect_action"]
+    urpf_check = ansible_module.params["urpf_check"]
+    ip_mtu = ansible_module.params["ip_mtu"]
+
     configure_speed = ansible_module.params["configure_speed"]
     autoneg = ansible_module.params["autoneg"]
     duplex = ansible_module.params["duplex"]
@@ -583,6 +710,33 @@ def main():
         interface.admin_state = "up" if enabled else "down"
     if mtu:
         interface.mtu = mtu
+    # Physical user_config attributes
+    user_cfg = {
+        "pause": pause,
+        "eee": eee,
+        "error_control": error_control,
+        "speed_downshift": speed_downshift,
+    }
+    for key, val in user_cfg.items():
+        if val is not None:
+            if not isinstance(interface.user_config, dict):
+                interface.user_config = {}
+            interface.user_config[key] = val
+    # Top-level attributes
+    top_level = {
+        "udld_enable": udld_enable,
+        "udld_interval": udld_interval,
+        "udld_retries": udld_retries,
+        "loop_protect_enable": loop_protect_enable,
+        "loop_protect_action": loop_protect_action,
+        "urpf_check": urpf_check,
+        "ip_mtu": ip_mtu,
+    }
+    for key, val in top_level.items():
+        if val is not None:
+            setattr(interface, key, val)
+            if key not in interface.config_attrs:
+                interface.config_attrs.append(key)
     if vsx_sync:
         if not device.materialized:
             device.get()

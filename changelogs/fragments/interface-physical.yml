@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_interface - add ``pause``, ``eee``, ``error_control``, ``speed_downshift``,
+    ``udld_enable``, ``udld_interval``, ``udld_retries``, ``loop_protect_enable``,
+    ``loop_protect_action``, ``urpf_check`` and ``ip_mtu`` options.
