@@ -1,0 +1,2 @@
+minor_changes:
+  - Add ``aoscx_vni`` module to manage VXLAN VNIs.
