@@ -26,8 +26,12 @@ description:
     identified by its VRF, address and connection type.
 author: Aruba Networks (@ArubaNetworks)
 notes:
-  - When C(secret_key) is supplied the module reports changed on every run
-    because the secret cannot be read back from the switch for comparison.
+  - The switch stores C(secret_key) as a salted ciphertext, so a supplied
+    value never matches the stored representation and the module reports
+    changed on every run when C(secret_key) is set.
+  - The ciphertext returned by the switch cannot be used to restore the same
+    secret; it would be stored as a new plaintext value. Always supply the
+    plaintext shared secret.
 options:
   vrf:
     description: Name of the VRF the client belongs to.
