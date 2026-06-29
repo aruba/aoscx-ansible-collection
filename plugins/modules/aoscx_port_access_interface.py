@@ -134,6 +134,17 @@ ATTR_MAP = {
     "device_fingerprint": "device_fingerprint_configuration",
 }
 
+# Default values used to reset dict attributes on delete so the operation
+# is idempotent.
+DELETE_DEFAULTS = {
+    "client_ip_track": {
+        "admin_state": "auto",
+        "client_limit": 128,
+        "update_interval": 1800,
+    },
+    "device_fingerprint": {"client_limit": 256},
+}
+
 
 def main():
     module_args = dict(
@@ -194,7 +205,7 @@ def main():
             if isinstance(value, list):
                 new_value = []
             elif isinstance(value, dict):
-                new_value = {}
+                new_value = DELETE_DEFAULTS.get(attr, {})
             elif isinstance(value, bool):
                 new_value = False
             else:
@@ -203,7 +214,9 @@ def main():
             new_value = value
         current = getattr(interface, target, None)
         if isinstance(new_value, dict) and isinstance(current, dict):
-            if not new_value:
+            if state == "delete":
+                different = current != new_value
+            elif not new_value:
                 different = bool(current)
             else:
                 different = any(
