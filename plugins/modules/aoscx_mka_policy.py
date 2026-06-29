@@ -29,6 +29,9 @@ description: >
   on the switch and cannot be read back, so a change to cak or ckn alone
   (without any other field change) is not detected.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When C(cak) or C(ckn) are supplied the module reports changed on every
+    run because the secret cannot be read back from the switch for comparison.
 options:
   name:
     description: Name of the MKA policy (index under system/mka_policies).

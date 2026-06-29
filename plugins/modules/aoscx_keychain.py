@@ -31,6 +31,9 @@ description: >
   back, so a change to auth_key alone (without any other key field change) is
   not detected.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When a key C(auth_key) is supplied the module reports changed on every
+    run because the secret cannot be read back from the switch for comparison.
 options:
   name:
     description: Name of the keychain (index under system/keychains).
