@@ -159,7 +159,11 @@ def main():
     if trust_enable is not None:
         kwargs["trust_enable"] = trust_enable
 
-    ntp_key = NtpKey(session, key_id, **kwargs)
+    if exists:
+        for key, value in kwargs.items():
+            setattr(ntp_key, key, value)
+    else:
+        ntp_key = NtpKey(session, key_id, **kwargs)
     result["changed"] = ntp_key.apply()
 
     ansible_module.exit_json(**result)
