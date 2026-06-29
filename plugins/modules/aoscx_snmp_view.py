@@ -174,7 +174,8 @@ def main():
     except Exception:
         existing_entries = {}
     for index, existing in existing_entries.items():
-        existing.get()
+        if not existing.materialized:
+            existing.get()
         key = (
             existing.oid_tree,
             getattr(existing, "type", "included"),
