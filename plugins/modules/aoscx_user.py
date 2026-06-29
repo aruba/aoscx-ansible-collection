@@ -24,6 +24,9 @@ description: >
   This module provides configuration management of local users on AOS-CX
   devices (system/users).
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When C(password) is supplied the module reports changed on every run
+    because the secret cannot be read back from the switch for comparison.
 options:
   name:
     description: Name of the local user. Index under system/users.
