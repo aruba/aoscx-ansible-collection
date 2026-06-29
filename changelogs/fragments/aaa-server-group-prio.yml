@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - New module ``aoscx_aaa_server_group_prio`` to configure the ordered list of
+    AAA server groups used for accounting, authentication, authorization and
+    RADIUS authorize-only per management session type.
