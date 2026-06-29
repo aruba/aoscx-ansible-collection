@@ -27,6 +27,10 @@ description: >
   10.13). Note that the switch supports a single Traffic Insight instance at a
   time.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - Some platforms only expose a single built-in Traffic Insight instance and
+    reject creation of additional instances; in that case the switch returns
+    an error when a new name is created.
 options:
   name:
     description: >
