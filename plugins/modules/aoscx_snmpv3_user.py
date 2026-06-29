@@ -25,6 +25,10 @@ description: >
   devices (system/snmpv3_users). Requires REST API v10.16
   (set ansible_aoscx_rest_version to 10.16).
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When C(auth_pass_phrase) or C(priv_pass_phrase) are supplied the module
+    reports changed on every run because the secret cannot be read back from
+    the switch for comparison.
 options:
   user_name:
     description: Name of the SNMPv3 user. Index under system/snmpv3_users.
