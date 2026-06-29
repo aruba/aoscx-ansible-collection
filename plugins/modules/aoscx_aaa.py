@@ -25,6 +25,9 @@ description:
     including the RADIUS server groups used for port access and the AAA
     fail-through behaviour.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When C(mac_auth_password) is supplied the module reports changed on every
+    run because the secret cannot be read back from the switch for comparison.
 options:
   portaccess_accounting_radius_server_group:
     description: >
@@ -39,8 +42,46 @@ options:
     description: RADIUS server group used for 802.1X authentication.
     required: false
     type: str
+  dot1x_auth_enable:
+    description: Enable global 802.1X authentication.
+    required: false
+    type: bool
+  dot1x_remote_auth_method:
+    description: Remote authentication method used for 802.1X.
+    required: false
+    choices:
+      - eap-radius
+    type: str
   mac_auth_radius_server_group:
     description: RADIUS server group used for MAC authentication.
+    required: false
+    type: str
+  mac_auth_enable:
+    description: Enable global MAC authentication.
+    required: false
+    type: bool
+  mac_auth_address_format:
+    description: MAC address format used for MAC authentication.
+    required: false
+    choices:
+      - no-delimiter
+      - single-dash
+      - multi-dash
+      - multi-colon
+      - no-delimiter-uppercase
+      - single-dash-uppercase
+      - multi-dash-uppercase
+      - multi-colon-uppercase
+    type: str
+  mac_auth_radius_auth_method:
+    description: RADIUS authentication method used for MAC authentication.
+    required: false
+    choices:
+      - chap
+      - pap
+    type: str
+  mac_auth_password:
+    description: Password used for MAC authentication.
     required: false
     type: str
   accounting_fail_through:
@@ -90,7 +131,13 @@ SCALARS = [
     "portaccess_accounting_radius_server_group",
     "portaccess_local_accounting_enable",
     "dot1x_radius_server_group",
+    "dot1x_auth_enable",
+    "dot1x_remote_auth_method",
     "mac_auth_radius_server_group",
+    "mac_auth_enable",
+    "mac_auth_address_format",
+    "mac_auth_radius_auth_method",
+    "mac_auth_password",
     "accounting_fail_through",
     "authorization_fail_through",
     "fail_through",
@@ -104,7 +151,30 @@ def main():
         ),
         portaccess_local_accounting_enable=dict(type="bool", default=None),
         dot1x_radius_server_group=dict(type="str", default=None),
+        dot1x_auth_enable=dict(type="bool", default=None),
+        dot1x_remote_auth_method=dict(
+            type="str", default=None, choices=["eap-radius"]
+        ),
         mac_auth_radius_server_group=dict(type="str", default=None),
+        mac_auth_enable=dict(type="bool", default=None),
+        mac_auth_address_format=dict(
+            type="str",
+            default=None,
+            choices=[
+                "no-delimiter",
+                "single-dash",
+                "multi-dash",
+                "multi-colon",
+                "no-delimiter-uppercase",
+                "single-dash-uppercase",
+                "multi-dash-uppercase",
+                "multi-colon-uppercase",
+            ],
+        ),
+        mac_auth_radius_auth_method=dict(
+            type="str", default=None, choices=["chap", "pap"]
+        ),
+        mac_auth_password=dict(type="str", default=None, no_log=True),
         accounting_fail_through=dict(type="bool", default=None),
         authorization_fail_through=dict(type="bool", default=None),
         fail_through=dict(type="bool", default=None),
