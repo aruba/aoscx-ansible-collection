@@ -1,0 +1,84 @@
+# Integration tests for the aoscx_traffic_insight_monitor module.
+#
+# Run with:
+#   ansible-test integration aoscx_traffic_insight_monitor --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the TrafficInsight and TrafficInsightMonitor classes and a REST
+# API version of 10.13 or later. Creates a temporary instance and monitor
+# named "ansible-test" / "ansible-mon" and cleans up afterwards.
+
+- name: Make sure the test instance does not exist yet
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create the parent Traffic Insight instance
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    enable: true
+    source:
+      - ipfix
+
+- name: Create a topN-flows monitor
+  arubanetworks.aoscx.aoscx_traffic_insight_monitor:
+    traffic_insight_instance: ansible-test
+    monitor_name: ansible-mon
+    monitor_type: topN-flows
+    group_by: appid
+    monitor_n_flows: 10
+    running_stats_reset_interval: 600
+  register: result
+
+- name: Assert the monitor was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the monitor again (idempotent)
+  arubanetworks.aoscx.aoscx_traffic_insight_monitor:
+    traffic_insight_instance: ansible-test
+    monitor_name: ansible-mon
+    monitor_type: topN-flows
+    group_by: appid
+    monitor_n_flows: 10
+    running_stats_reset_interval: 600
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the monitor flow count
+  arubanetworks.aoscx.aoscx_traffic_insight_monitor:
+    traffic_insight_instance: ansible-test
+    monitor_name: ansible-mon
+    monitor_type: topN-flows
+    state: update
+    monitor_n_flows: 20
+  register: result
+
+- name: Assert the monitor was updated
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the monitor
+  arubanetworks.aoscx.aoscx_traffic_insight_monitor:
+    traffic_insight_instance: ansible-test
+    monitor_name: ansible-mon
+    monitor_type: topN-flows
+    state: delete
+  register: result
+
+- name: Assert the monitor was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Clean up the parent instance
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    state: delete
