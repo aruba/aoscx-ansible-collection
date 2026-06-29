@@ -26,6 +26,9 @@ description: >
   so the requested entries fully replace the existing ones. Requires REST API
   v10.16 (set ansible_aoscx_rest_version to 10.16).
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - On some firmware releases an SNMP view stores a single entry; if multiple
+    entries are supplied only the last one is retained by the switch.
 options:
   name:
     description: Name of the SNMP view.
