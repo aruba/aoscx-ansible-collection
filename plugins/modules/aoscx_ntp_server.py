@@ -209,6 +209,10 @@ def main():
         kwargs["association_attributes"] = association_attributes
 
     assoc = NtpAssociation(session, vrf, address, **kwargs)
+    if exists:
+        assoc.get()
+        for key, value in kwargs.items():
+            setattr(assoc, key, value)
     result["changed"] = assoc.apply()
 
     ansible_module.exit_json(**result)
