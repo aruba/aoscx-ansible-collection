@@ -203,11 +203,16 @@ def main():
             new_value = value
         current = getattr(interface, target, None)
         if isinstance(new_value, dict) and isinstance(current, dict):
-            different = any(current.get(k) != v for k, v in new_value.items())
-            if different:
-                merged = dict(current)
-                merged.update(new_value)
-                new_value = merged
+            if not new_value:
+                different = bool(current)
+            else:
+                different = any(
+                    current.get(k) != v for k, v in new_value.items()
+                )
+                if different:
+                    merged = dict(current)
+                    merged.update(new_value)
+                    new_value = merged
         elif isinstance(new_value, list) and isinstance(current, list):
             different = set(new_value) != set(current)
         else:
