@@ -124,7 +124,8 @@ def main():
     supplied = {
         "address_family": address_family,
     }
-    vlan_uri = "{0}system/vlans/{1}".format(session.resource_prefix, vlan)
+    vlan_obj = session.api.get_module(session, "Vlan", vlan)
+    vlan_uri = vlan_obj.get_uri()
     if mac is not None:
         supplied["mac"] = mac
     if port is not None:
