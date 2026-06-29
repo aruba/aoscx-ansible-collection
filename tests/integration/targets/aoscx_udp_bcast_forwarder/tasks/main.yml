@@ -1,0 +1,72 @@
+# Integration tests for the aoscx_udp_bcast_forwarder module.
+#
+# Run with:
+#   ansible-test integration aoscx_udp_bcast_forwarder --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the UdpBcastForwarderServer class.
+
+- name: Make sure the test forwarder does not exist yet
+  arubanetworks.aoscx.aoscx_udp_bcast_forwarder:
+    src_port: 1/1/1
+    udp_dport: 53
+    state: delete
+  ignore_errors: true
+
+- name: Create a UDP broadcast forwarder with two servers
+  arubanetworks.aoscx.aoscx_udp_bcast_forwarder:
+    src_port: 1/1/1
+    udp_dport: 53
+    dest_vrf: default
+    ipv4_ucast_server:
+      - 10.0.0.1
+      - 10.0.0.2
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_udp_bcast_forwarder:
+    src_port: 1/1/1
+    udp_dport: 53
+    dest_vrf: default
+    ipv4_ucast_server:
+      - 10.0.0.1
+      - 10.0.0.2
+    state: create
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Update the server list
+  arubanetworks.aoscx.aoscx_udp_bcast_forwarder:
+    src_port: 1/1/1
+    udp_dport: 53
+    state: update
+    ipv4_ucast_server:
+      - 10.0.0.1
+  register: update_result
+
+- name: Assert update changed
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Delete the forwarder
+  arubanetworks.aoscx.aoscx_udp_bcast_forwarder:
+    src_port: 1/1/1
+    udp_dport: 53
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
