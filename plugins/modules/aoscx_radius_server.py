@@ -29,6 +29,9 @@ description: >
   created and cannot be changed afterwards. The passkey is write-only; when it
   is supplied the module always (re)applies it, which is reported as a change.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - When C(passkey) is supplied the module reports changed on every run
+    because the secret cannot be read back from the switch for comparison.
 options:
   address:
     description: IP address or hostname of the RADIUS server.
