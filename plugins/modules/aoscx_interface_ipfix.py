@@ -145,7 +145,7 @@ def main():
     # changes from differing URI prefixes.
     def names(cfg):
         return {
-            af: uri.rstrip("/").split("/")[-1] for af, uri in cfg.items()
+            af: uri.rstrip("/").rsplit("/", 1)[-1] for af, uri in cfg.items()
         }
 
     changed = names(new_config) != names(current)
