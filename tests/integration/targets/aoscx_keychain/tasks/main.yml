@@ -1,0 +1,85 @@
+# Integration tests for the aoscx_keychain module.
+#
+# Run with:
+#   ansible-test integration aoscx_keychain --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a REST API version
+# of 10.16. Uses a temporary keychain named "ansible-test" and cleans up
+# afterwards.
+
+- name: Make sure the test keychain does not exist yet
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a keychain with one SHA-256 key
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    keys:
+      - key_id: 1
+        auth_type: sha256
+        auth_key: "S3cretKey123"
+        accept_start: 1577836800
+        accept_end: 2556143999
+        send_start: 1577836800
+        send_end: 2556143999
+        recv_id: 1
+        send_id: 1
+  register: result
+
+- name: Assert the keychain was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the keychain again (idempotent)
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    keys:
+      - key_id: 1
+        auth_type: sha256
+        auth_key: "S3cretKey123"
+        accept_start: 1577836800
+        accept_end: 2556143999
+        send_start: 1577836800
+        send_end: 2556143999
+        recv_id: 1
+        send_id: 1
+  register: result
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Change the key auth_type (key recreated)
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    keys:
+      - key_id: 1
+        auth_type: sha512
+        auth_key: "S3cretKey123"
+        accept_start: 1577836800
+        accept_end: 2556143999
+        send_start: 1577836800
+        send_end: 2556143999
+        recv_id: 1
+        send_id: 1
+  register: result
+
+- name: Assert the key was recreated
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the keychain
+  arubanetworks.aoscx.aoscx_keychain:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the keychain was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
