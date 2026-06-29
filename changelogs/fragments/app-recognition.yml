@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - New module ``aoscx_app_recognition`` to configure global application
+    recognition settings (enable, mode, ABP session limit action).
+  - aoscx connection plugin now accepts REST version ``10.17``.
