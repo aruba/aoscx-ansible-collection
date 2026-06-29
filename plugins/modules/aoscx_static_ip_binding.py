@@ -190,8 +190,8 @@ def main():
         if attr == "port" and current and value:
             if isinstance(current, dict):
                 current = next(iter(current.values()), "")
-            different = str(current).rstrip("/").split("/")[-1] != \
-                value.rstrip("/").split("/")[-1]
+            different = str(current).rstrip("/").rsplit("/", 1)[-1] != \
+                value.rstrip("/").rsplit("/", 1)[-1]
         else:
             different = current != value
         if different:
