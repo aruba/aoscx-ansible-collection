@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - aoscx_ntp_key - new module to manage NTP authentication keys
+    (system/ntp_keys) backed by the pyaoscx NtpKey class.
+  - aoscx_ntp_server - new module to manage NTP server associations
+    (system/vrfs/{vrf}/ntp_associations) backed by the pyaoscx
+    NtpAssociation class.
