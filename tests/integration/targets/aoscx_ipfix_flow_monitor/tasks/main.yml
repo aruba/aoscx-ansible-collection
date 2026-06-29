@@ -1,0 +1,94 @@
+# Integration tests for the aoscx_ipfix_flow_monitor module.
+#
+# Run with:
+#   ansible-test integration aoscx_ipfix_flow_monitor --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the IpfixFlowMonitor class and a REST API version of 10.13 or
+# later. Uses temporary flow record, exporter and monitor named "ansible-test"
+# and cleans up afterwards.
+
+- name: Make sure the test flow monitor does not exist yet
+  arubanetworks.aoscx.aoscx_ipfix_flow_monitor:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create the referenced flow record
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    match:
+      ipv4_source_address: true
+
+- name: Create the referenced flow exporter
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    destination_type: hostname-or-ip-addr
+    destination: 10.0.0.5
+    vrf: default
+    transport_port: 4739
+
+- name: Create a flow monitor binding the record and exporter
+  arubanetworks.aoscx.aoscx_ipfix_flow_monitor:
+    name: ansible-test
+    description: ansible monitor
+    record: ansible-test
+    exporters:
+      - ansible-test
+    cache_timeout_active: 60
+    cache_timeout_inactive: 30
+  register: result
+
+- name: Assert the monitor was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Re-apply the same configuration (idempotent)
+  arubanetworks.aoscx.aoscx_ipfix_flow_monitor:
+    name: ansible-test
+    state: update
+    record: ansible-test
+    exporters:
+      - ansible-test
+    cache_timeout_active: 60
+    cache_timeout_inactive: 30
+  register: result
+
+- name: Assert nothing changed
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the active cache timeout
+  arubanetworks.aoscx.aoscx_ipfix_flow_monitor:
+    name: ansible-test
+    state: update
+    cache_timeout_active: 120
+  register: result
+
+- name: Assert the monitor changed
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the flow monitor
+  arubanetworks.aoscx.aoscx_ipfix_flow_monitor:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the monitor was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Clean up the referenced exporter
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    state: delete
+
+- name: Clean up the referenced record
+  arubanetworks.aoscx.aoscx_ipfix_flow_record:
+    name: ansible-test
+    state: delete
