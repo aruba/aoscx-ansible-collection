@@ -179,7 +179,11 @@ def main():
             )
         )
 
-    config.get(selector="writable")
+    try:
+        config.get(selector="writable")
+        exists = True
+    except Exception:
+        exists = False
 
     supplied = {
         attr: ansible_module.params[attr]
@@ -187,11 +191,39 @@ def main():
         if ansible_module.params[attr] is not None
     }
 
+    if state == "delete":
+        if exists and not ansible_module.check_mode:
+            try:
+                config.delete()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not delete configuration: {0}".format(str(e))
+                )
+        result["changed"] = exists
+        ansible_module.exit_json(**result)
+
+    if not exists:
+        config = session.api.get_module(
+            session,
+            "PortAccessAuthConfiguration",
+            interface,
+            authentication_method=method,
+            **supplied
+        )
+        result["changed"] = True
+        if not ansible_module.check_mode:
+            try:
+                config.create()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not create configuration: {0}".format(str(e))
+                )
+        ansible_module.exit_json(**result)
+
     changed = False
     for attr, value in supplied.items():
-        new_value = None if state == "delete" else value
-        if getattr(config, attr, None) != new_value:
-            setattr(config, attr, new_value)
+        if getattr(config, attr, None) != value:
+            setattr(config, attr, value)
             if attr not in config.config_attrs:
                 config.config_attrs.append(attr)
             changed = True
