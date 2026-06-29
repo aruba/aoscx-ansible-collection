@@ -179,7 +179,21 @@ def main():
 
     changed = False
     for attr, value in supplied.items():
-        if getattr(binding, attr, None) != value:
+        current = getattr(binding, attr, None)
+        if attr == "address_family":
+            # Not returned by the writable selector; set only on create.
+            continue
+        # URI references may be returned with a different prefix, or as a
+        # dict mapping; compare the last path segment to avoid spurious
+        # changes.
+        if attr == "port" and current and value:
+            if isinstance(current, dict):
+                current = next(iter(current.values()), "")
+            different = str(current).rstrip("/").split("/")[-1] != \
+                value.rstrip("/").split("/")[-1]
+        else:
+            different = current != value
+        if different:
             setattr(binding, attr, value)
             if attr not in binding.config_attrs:
                 binding.config_attrs.append(attr)
