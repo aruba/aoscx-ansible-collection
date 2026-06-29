@@ -84,7 +84,9 @@ def main():
     module_args = dict(
         name=dict(type="str", required=True),
         url=dict(type="str", required=False, default=None),
-        url_hash_key=dict(type="str", required=False, default=None),
+        url_hash_key=dict(
+            type="str", required=False, default=None, no_log=True
+        ),
         state=dict(
             type="str",
             default="create",
