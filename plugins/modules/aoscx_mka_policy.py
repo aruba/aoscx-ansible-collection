@@ -140,7 +140,7 @@ SECRET_FIELDS = ["cak", "ckn"]
 def build_argument_spec():
     spec = dict(
         name=dict(type="str", required=True),
-        keychain=dict(type="str", required=False, default=None),
+        keychain=dict(type="str", required=False, default=None, no_log=False),
         state=dict(
             type="str",
             default="create",

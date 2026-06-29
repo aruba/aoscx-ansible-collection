@@ -217,6 +217,7 @@ def build_argument_spec():
             type="dict",
             required=False,
             default=None,
+            no_log=False,
             options={
                 k: dict(type="bool", required=False, default=None)
                 for k in keys

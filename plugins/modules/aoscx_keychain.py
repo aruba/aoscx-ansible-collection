@@ -210,6 +210,7 @@ def build_argument_spec():
             options=key_spec,
             required=False,
             default=None,
+            no_log=False,
         ),
         state=dict(
             type="str",
