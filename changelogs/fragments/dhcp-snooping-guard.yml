@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - New module ``aoscx_dhcpv4_snooping_guard`` to manage DHCPv4 snooping guard policies.
+  - New module ``aoscx_dhcpv6_snooping_guard`` to manage DHCPv6 snooping guard policies.
+  - New module ``aoscx_ipv6_destination_guard`` to manage IPv6 destination guard policies.
+  - New module ``aoscx_static_ip_binding`` to manage static IP source bindings.
