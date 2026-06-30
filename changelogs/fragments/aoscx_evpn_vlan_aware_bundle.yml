@@ -1,0 +1,5 @@
+minor_changes:
+  - Add ``aoscx_evpn_vlan_aware_bundle`` module to create, update and delete
+    EVPN VLAN-aware bundles (route distinguisher, route targets, redistribution
+    and member VLANs mapped through their Ethernet tags). Requires a pyaoscx
+    release that ships the ``EvpnVlanAwareBundle`` class.
