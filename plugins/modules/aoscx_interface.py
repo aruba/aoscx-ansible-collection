@@ -243,6 +243,36 @@ options:
     description: IP MTU of the interface.
     type: int
     required: false
+  sflow_enabled:
+    description: >
+      Enable or disable sFlow sampling on the interface. Set to false to apply
+      C(no sflow) on the port (overriding the global sFlow setting).
+    type: bool
+    required: false
+  arp_inspection_trust:
+    description: >
+      Mark the interface as trusted for Dynamic ARP Inspection. When true,
+      ARP packets received on the port are not inspected.
+    type: bool
+    required: false
+  dhcpv4_snooping_trust:
+    description: Mark the interface as trusted for DHCPv4 snooping.
+    type: bool
+    required: false
+  dhcpv4_snooping_max_bindings:
+    description: >
+      Maximum number of DHCPv4 snooping bindings allowed on the port (1-8192).
+    type: int
+    required: false
+  dhcpv6_snooping_trust:
+    description: Mark the interface as trusted for DHCPv6 snooping.
+    type: bool
+    required: false
+  dhcpv6_snooping_max_bindings:
+    description: >
+      Maximum number of DHCPv6 snooping bindings allowed on the port (1-8192).
+    type: int
+    required: false
   state:
     description: Create, Update or Delete the Interface.
     type: str
@@ -545,6 +575,36 @@ def get_argument_spec():
             "required": False,
             "default": None,
         },
+        "sflow_enabled": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "arp_inspection_trust": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "dhcpv4_snooping_trust": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "dhcpv4_snooping_max_bindings": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
+        "dhcpv6_snooping_trust": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
+        "dhcpv6_snooping_max_bindings": {
+            "type": "int",
+            "required": False,
+            "default": None,
+        },
         "qos_rate": {
             "type": "dict",
             "required": False,
@@ -658,6 +718,16 @@ def main():
     loop_protect_action = ansible_module.params["loop_protect_action"]
     urpf_check = ansible_module.params["urpf_check"]
     ip_mtu = ansible_module.params["ip_mtu"]
+    sflow_enabled = ansible_module.params["sflow_enabled"]
+    arp_inspection_trust = ansible_module.params["arp_inspection_trust"]
+    dhcpv4_snooping_trust = ansible_module.params["dhcpv4_snooping_trust"]
+    dhcpv4_snooping_max_bindings = ansible_module.params[
+        "dhcpv4_snooping_max_bindings"
+    ]
+    dhcpv6_snooping_trust = ansible_module.params["dhcpv6_snooping_trust"]
+    dhcpv6_snooping_max_bindings = ansible_module.params[
+        "dhcpv6_snooping_max_bindings"
+    ]
 
     configure_speed = ansible_module.params["configure_speed"]
     autoneg = ansible_module.params["autoneg"]
@@ -722,6 +792,36 @@ def main():
             if not isinstance(interface.user_config, dict):
                 interface.user_config = {}
             interface.user_config[key] = val
+    # sFlow per-interface enable lives in the other_config dict.
+    if sflow_enabled is not None:
+        if not isinstance(interface.other_config, dict):
+            interface.other_config = {}
+        interface.other_config["sflow-enabled"] = sflow_enabled
+        if "other_config" not in interface.config_attrs:
+            interface.config_attrs.append("other_config")
+    # ARP inspection and DHCP snooping trust live in nested dicts.
+    nested_updates = {
+        "arp_inspection": {"trust": arp_inspection_trust},
+        "dhcpv4_snooping_configuration": {
+            "trusted": dhcpv4_snooping_trust,
+            "max_bindings": dhcpv4_snooping_max_bindings,
+        },
+        "dhcpv6_snooping_configuration": {
+            "trusted": dhcpv6_snooping_trust,
+            "max_bindings": dhcpv6_snooping_max_bindings,
+        },
+    }
+    for target, updates in nested_updates.items():
+        wanted = {k: v for k, v in updates.items() if v is not None}
+        if not wanted:
+            continue
+        if not isinstance(getattr(interface, target, None), dict):
+            setattr(interface, target, {})
+        current = getattr(interface, target)
+        for key, value in wanted.items():
+            current[key] = value
+        if target not in interface.config_attrs:
+            interface.config_attrs.append(target)
     # Top-level attributes
     top_level = {
         "udld_enable": udld_enable,
