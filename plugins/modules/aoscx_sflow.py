@@ -67,6 +67,13 @@ options:
     description: Packet sampling rate (one in N packets).
     required: false
     type: int
+  reachability_check:
+    description: >
+      When enabled, the device periodically probes all configured collectors
+      with ICMP echo and only sends sFlow datagrams to collectors that respond.
+      When disabled, datagrams are sent regardless of the ICMP echo outcome.
+    required: false
+    type: bool
   state:
     description: Create, update or delete the sFlow instance.
     required: false
@@ -128,6 +135,7 @@ def main():
         ),
         polling=dict(type="int", required=False, default=None),
         sampling=dict(type="int", required=False, default=None),
+        reachability_check=dict(type="bool", required=False, default=None),
         state=dict(
             type="str",
             default="create",
@@ -151,6 +159,7 @@ def main():
         "mode",
         "polling",
         "sampling",
+        "reachability_check",
     ]
     supplied = {
         attr: ansible_module.params[attr]

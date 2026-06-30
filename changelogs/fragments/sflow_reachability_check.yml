@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_sflow - add the C(reachability_check) option so the device only sends
+    sFlow datagrams to collectors that respond to its periodic ICMP echo
+    probes.
