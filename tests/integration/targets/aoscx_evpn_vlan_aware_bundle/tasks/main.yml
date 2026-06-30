@@ -1,0 +1,118 @@
+# Integration tests for the aoscx_evpn_vlan_aware_bundle module.
+#
+# Run with:
+#   ansible-test integration aoscx_evpn_vlan_aware_bundle --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the EvpnVlanAwareBundle class. Uses temporary
+# VLANs (3998, 3999) and a temporary bundle, and cleans up afterwards.
+
+- name: Make sure the test bundle does not exist yet
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    state: delete
+  ignore_errors: true
+
+- name: Ensure the test VLANs exist
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item }}"
+    name: "bundle-integration-{{ item }}"
+    state: create
+  loop:
+    - 3998
+    - 3999
+
+- name: Create the bundle with two member VLANs
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    rd: "65000:1"
+    import_route_targets:
+      - "65000:1"
+    export_route_targets:
+      - "65000:1"
+    vlans:
+      - id: 3998
+      - id: 3999
+        ethernet_tag: 100
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    rd: "65000:1"
+    import_route_targets:
+      - "65000:1"
+    export_route_targets:
+      - "65000:1"
+    vlans:
+      - id: 3998
+      - id: 3999
+        ethernet_tag: 100
+    state: create
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Replace the member VLANs
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    vlans:
+      - id: 3998
+    state: update
+  register: replace_result
+
+- name: Assert replacing VLANs changed
+  ansible.builtin.assert:
+    that:
+      - replace_result is changed
+
+- name: Remove all member VLANs
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    vlans: []
+    state: update
+  register: clear_result
+
+- name: Assert clearing VLANs changed
+  ansible.builtin.assert:
+    that:
+      - clear_result is changed
+
+- name: Delete the bundle
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again (idempotent)
+  arubanetworks.aoscx.aoscx_evpn_vlan_aware_bundle:
+    bundle_name: integration-bundle
+    state: delete
+  register: delete_idem
+
+- name: Assert second delete did not change
+  ansible.builtin.assert:
+    that:
+      - delete_idem is not changed
+
+- name: Remove the test VLANs
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: "{{ item }}"
+    state: delete
+  loop:
+    - 3998
+    - 3999
