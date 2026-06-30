@@ -1,0 +1,5 @@
+minor_changes:
+  - Add ``vtep_peers`` and ``vtep_peer_vrf`` options to the ``aoscx_vni`` module
+    to manage static remote VTEP peers (head-end replication) attached to a
+    VNI's flood list. Requires a pyaoscx release that keeps the Tunnel Endpoint
+    ``network_id`` as a multi-VNI map.

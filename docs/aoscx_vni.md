@@ -48,6 +48,22 @@ compound index (vni_type, vni_id).
       VNI. When omitted it is left unchanged. Ignored when state is delete.
     required: false
     type: bool
+  vtep_peers:
+    description: >
+      List of static remote VTEP IPv4 addresses (head-end replication) added
+      to this VNI's flood list. The supplied list fully replaces the set of
+      static peers attached to this VNI. When omitted the peers are left
+      unchanged; an empty list removes all static peers for this VNI. Ignored
+      when state is delete.
+    required: false
+    type: list
+    elements: str
+  vtep_peer_vrf:
+    description: >
+      Transport VRF in which the static VTEP peers are reachable.
+    required: false
+    default: default
+    type: str
   state:
     description: Create, update or delete the VNI.
     required: false
@@ -81,6 +97,22 @@ compound index (vni_type, vni_id).
     interface: vxlan1
     state: update
     vlan: 4001
+
+- name: Map a VLAN and attach static VTEP peers (head-end replication)
+  aoscx_vni:
+    vni_id: 206
+    interface: vxlan1
+    vlan: 206
+    vtep_peers:
+      - 10.0.0.9
+      - 10.0.0.10
+
+- name: Remove all static VTEP peers from a VNI
+  aoscx_vni:
+    vni_id: 206
+    interface: vxlan1
+    state: update
+    vtep_peers: []
 
 - name: Delete a VNI
   aoscx_vni:

@@ -324,3 +324,166 @@ def test_create_error_is_reported():
     )
     assert result["failed"] is True
     assert "Could not create VNI" in result["msg"]
+
+
+# --------------------------------------------------------------------------
+# VTEP peers (static head-end replication)
+# --------------------------------------------------------------------------
+VNI_KEY = "vxlan_vni,206"
+
+
+def build_tep(destination, vni_keys, vrf_name="default", origin="static"):
+    tep = MagicMock()
+    tep.destination = destination
+    tep.origin = origin
+    tep.vrf_name = vrf_name
+    tep.network_id = {k: "/rest/uri/" + k for k in vni_keys}
+    return tep
+
+
+def build_vtep_session(
+    exists, existing_teps, new_vni=None, interface_type="vxlan"
+):
+    session = MagicMock()
+    existing = build_vni(exists, vlan_id=206)
+    created_teps = []
+
+    def get_index(obj):
+        return {VNI_KEY: "/rest/latest/system/virtual_network_ids/" + VNI_KEY}
+
+    def get_module(sess, module, index=None, **kwargs):
+        if module == "Interface":
+            intf = MagicMock()
+            intf.type = interface_type
+            return intf
+        if module == "Vlan":
+            vlan = MagicMock()
+            vlan.id = index
+            return vlan
+        if module == "Vrf":
+            vrf = MagicMock()
+            vrf.name = index
+            return vrf
+        if module == "Vni":
+            if new_vni is not None and any(
+                k in kwargs for k in ("vlan", "vrf", "routing")
+            ):
+                return new_vni
+            return existing
+        if module == "TunnelEndpoint":
+            tep = MagicMock()
+            tep.destination = kwargs.get("destination")
+            tep.origin = "static"
+            tep.vrf_name = "default"
+            tep.network_id = {}
+            created_teps.append(tep)
+            return tep
+        raise AssertionError("unexpected module {0}".format(module))
+
+    tep_class = MagicMock()
+    tep_class.get_all.return_value = {
+        "{0},{1},{2}".format(t.vrf_name, t.origin, t.destination): t
+        for t in existing_teps
+    }
+
+    session.api.get_module.side_effect = get_module
+    session.api.get_module_class.return_value = tep_class
+    session.api.get_index.side_effect = get_index
+    session._created_teps = created_teps
+    return session
+
+
+def test_invalid_vtep_peer_rejected():
+    session = build_session(build_vni(False))
+    result = run_module(
+        {"vni_id": 206, "interface": "vxlan1", "vtep_peers": ["a,b"]},
+        session,
+    )
+    assert result["failed"] is True
+    assert "Invalid VTEP peer" in result["msg"]
+
+
+def test_vtep_peers_create_adds_endpoint():
+    session = build_vtep_session(False, [], new_vni=build_vni(False))
+    result = run_module(
+        {
+            "vni_id": 206,
+            "interface": "vxlan1",
+            "vlan": 206,
+            "vtep_peers": ["9.9.9.9"],
+        },
+        session,
+    )
+    assert result["changed"] is True
+    created = session._created_teps
+    assert len(created) == 1
+    assert created[0].destination == "9.9.9.9"
+    created[0].create.assert_called_once()
+
+
+def test_vtep_peers_idempotent():
+    tep = build_tep("9.9.9.9", [VNI_KEY])
+    session = build_vtep_session(True, [tep])
+    result = run_module(
+        {
+            "vni_id": 206,
+            "interface": "vxlan1",
+            "state": "update",
+            "vtep_peers": ["9.9.9.9"],
+        },
+        session,
+    )
+    assert result["changed"] is False
+    tep.update.assert_not_called()
+    tep.delete.assert_not_called()
+
+
+def test_vtep_peers_remove_deletes_unreferenced_endpoint():
+    tep = build_tep("9.9.9.9", [VNI_KEY])
+    session = build_vtep_session(True, [tep])
+    result = run_module(
+        {
+            "vni_id": 206,
+            "interface": "vxlan1",
+            "state": "update",
+            "vtep_peers": [],
+        },
+        session,
+    )
+    assert result["changed"] is True
+    tep.delete.assert_called_once()
+
+
+def test_vtep_peers_remove_keeps_shared_endpoint():
+    # Endpoint floods this VNI plus another one: removing this VNI must keep
+    # the endpoint (update), not delete it.
+    tep = build_tep("9.9.9.9", [VNI_KEY, "vxlan_vni,207"])
+    session = build_vtep_session(True, [tep])
+    result = run_module(
+        {
+            "vni_id": 206,
+            "interface": "vxlan1",
+            "state": "update",
+            "vtep_peers": [],
+        },
+        session,
+    )
+    assert result["changed"] is True
+    tep.update.assert_called_once()
+    tep.delete.assert_not_called()
+
+
+def test_vtep_peers_unsupported_pyaoscx_reports_error():
+    session = build_vtep_session(True, [])
+    session.api.get_module_class.side_effect = Exception("no TunnelEndpoint")
+    result = run_module(
+        {
+            "vni_id": 206,
+            "interface": "vxlan1",
+            "state": "update",
+            "vtep_peers": ["9.9.9.9"],
+        },
+        session,
+    )
+    assert result["failed"] is True
+    assert "does not support VTEP peers" in result["msg"]
