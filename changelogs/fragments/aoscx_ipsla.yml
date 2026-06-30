@@ -1,0 +1,14 @@
+---
+minor_changes:
+  - aoscx_ipsla_source - new module to create, update or delete IP SLA sources
+    (system/ipsla_sources).
+  - aoscx_ipsla_responder - new module to create or delete IP SLA responders
+    (system/ipsla_responders).
+  - aoscx_ipsla_track_object - new module to create, update or delete IP SLA
+    track objects (system/ipsla_track_objects).
+  - aoscx connection plugin - allow REST API version 10.16, which is required
+    by the IP SLA track object module.
+  - aoscx_ipsla_source - support the advanced parameters source_interface,
+    http_sla, https_sla and voip_jitter_sla.
+  - aoscx_ipsla_responder - support the responder_interface parameter, which
+    binds the responder to an interface (recreated when changed).

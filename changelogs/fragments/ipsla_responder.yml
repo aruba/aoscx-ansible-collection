@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_ipsla_source - add the C(responder) option to configure the IP SLA
+    responder address (hostname and port), required for all probe types except
+    http and https.
