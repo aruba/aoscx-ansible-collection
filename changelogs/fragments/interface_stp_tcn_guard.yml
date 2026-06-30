@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - aoscx_interface_stp - add the C(tcn_guard) option to enable spanning-tree
+    TCN guard on the interface so it does not propagate topology changes.
