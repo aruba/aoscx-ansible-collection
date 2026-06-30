@@ -1,0 +1,92 @@
+# Integration tests for the aoscx_port_access_policy module.
+#
+# Run with:
+#   ansible-test integration aoscx_port_access_policy --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a REST API version
+# of 10.16, and the referenced traffic classes "ansible-test-pol1" and
+# "ansible-test-pol2" (type ipv4) to already exist on the device. Uses a
+# temporary policy named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test policy does not exist yet
+  arubanetworks.aoscx.aoscx_port_access_policy:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a port access policy with redirect and rate-limit entries
+  arubanetworks.aoscx.aoscx_port_access_policy:
+    name: ansible-test
+    entries:
+      - sequence_number: 10
+        class_name: ansible-test-pol1
+        class_type: ipv4
+        redirect: captive-portal
+      - sequence_number: 20
+        class_name: ansible-test-pol2
+        class_type: ipv4
+        dscp: 46
+        cir: 1000
+        cbs: 5000
+  register: result
+
+- name: Assert the policy was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the policy again (idempotent)
+  arubanetworks.aoscx.aoscx_port_access_policy:
+    name: ansible-test
+    state: update
+    entries:
+      - sequence_number: 10
+        class_name: ansible-test-pol1
+        class_type: ipv4
+        redirect: captive-portal
+      - sequence_number: 20
+        class_name: ansible-test-pol2
+        class_type: ipv4
+        dscp: 46
+        cir: 1000
+        cbs: 5000
+  register: result
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the action set (drop on entry 20)
+  arubanetworks.aoscx.aoscx_port_access_policy:
+    name: ansible-test
+    state: update
+    entries:
+      - sequence_number: 10
+        class_name: ansible-test-pol1
+        class_type: ipv4
+        redirect: captive-portal
+      - sequence_number: 20
+        class_name: ansible-test-pol2
+        class_type: ipv4
+        dscp: 46
+        cir: 1000
+        cbs: 5000
+        drop: true
+  register: result
+
+- name: Assert the update was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the port access policy
+  arubanetworks.aoscx.aoscx_port_access_policy:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the policy was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
