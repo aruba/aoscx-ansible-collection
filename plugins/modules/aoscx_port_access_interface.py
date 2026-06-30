@@ -81,6 +81,36 @@ options:
       client_limit:
         description: Maximum number of fingerprinted clients.
         type: int
+  auth_precedence:
+    description: >
+      Ordered list of port access authentication methods defining their
+      precedence. When empty the default order (dot1x then mac-auth) is used.
+    required: false
+    type: list
+    elements: str
+    choices:
+      - dot1x
+      - mac-auth
+  radius_override:
+    description: >
+      Enable RADIUS override support so that RADIUS attributes received from
+      the server override the corresponding client role attributes.
+    required: false
+    type: bool
+  disable_lldp_auth:
+    description: >
+      Disable LLDP triggered (BPDU) authentication on the interface. Only
+      applicable when port access authentication is enabled.
+    required: false
+    type: bool
+  lldp_authentication_mac:
+    description: >
+      MAC address to use when authentication is triggered by an LLDP frame.
+    required: false
+    type: str
+    choices:
+      - chassis-mac
+      - source-mac
   state:
     description: Configure or reset port access settings on the interface.
     required: false
@@ -132,6 +162,9 @@ ATTR_MAP = {
     "allow_bpdu": "port_access_allow_bpdu",
     "client_ip_track": "client_ip_track_configuration",
     "device_fingerprint": "device_fingerprint_configuration",
+    "radius_override": "aaa_port_access_radius_override_enable",
+    "disable_lldp_auth": "port_access_disable_lldp_auth",
+    "lldp_authentication_mac": "port_access_lldp_authentication_mac",
 }
 
 # Default values used to reset dict attributes on delete so the operation
@@ -167,6 +200,16 @@ def main():
         ),
         client_ip_track=dict(type="dict", default=None),
         device_fingerprint=dict(type="dict", default=None),
+        auth_precedence=dict(
+            type="list", elements="str", default=None,
+            choices=["dot1x", "mac-auth"],
+        ),
+        radius_override=dict(type="bool", default=None),
+        disable_lldp_auth=dict(type="bool", default=None),
+        lldp_authentication_mac=dict(
+            type="str", default=None,
+            choices=["chassis-mac", "source-mac"],
+        ),
         state=dict(
             type="str",
             default="create",
@@ -234,6 +277,23 @@ def main():
             setattr(interface, target, new_value)
             if target not in interface.config_attrs:
                 interface.config_attrs.append(target)
+            modified = True
+
+    # auth_precedence: ordered list of methods -> map {position: method}.
+    auth_precedence = ansible_module.params["auth_precedence"]
+    if auth_precedence is not None:
+        if state == "delete":
+            desired = {}
+        else:
+            desired = {
+                str(index + 1): method
+                for index, method in enumerate(auth_precedence)
+            }
+        current = getattr(interface, "aaa_auth_precedence", None) or {}
+        if current != desired:
+            setattr(interface, "aaa_auth_precedence", desired)
+            if "aaa_auth_precedence" not in interface.config_attrs:
+                interface.config_attrs.append("aaa_auth_precedence")
             modified = True
 
     if not ansible_module.check_mode:
