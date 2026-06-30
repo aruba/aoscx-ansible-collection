@@ -131,6 +131,27 @@ options:
       The supplied mapping fully replaces the current group membership.
     required: false
     type: dict
+  ipsec_ah:
+    description: >
+      IPsec Authentication Header settings for the RADIUS server, as a
+      dictionary (for example {ah_null: true}). The C(auth_key) value, when
+      present, is write-only and stored encrypted by the switch.
+    required: false
+    type: dict
+  ipsec_esp:
+    description: >
+      IPsec Encapsulating Security Payload settings for the RADIUS server, as a
+      dictionary (for example {esp_null: true}). Secret values, when present,
+      are write-only and stored encrypted by the switch.
+    required: false
+    type: dict
+  clearpass:
+    description: >
+      ClearPass integration settings for the RADIUS server, as a dictionary.
+      Secret values, when present, are write-only and stored encrypted by the
+      switch.
+    required: false
+    type: dict
   state:
     description: Create, update or delete the RADIUS server.
     required: false
@@ -244,6 +265,9 @@ def main():
             choices=["status-server", "keep-alive"],
         ),
         default_group_priority=dict(type="int", required=False, default=None),
+        ipsec_ah=dict(type="dict", required=False, default=None),
+        ipsec_esp=dict(type="dict", required=False, default=None),
+        clearpass=dict(type="dict", required=False, default=None, no_log=True),
         server_group=dict(type="dict", required=False, default=None),
         state=dict(
             type="str",
@@ -275,6 +299,9 @@ def main():
         "tracking_mode",
         "port_access",
         "default_group_priority",
+        "ipsec_ah",
+        "ipsec_esp",
+        "clearpass",
     ]
     supplied = {
         attr: ansible_module.params[attr]
