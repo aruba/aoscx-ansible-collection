@@ -1,0 +1,5 @@
+minor_changes:
+  - Add ``aoscx_mirror`` module to manage traffic mirror (port monitoring)
+    sessions.
+  - Add ``aoscx_mirror_endpoint`` module to manage remote (ERSPAN) mirror
+    endpoints.

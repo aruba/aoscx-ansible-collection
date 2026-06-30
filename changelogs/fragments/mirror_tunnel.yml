@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_mirror - add the C(tunnel) and C(tunnel_vrf) options to configure
+    ERSPAN (encapsulated remote) mirror sessions, including the tunnel source
+    and destination IPv4 addresses, DSCP marking and the VRF used to reach the
+    tunnel destination.

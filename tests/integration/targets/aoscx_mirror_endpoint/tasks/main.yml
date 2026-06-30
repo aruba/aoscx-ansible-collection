@@ -1,0 +1,88 @@
+# Integration tests for the aoscx_mirror_endpoint module.
+#
+# Run with:
+#   ansible-test integration aoscx_mirror_endpoint --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the MirrorEndpoint class. Uses a temporary endpoint, kept
+# administratively down, and cleans up afterwards. Adjust the port name to
+# match the device under test.
+
+- name: Make sure the test mirror endpoint does not exist yet
+  arubanetworks.aoscx.aoscx_mirror_endpoint:
+    name: mirror-integration-ep
+    state: delete
+  ignore_errors: true
+
+- name: Create an ERSPAN mirror endpoint (admin down)
+  arubanetworks.aoscx.aoscx_mirror_endpoint:
+    name: mirror-integration-ep
+    admin: down
+    comment: endpoint-integration-test
+    output_port:
+      - 1/1/27
+    tunnel:
+      src_ip_address: 10.0.0.1
+      dest_ip_address: 10.0.0.2
+      id: 100
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_mirror_endpoint:
+    name: mirror-integration-ep
+    state: update
+    admin: down
+    comment: endpoint-integration-test
+    output_port:
+      - 1/1/27
+    tunnel:
+      src_ip_address: 10.0.0.1
+      dest_ip_address: 10.0.0.2
+      id: 100
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Update the tunnel destination
+  arubanetworks.aoscx.aoscx_mirror_endpoint:
+    name: mirror-integration-ep
+    state: update
+    tunnel:
+      dest_ip_address: 10.0.0.3
+  register: update_result
+
+- name: Assert update changed
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Delete the mirror endpoint
+  arubanetworks.aoscx.aoscx_mirror_endpoint:
+    name: mirror-integration-ep
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again (idempotent)
+  arubanetworks.aoscx.aoscx_mirror_endpoint:
+    name: mirror-integration-ep
+    state: delete
+  register: delete_idem
+
+- name: Assert second delete did not change
+  ansible.builtin.assert:
+    that:
+      - delete_idem is not changed
