@@ -120,6 +120,15 @@ options:
       The supplied dictionary fully replaces the current settings.
     required: false
     type: dict
+  responder:
+    description: >
+      IP SLA responder address. Required for all probe types except http and
+      https (which use a URL instead). Supported keys are hostname (the
+      hostname, FQDN or IPv4/IPv6 address of the responder) and port (the
+      transport layer port number; not needed for icmp_echo). The supplied
+      dictionary fully replaces the current settings.
+    required: false
+    type: dict
   state:
     description: Create, update or delete the IP SLA source.
     required: false
@@ -228,6 +237,7 @@ def main():
         http_sla=dict(type="dict", required=False, default=None),
         https_sla=dict(type="dict", required=False, default=None),
         voip_jitter_sla=dict(type="dict", required=False, default=None),
+        responder=dict(type="dict", required=False, default=None),
         state=dict(
             type="str",
             default="create",
@@ -258,6 +268,7 @@ def main():
         "http_sla",
         "https_sla",
         "voip_jitter_sla",
+        "responder",
     ]
     supplied = {
         attr: ansible_module.params[attr]
