@@ -67,6 +67,22 @@ options:
       C(delete).
     required: false
     type: bool
+  vtep_peers:
+    description: >
+      List of static remote VTEP IPv4 addresses (head-end replication) added
+      to this VNI's flood list. The supplied list fully replaces the set of
+      static peers attached to this VNI. When omitted the peers are left
+      unchanged; an empty list removes all static peers for this VNI. Ignored
+      when I(state) is C(delete).
+    required: false
+    type: list
+    elements: str
+  vtep_peer_vrf:
+    description: >
+      Transport VRF in which the static VTEP peers are reachable.
+    required: false
+    default: default
+    type: str
   state:
     description: Create, update or delete the VNI.
     required: false
@@ -99,6 +115,22 @@ EXAMPLES = """
     state: update
     vlan: 4001
 
+- name: Create a Layer 2 VNI with static VTEP peers (head-end replication)
+  aoscx_vni:
+    vni_id: 206
+    interface: vxlan1
+    vlan: 206
+    vtep_peers:
+      - 10.0.0.9
+      - 10.0.0.10
+
+- name: Remove all static VTEP peers from a VNI
+  aoscx_vni:
+    vni_id: 206
+    interface: vxlan1
+    state: update
+    vtep_peers: []
+
 - name: Delete a VNI
   aoscx_vni:
     vni_id: 40000
@@ -123,6 +155,94 @@ MIN_VNI_ID = 1
 MAX_VNI_ID = 16777215
 
 
+def reconcile_vtep_peers(
+    ansible_module, session, interface_obj, vni, desired_peers, peer_vrf
+):
+    """Reconcile the set of static VTEP peers flooding this VNI.
+
+    Each peer is a static Tunnel Endpoint (head-end replication) keyed by
+    (vrf, origin, destination) whose network_id map references the VNIs it
+    floods. A single endpoint may flood several VNIs, so this VNI is added to
+    or removed from the endpoint's network_id map; an endpoint is only created
+    or deleted when it becomes referenced or unreferenced.
+
+    Returns True if any tunnel endpoint was created, modified or deleted.
+    """
+    try:
+        tep_class = session.api.get_module_class(session, "TunnelEndpoint")
+    except Exception as e:
+        ansible_module.fail_json(
+            msg=(
+                "This pyaoscx version does not support VTEP peers "
+                "(TunnelEndpoint). Upgrade pyaoscx. Details: {0}".format(
+                    str(e)
+                )
+            )
+        )
+
+    vni_index = session.api.get_index(vni)
+    vni_key = next(iter(vni_index))
+
+    desired = set(desired_peers)
+    changed = False
+
+    try:
+        # Existing static tunnel endpoints in the target VRF, by peer IP.
+        teps = tep_class.get_all(session, interface_obj)
+        existing_by_ip = {}
+        current_ips = set()
+        for tep in teps.values():
+            if getattr(tep, "origin", None) != "static":
+                continue
+            if getattr(tep, "vrf_name", None) != peer_vrf:
+                continue
+            tep.get()
+            existing_by_ip[tep.destination] = tep
+            if vni_key in tep.network_id:
+                current_ips.add(tep.destination)
+
+        to_add = desired - current_ips
+        to_remove = current_ips - desired
+        changed = bool(to_add or to_remove)
+
+        if not changed or ansible_module.check_mode:
+            return changed
+
+        vrf_obj = session.api.get_module(session, "Vrf", peer_vrf)
+        vrf_obj.get()
+
+        for ip in to_add:
+            tep = existing_by_ip.get(ip)
+            if tep is not None:
+                # Endpoint already exists (floods other VNIs): attach this one.
+                tep.network_id.update(vni_index)
+                tep.update()
+            else:
+                tep = session.api.get_module(
+                    session,
+                    "TunnelEndpoint",
+                    interface_obj,
+                    network_id=vni,
+                    destination=ip,
+                    vrf=vrf_obj,
+                )
+                tep.create()
+
+        for ip in to_remove:
+            tep = existing_by_ip[ip]
+            del tep.network_id[vni_key]
+            if tep.network_id:
+                tep.update()
+            else:
+                tep.delete()
+    except Exception as e:
+        ansible_module.fail_json(
+            msg="Could not reconcile VTEP peers: {0}".format(str(e))
+        )
+
+    return changed
+
+
 def main():
     module_args = dict(
         vni_id=dict(type="int", required=True),
@@ -131,6 +251,8 @@ def main():
         vlan=dict(type="int", default=None),
         vrf=dict(type="str", default=None),
         routing=dict(type="bool", default=None),
+        vtep_peers=dict(type="list", elements="str", default=None),
+        vtep_peer_vrf=dict(type="str", default="default"),
         state=dict(
             type="str",
             default="create",
@@ -149,6 +271,8 @@ def main():
     vlan = ansible_module.params["vlan"]
     vrf = ansible_module.params["vrf"]
     routing = ansible_module.params["routing"]
+    vtep_peers = ansible_module.params["vtep_peers"]
+    vtep_peer_vrf = ansible_module.params["vtep_peer_vrf"]
     state = ansible_module.params["state"]
 
     result = dict(changed=False)
@@ -170,6 +294,21 @@ def main():
         vrf in ("", ".", "..") or "," in vrf or "/" in vrf
     ):
         ansible_module.fail_json(msg="Invalid vrf: {0}".format(vrf))
+
+    if (
+        vtep_peer_vrf in ("", ".", "..")
+        or "," in vtep_peer_vrf
+        or "/" in vtep_peer_vrf
+    ):
+        ansible_module.fail_json(
+            msg="Invalid vtep_peer_vrf: {0}".format(vtep_peer_vrf)
+        )
+    if vtep_peers is not None:
+        for peer in vtep_peers:
+            if peer in ("", ".", "..") or "," in peer or "/" in peer:
+                ansible_module.fail_json(
+                    msg="Invalid VTEP peer: {0}".format(peer)
+                )
 
     try:
         session = get_pyaoscx_session(ansible_module)
@@ -248,6 +387,7 @@ def main():
             )
 
     # ------------------------------------------------------- create / update
+    changed = False
     if not exists:
         kwargs = {}
         if vlan_obj is not None:
@@ -264,7 +404,7 @@ def main():
             vni_type=vni_type,
             **kwargs
         )
-        result["changed"] = True
+        changed = True
         if not ansible_module.check_mode:
             try:
                 vni.create()
@@ -272,38 +412,46 @@ def main():
                 ansible_module.fail_json(
                     msg="Could not create VNI: {0}".format(str(e))
                 )
-        ansible_module.exit_json(**result)
+    else:
+        if vlan_obj is not None:
+            current_vlan = getattr(vni, "vlan", None)
+            current_vlan_id = getattr(current_vlan, "id", None)
+            if current_vlan_id != vlan:
+                changed = True
+                vni.vlan = vlan_obj
 
-    changed = False
+        if vrf_obj is not None:
+            current_vrf = getattr(vni, "vrf", None)
+            current_vrf_name = getattr(current_vrf, "name", None)
+            if current_vrf_name != vrf:
+                changed = True
+                vni.vrf = vrf_obj
 
-    if vlan_obj is not None:
-        current_vlan = getattr(vni, "vlan", None)
-        current_vlan_id = getattr(current_vlan, "id", None)
-        if current_vlan_id != vlan:
-            changed = True
-            vni.vlan = vlan_obj
+        if routing is not None:
+            if bool(getattr(vni, "routing", False)) != routing:
+                changed = True
+                vni.routing = routing
 
-    if vrf_obj is not None:
-        current_vrf = getattr(vni, "vrf", None)
-        current_vrf_name = getattr(current_vrf, "name", None)
-        if current_vrf_name != vrf:
-            changed = True
-            vni.vrf = vrf_obj
+        if changed and not ansible_module.check_mode:
+            try:
+                vni.update()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not update VNI: {0}".format(str(e))
+                )
 
-    if routing is not None:
-        if bool(getattr(vni, "routing", False)) != routing:
-            changed = True
-            vni.routing = routing
+    if vtep_peers is not None:
+        peers_changed = reconcile_vtep_peers(
+            ansible_module,
+            session,
+            interface_obj,
+            vni,
+            vtep_peers,
+            vtep_peer_vrf,
+        )
+        changed = changed or peers_changed
 
     result["changed"] = changed
-    if changed and not ansible_module.check_mode:
-        try:
-            vni.update()
-        except Exception as e:
-            ansible_module.fail_json(
-                msg="Could not update VNI: {0}".format(str(e))
-            )
-
     ansible_module.exit_json(**result)
 
 

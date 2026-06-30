@@ -61,6 +61,50 @@
     that:
       - bad_intf is failed
 
+- name: Attach static VTEP peers to the VNI
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vlan: 3999
+    vtep_peers:
+      - 192.0.2.9
+      - 192.0.2.10
+    state: update
+  register: peers_result
+
+- name: Assert attaching peers changed
+  ansible.builtin.assert:
+    that:
+      - peers_result is changed
+
+- name: Re-apply identical VTEP peers
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vtep_peers:
+      - 192.0.2.9
+      - 192.0.2.10
+    state: update
+  register: peers_idem
+
+- name: Assert re-applying peers did not change
+  ansible.builtin.assert:
+    that:
+      - peers_idem is not changed
+
+- name: Remove all static VTEP peers
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vtep_peers: []
+    state: update
+  register: peers_clear
+
+- name: Assert removing peers changed
+  ansible.builtin.assert:
+    that:
+      - peers_clear is changed
+
 - name: Delete the VNI
   arubanetworks.aoscx.aoscx_vni:
     vni_id: 39990
