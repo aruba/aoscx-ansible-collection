@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_port_access_interface - add the C(auth_precedence), C(radius_override),
+    C(disable_lldp_auth) and C(lldp_authentication_mac) options to configure the
+    port access authentication precedence, RADIUS override, LLDP triggered
+    authentication and the LLDP authentication MAC source on the interface.
