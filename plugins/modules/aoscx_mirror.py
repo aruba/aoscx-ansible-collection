@@ -87,6 +87,32 @@ options:
     required: false
     type: list
     elements: int
+  tunnel_vrf:
+    description: >
+      Name of the VRF used to reach the tunnel destination IP address. Only
+      considered when I(session_type=tunnel). The VRF must already exist. If
+      not specified, the 'default' VRF is used.
+    required: false
+    type: str
+  tunnel:
+    description: >
+      Tunnel parameters for an ERSPAN (encapsulated remote) mirror session.
+      Only considered when I(session_type=tunnel).
+    required: false
+    type: dict
+    suboptions:
+      src_ip_address:
+        description: Source IPv4 address of the tunnel.
+        required: false
+        type: str
+      dest_ip_address:
+        description: Destination IPv4 address of the tunnel.
+        required: false
+        type: str
+      dscp:
+        description: DSCP value to mark on the tunneled packets (0-63).
+        required: false
+        type: int
   state:
     description: Create, update or delete the mirror session.
     required: false
@@ -163,6 +189,21 @@ def main():
         select_tx_vlan=dict(
             type="list", elements="int", required=False, default=None
         ),
+        tunnel_vrf=dict(type="str", required=False, default=None),
+        tunnel=dict(
+            type="dict",
+            required=False,
+            default=None,
+            options=dict(
+                src_ip_address=dict(
+                    type="str", required=False, default=None
+                ),
+                dest_ip_address=dict(
+                    type="str", required=False, default=None
+                ),
+                dscp=dict(type="int", required=False, default=None),
+            ),
+        ),
         state=dict(
             type="str",
             default="create",
@@ -183,6 +224,8 @@ def main():
     select_dst_port = ansible_module.params["select_dst_port"]
     select_rx_vlan = ansible_module.params["select_rx_vlan"]
     select_tx_vlan = ansible_module.params["select_tx_vlan"]
+    tunnel_vrf = ansible_module.params["tunnel_vrf"]
+    tunnel = ansible_module.params["tunnel"]
     state = ansible_module.params["state"]
 
     result = dict(changed=False)
@@ -241,6 +284,21 @@ def main():
     def materialize_vlans(ids):
         return [session.api.get_module(session, "Vlan", v) for v in ids]
 
+    def materialize_vrf(vrf_name):
+        return session.api.get_module(session, "Vrf", vrf_name)
+
+    def vrf_name_of(ref):
+        if not ref:
+            return None
+        if isinstance(ref, str):
+            return ref.rstrip("/").split("/")[-1]
+        if isinstance(ref, dict):
+            return next(iter(ref), None)
+        return getattr(ref, "name", None)
+
+    def clean_tunnel(value):
+        return {k: v for k, v in value.items() if v is not None}
+
     # ------------------------------------------------------- create / update
     if not exists:
         kwargs = {}
@@ -256,6 +314,10 @@ def main():
         for attr, ids in vlan_params.items():
             if ids is not None:
                 kwargs[attr] = materialize_vlans(ids)
+        if tunnel is not None:
+            kwargs["tunnel"] = clean_tunnel(tunnel)
+        if tunnel_vrf is not None:
+            kwargs["tunnel_vrf"] = materialize_vrf(tunnel_vrf).get_uri()
         mirror = session.api.get_module(session, "Mirror", mirror_id, **kwargs)
         result["changed"] = True
         if not ansible_module.check_mode:
@@ -302,6 +364,20 @@ def main():
         if current != sorted(int(i) for i in ids):
             changed = True
             setattr(mirror, attr, materialize_vlans(ids))
+
+    if tunnel is not None:
+        want = clean_tunnel(tunnel)
+        current_tunnel = getattr(mirror, "tunnel", None) or {}
+        if any(current_tunnel.get(k) != v for k, v in want.items()):
+            changed = True
+            merged = dict(current_tunnel)
+            merged.update(want)
+            mirror.tunnel = merged
+
+    if tunnel_vrf is not None:
+        if vrf_name_of(getattr(mirror, "tunnel_vrf", None)) != tunnel_vrf:
+            changed = True
+            mirror.tunnel_vrf = materialize_vrf(tunnel_vrf).get_uri()
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:
