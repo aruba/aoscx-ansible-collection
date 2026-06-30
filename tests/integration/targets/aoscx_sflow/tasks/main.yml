@@ -1,0 +1,73 @@
+# Integration tests for the aoscx_sflow module.
+#
+# Run with:
+#   ansible-test integration aoscx_sflow --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the SFlow class. Uses a temporary sFlow instance named
+# "ansible-test" that is kept disabled, and cleans up afterwards.
+
+- name: Make sure the test sFlow instance does not exist yet
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a disabled sFlow instance
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    enabled: false
+    mode: both
+    polling: 20
+    sampling: 2048
+    agent_address: 10.0.0.9
+    header: 64
+    max_datagram: 1200
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result.changed
+
+- name: Re-apply identical values (idempotent)
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    state: update
+    enabled: false
+    mode: both
+    polling: 20
+    sampling: 2048
+    agent_address: 10.0.0.9
+    header: 64
+    max_datagram: 1200
+  register: idem_result
+
+- name: Assert update is idempotent
+  ansible.builtin.assert:
+    that:
+      - not idem_result.changed
+
+- name: Update the sampling rate
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    state: update
+    sampling: 4096
+  register: update_result
+
+- name: Assert update changed
+  ansible.builtin.assert:
+    that:
+      - update_result.changed
+
+- name: Delete the sFlow instance
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result.changed
