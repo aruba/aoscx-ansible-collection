@@ -1,0 +1,37 @@
+# Integration tests for aoscx_radius_proxy_client_group.
+- name: Create client group with one NAS client
+  arubanetworks.aoscx.aoscx_radius_proxy_client_group:
+    group_name: integration-nas
+    clients:
+      - address: 192.0.2.50
+        connection_type: udp
+        secret_key: nas-secret
+    state: create
+  register: create_result
+- ansible.builtin.assert:
+    that:
+      - create_result is changed
+- name: Re-apply without secret (idempotent)
+  arubanetworks.aoscx.aoscx_radius_proxy_client_group:
+    group_name: integration-nas
+    clients:
+      - address: 192.0.2.50
+        connection_type: udp
+    state: update
+  register: idem_result
+- ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+- name: Clear members
+  arubanetworks.aoscx.aoscx_radius_proxy_client_group:
+    group_name: integration-nas
+    clients: []
+    state: update
+  register: clear_result
+- ansible.builtin.assert:
+    that:
+      - clear_result is changed
+- name: Delete client group
+  arubanetworks.aoscx.aoscx_radius_proxy_client_group:
+    group_name: integration-nas
+    state: delete
