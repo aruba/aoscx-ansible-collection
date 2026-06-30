@@ -1,0 +1,135 @@
+# Integration tests for the aoscx_vni module.
+#
+# Run with:
+#   ansible-test integration aoscx_vni --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the Vni class and the delete_attrs fix, plus an
+# existing VXLAN tunnel interface (vxlan1). Uses an unused VNI id (39990) and
+# a temporary VLAN (3999), and cleans up afterwards.
+
+- name: Make sure the test VNI does not exist yet
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    state: delete
+  ignore_errors: true
+
+- name: Ensure the test VLAN exists
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: 3999
+    name: vni-integration-test
+    state: create
+
+- name: Create a Layer 2 VNI mapping the test VLAN
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vlan: 3999
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vlan: 3999
+    state: create
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Reject a non-VXLAN interface
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: 1/1/1
+    vlan: 3999
+    state: update
+  register: bad_intf
+  ignore_errors: true
+
+- name: Assert the non-VXLAN interface was rejected
+  ansible.builtin.assert:
+    that:
+      - bad_intf is failed
+
+- name: Attach static VTEP peers to the VNI
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vlan: 3999
+    vtep_peers:
+      - 192.0.2.9
+      - 192.0.2.10
+    state: update
+  register: peers_result
+
+- name: Assert attaching peers changed
+  ansible.builtin.assert:
+    that:
+      - peers_result is changed
+
+- name: Re-apply identical VTEP peers
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vtep_peers:
+      - 192.0.2.9
+      - 192.0.2.10
+    state: update
+  register: peers_idem
+
+- name: Assert re-applying peers did not change
+  ansible.builtin.assert:
+    that:
+      - peers_idem is not changed
+
+- name: Remove all static VTEP peers
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    vtep_peers: []
+    state: update
+  register: peers_clear
+
+- name: Assert removing peers changed
+  ansible.builtin.assert:
+    that:
+      - peers_clear is changed
+
+- name: Delete the VNI
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again (idempotent)
+  arubanetworks.aoscx.aoscx_vni:
+    vni_id: 39990
+    interface: vxlan1
+    state: delete
+  register: delete_idem
+
+- name: Assert second delete did not change
+  ansible.builtin.assert:
+    that:
+      - delete_idem is not changed
+
+- name: Remove the test VLAN
+  arubanetworks.aoscx.aoscx_vlan:
+    vlan_id: 3999
+    state: delete
