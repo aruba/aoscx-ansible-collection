@@ -1,0 +1,44 @@
+# Integration tests for aoscx_radius_config_attribute.
+- name: Ensure the AAA server group exists
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: integration-grp
+    group_type: radius
+    state: create
+- name: Enable NAS-Identifier and NAS-IP-Address
+  arubanetworks.aoscx.aoscx_radius_config_attribute:
+    server_group: integration-grp
+    nas_id: true
+    nas_ip_addr: true
+    state: create
+  register: create_result
+- ansible.builtin.assert:
+    that:
+      - create_result is changed
+- name: Re-apply identical (idempotent)
+  arubanetworks.aoscx.aoscx_radius_config_attribute:
+    server_group: integration-grp
+    nas_id: true
+    nas_ip_addr: true
+    state: create
+  register: idem_result
+- ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+- name: Disable NAS-Identifier
+  arubanetworks.aoscx.aoscx_radius_config_attribute:
+    server_group: integration-grp
+    nas_id: false
+    state: update
+  register: update_result
+- ansible.builtin.assert:
+    that:
+      - update_result is changed
+- name: Tear down
+  block:
+    - arubanetworks.aoscx.aoscx_radius_config_attribute:
+        server_group: integration-grp
+        state: delete
+    - arubanetworks.aoscx.aoscx_aaa_server_group:
+        group_name: integration-grp
+        group_type: radius
+        state: delete

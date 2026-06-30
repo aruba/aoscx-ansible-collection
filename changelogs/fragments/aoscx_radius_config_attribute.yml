@@ -1,0 +1,5 @@
+minor_changes:
+  - Add ``aoscx_radius_config_attribute`` module to manage the RADIUS
+    configuration attributes (Framed-IP-Address, NAS-Identifier, NAS-IP-Address,
+    Tunnel-Private-Group-ID) attached to an AAA server group. Requires a pyaoscx
+    release that ships the ``RadiusConfigAttribute`` class.
