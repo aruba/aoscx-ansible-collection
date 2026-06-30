@@ -1,0 +1,86 @@
+# Integration tests for the aoscx_vxlan_interface module.
+#
+# Run with:
+#   ansible-test integration aoscx_vxlan_interface --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi. Creates the
+# VXLAN tunnel interface vxlan1 and cleans it up afterwards.
+
+- name: Make sure the VXLAN interface does not exist yet
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    state: delete
+  ignore_errors: true
+
+- name: Create the VXLAN interface with a source IP
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    source_ip: 10.141.254.11
+    enabled: true
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    source_ip: 10.141.254.11
+    enabled: true
+    state: create
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Update the description and destination UDP port
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    description: EVPN-VXLAN overlay
+    dest_udp_port: 4789
+    state: update
+  register: update_result
+
+- name: Assert update changed
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Shut the interface down
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    enabled: false
+    state: update
+  register: shutdown_result
+
+- name: Assert shutdown changed
+  ansible.builtin.assert:
+    that:
+      - shutdown_result is changed
+
+- name: Delete the VXLAN interface
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again (idempotent)
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    state: delete
+  register: delete_idem
+
+- name: Assert second delete did not change
+  ansible.builtin.assert:
+    that:
+      - delete_idem is not changed

@@ -1,0 +1,4 @@
+minor_changes:
+  - Add ``aoscx_vxlan_interface`` module to create, update and delete VXLAN
+    tunnel interfaces (source IP, destination UDP port, admin state and
+    description).
