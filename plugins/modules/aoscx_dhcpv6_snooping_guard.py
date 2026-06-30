@@ -34,7 +34,28 @@ options:
       servers. When omitted server filtering is left unchanged.
     required: false
     type: str
-
+  client_prefix_list:
+    description: >
+      Name of the existing prefix list of IPv6 prefixes that a client is
+      allowed to use. The prefix list must already exist. When omitted the
+      client prefix filtering is left unchanged.
+    required: false
+    type: str
+  server_preference_range:
+    description: >
+      Allowed DHCPv6 server preference value range. The supplied dictionary
+      fully replaces the current settings.
+    required: false
+    type: dict
+    suboptions:
+      preference_min:
+        description: Minimum allowed preference value (0-255).
+        required: false
+        type: int
+      preference_max:
+        description: Maximum allowed preference value (0-255).
+        required: false
+        type: int
   state:
     description: Create, update or delete the policy.
     required: false
@@ -71,6 +92,20 @@ def main():
     module_args = dict(
         name=dict(type="str", required=True),
         server_access_list=dict(type="str", required=False, default=None),
+        client_prefix_list=dict(type="str", required=False, default=None),
+        server_preference_range=dict(
+            type="dict",
+            required=False,
+            default=None,
+            options=dict(
+                preference_min=dict(
+                    type="int", required=False, default=None
+                ),
+                preference_max=dict(
+                    type="int", required=False, default=None
+                ),
+            ),
+        ),
         state=dict(
             type="str",
             default="create",
@@ -84,6 +119,8 @@ def main():
 
     name = ansible_module.params["name"]
     server_access_list = ansible_module.params["server_access_list"]
+    client_prefix_list = ansible_module.params["client_prefix_list"]
+    server_preference_range = ansible_module.params["server_preference_range"]
     state = ansible_module.params["state"]
 
     result = dict(changed=False)
@@ -101,6 +138,13 @@ def main():
             session, "ACL", server_access_list, list_type="ipv6"
         )
         supplied["match_server_access_list"] = acl.get_uri()
+    if client_prefix_list is not None:
+        prefix_list = session.api.get_module(
+            session, "PrefixList", client_prefix_list
+        )
+        supplied["match_client_prefix_list"] = "{0}{1}".format(
+            session.resource_prefix, prefix_list.path
+        )
 
     try:
         policy = session.api.get_module(
@@ -132,8 +176,15 @@ def main():
         ansible_module.exit_json(**result)
 
     if not exists:
+        create_kwargs = dict(supplied)
+        if server_preference_range is not None:
+            create_kwargs["server_preference_range"] = {
+                k: v
+                for k, v in server_preference_range.items()
+                if v is not None
+            }
         policy = session.api.get_module(
-            session, "Dhcpv6SnoopingGuardPolicy", name, **supplied
+            session, "Dhcpv6SnoopingGuardPolicy", name, **create_kwargs
         )
         result["changed"] = True
         if not ansible_module.check_mode:
@@ -154,6 +205,19 @@ def main():
             setattr(policy, attr, value)
             if attr not in policy.config_attrs:
                 policy.config_attrs.append(attr)
+            changed = True
+
+    if server_preference_range is not None:
+        want = {
+            k: v for k, v in server_preference_range.items() if v is not None
+        }
+        current_range = getattr(policy, "server_preference_range", None) or {}
+        if any(current_range.get(k) != v for k, v in want.items()):
+            merged = dict(current_range)
+            merged.update(want)
+            policy.server_preference_range = merged
+            if "server_preference_range" not in policy.config_attrs:
+                policy.config_attrs.append("server_preference_range")
             changed = True
 
     result["changed"] = changed
