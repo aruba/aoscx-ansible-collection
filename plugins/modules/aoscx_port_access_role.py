@@ -187,6 +187,29 @@ options:
       apply to clients using this role. The policy must already exist.
     required: false
     type: str
+  macsec_policy:
+    description: >
+      Name of an existing MACsec policy (system/macsec_policies) to associate
+      with this role. The policy must already exist.
+    required: false
+    type: str
+  ipfix_flow_monitor:
+    description: >
+      IPFIX flow monitors to apply to this role, by address family. At most
+      one IPv4 and one IPv6 monitor can be configured. The referenced monitors
+      (system/ipfix_flow_monitors) must already exist. The supplied mapping
+      fully replaces the current monitors.
+    required: false
+    type: dict
+    suboptions:
+      ipv4:
+        description: Name of the existing IPv4 IPFIX flow monitor.
+        required: false
+        type: str
+      ipv6:
+        description: Name of the existing IPv6 IPFIX flow monitor.
+        required: false
+        type: str
   state:
     description: Create, update or delete the port access role.
     required: false
@@ -265,6 +288,7 @@ REFERENCE_ATTRS = {
     "in_gbp": "PortAccessGbp",
     "in_abp": "PortAccessAbp",
     "in_policy": "PortAccessPolicy",
+    "macsec_policy": "MacsecPolicy",
 }
 
 
@@ -303,6 +327,31 @@ def reference_uri(session, ansible_module, sdk_class, item_name):
             )
         )
     return referenced.get_uri()
+
+
+def ipfix_monitor_map(session, ansible_module, monitors):
+    """
+    Validate that each supplied IPFIX flow monitor exists and return a mapping
+    of address family (ipv4/ipv6) to the monitor URI, suitable for the role
+    ipfix_flow_monitor field.
+    """
+    mapping = {}
+    for family, monitor_name in monitors.items():
+        if monitor_name is None:
+            continue
+        monitor = session.api.get_module(
+            session, "IpfixFlowMonitor", monitor_name
+        )
+        try:
+            monitor.get()
+        except Exception:
+            ansible_module.fail_json(
+                msg="IPFIX flow monitor '{0}' does not exist".format(
+                    monitor_name
+                )
+            )
+        mapping[family] = monitor.get_uri()
+    return mapping
 
 
 def reconcile_reference(role, attr, desired_uri):
@@ -412,6 +461,16 @@ def main():
         in_gbp=dict(type="str", required=False, default=None),
         in_abp=dict(type="str", required=False, default=None),
         in_policy=dict(type="str", required=False, default=None),
+        macsec_policy=dict(type="str", required=False, default=None),
+        ipfix_flow_monitor=dict(
+            type="dict",
+            required=False,
+            default=None,
+            options=dict(
+                ipv4=dict(type="str", required=False, default=None),
+                ipv6=dict(type="str", required=False, default=None),
+            ),
+        ),
         state=dict(
             type="str",
             default="create",
@@ -488,12 +547,19 @@ def main():
                 session, ansible_module, sdk_class, item_name
             )
 
+    ipfix_names = ansible_module.params["ipfix_flow_monitor"]
+    ipfix_map = None
+    if ipfix_names is not None:
+        ipfix_map = ipfix_monitor_map(session, ansible_module, ipfix_names)
+
     # --------------------------------------------------------------- create
     if not exists:
         kwargs = dict(supplied)
         if cpp_uri is not None:
             kwargs["captive_portal_profile"] = cpp_uri
         kwargs.update(reference_uris)
+        if ipfix_map is not None:
+            kwargs["ipfix_flow_monitor"] = ipfix_map
         role = session.api.get_module(
             session, "PortAccessRole", name, **kwargs
         )
@@ -534,6 +600,31 @@ def main():
     for attr, desired_uri in reference_uris.items():
         if reconcile_reference(role, attr, desired_uri):
             changed = True
+
+    if ipfix_map is not None:
+        current_monitors = getattr(role, "ipfix_flow_monitor", None) or {}
+
+        def monitor_name(value):
+            if isinstance(value, dict):
+                value = next(iter(value.values()), "")
+            return str(value).rstrip("/").rsplit("/", 1)[-1]
+
+        if isinstance(current_monitors, dict):
+            current_names = {
+                family: monitor_name(value)
+                for family, value in current_monitors.items()
+            }
+        else:
+            current_names = {}
+        desired_names = {
+            family: monitor_name(value)
+            for family, value in ipfix_map.items()
+        }
+        if current_names != desired_names:
+            changed = True
+            role.ipfix_flow_monitor = ipfix_map
+            if "ipfix_flow_monitor" not in role.config_attrs:
+                role.config_attrs.append("ipfix_flow_monitor")
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:
