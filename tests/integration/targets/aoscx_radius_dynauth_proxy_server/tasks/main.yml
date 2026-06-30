@@ -1,0 +1,35 @@
+# Integration tests for aoscx_radius_dynauth_proxy_server.
+- name: Create proxy server
+  arubanetworks.aoscx.aoscx_radius_dynauth_proxy_server:
+    vrf: default
+    address: 192.0.2.30
+    port: 3799
+    port_type: udp
+    secret_key: integration-secret
+    state: create
+  register: create_result
+- ansible.builtin.assert:
+    that:
+      - create_result is changed
+- name: Delete proxy server
+  arubanetworks.aoscx.aoscx_radius_dynauth_proxy_server:
+    vrf: default
+    address: 192.0.2.30
+    port: 3799
+    port_type: udp
+    state: delete
+  register: delete_result
+- ansible.builtin.assert:
+    that:
+      - delete_result is changed
+- name: Delete again (idempotent)
+  arubanetworks.aoscx.aoscx_radius_dynauth_proxy_server:
+    vrf: default
+    address: 192.0.2.30
+    port: 3799
+    port_type: udp
+    state: delete
+  register: delete_idem
+- ansible.builtin.assert:
+    that:
+      - delete_idem is not changed
