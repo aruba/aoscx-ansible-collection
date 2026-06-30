@@ -1,0 +1,76 @@
+# Integration tests for the aoscx_tacacs_server module.
+#
+# Run with:
+#   ansible-test integration aoscx_tacacs_server --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the TacacsServer class and a REST API version of 10.16. Uses a
+# documentation-range address (192.0.2.60) and a temporary server group named
+# "ansible-test", and cleans up afterwards.
+
+- name: Make sure the test TACACS+ server does not exist yet
+  arubanetworks.aoscx.aoscx_tacacs_server:
+    address: 192.0.2.60
+    state: delete
+  ignore_errors: true
+
+- name: Create the test server group
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    group_type: tacacs
+
+- name: Create a TACACS+ server
+  arubanetworks.aoscx.aoscx_tacacs_server:
+    address: 192.0.2.60
+    vrf: default
+    passkey: testtacacs
+    group:
+      - ansible-test
+    auth_type: pap
+    timeout: 10
+  register: result
+
+- name: Assert the server was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Update the server timeout
+  arubanetworks.aoscx.aoscx_tacacs_server:
+    address: 192.0.2.60
+    state: update
+    timeout: 20
+  register: result
+
+- name: Assert the timeout changed
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Update the server timeout again (idempotent)
+  arubanetworks.aoscx.aoscx_tacacs_server:
+    address: 192.0.2.60
+    state: update
+    timeout: 20
+  register: result
+
+- name: Assert no change on re-update
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Delete the TACACS+ server
+  arubanetworks.aoscx.aoscx_tacacs_server:
+    address: 192.0.2.60
+    state: delete
+  register: result
+
+- name: Assert the server was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the test server group
+  arubanetworks.aoscx.aoscx_aaa_server_group:
+    group_name: ansible-test
+    state: delete
