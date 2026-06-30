@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_dhcpv6_snooping_guard - add the C(client_prefix_list) and
+    C(server_preference_range) options to restrict the IPv6 prefixes a client
+    may use and the allowed DHCPv6 server preference value range.
