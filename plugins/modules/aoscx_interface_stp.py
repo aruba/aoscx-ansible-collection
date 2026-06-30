@@ -49,6 +49,12 @@ options:
     description: Enable loop guard on the interface.
     required: false
     type: bool
+  tcn_guard:
+    description: >
+      Enable TCN guard. When enabled the port does not propagate topology
+      changes to other ports.
+    required: false
+    type: bool
   link_type:
     description: Spanning-tree link type.
     required: false
@@ -120,6 +126,7 @@ KEY_MAP = {
     "bpdu_guard": "bpdu_guard_enable",
     "root_guard": "root_guard_enable",
     "loop_guard": "loop_guard_enable",
+    "tcn_guard": "restricted_port_tcn_disable",
     "link_type": "link_type",
     "admin_path_cost": "admin_path_cost",
     "port_priority": "port_priority",
@@ -136,6 +143,7 @@ def main():
         bpdu_guard=dict(type="bool", default=None),
         root_guard=dict(type="bool", default=None),
         loop_guard=dict(type="bool", default=None),
+        tcn_guard=dict(type="bool", default=None),
         link_type=dict(
             type="str", default=None,
             choices=["point_to_point", "shared", "auto"],
@@ -186,6 +194,7 @@ def main():
             "bpdu_guard_enable": False,
             "root_guard_enable": False,
             "loop_guard_enable": False,
+            "restricted_port_tcn_disable": False,
             "link_type": "auto",
             "port_priority": 128,
             "bpdus_rx_disable": False,
