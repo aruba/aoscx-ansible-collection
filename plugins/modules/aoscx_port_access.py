@@ -72,12 +72,17 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-import json
-
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
 
 SETTINGS = {
     "port_security_enable": "port_security_enable",
@@ -101,6 +106,11 @@ def main():
 
     result = dict(changed=False)
 
+    if not HAS_PYAOSCX:
+        ansible_module.fail_json(
+            msg="Could not find the PYAOSCX SDK. Make sure it is installed."
+        )
+
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
@@ -119,21 +129,13 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-    response = session.request(
-        "GET", "system", params={"selector": "writable", "depth": 2}
-    )
-    system_doc = json.loads(response.text)
+    device = Device(session)
+    device.get(selector="writable")
 
-    if any(system_doc.get(k) != v for k, v in supplied.items()):
-        system_doc.update(supplied)
-        put = session.request("PUT", "system", data=json.dumps(system_doc))
-        if not 200 <= put.status_code < 300:
-            ansible_module.fail_json(
-                msg="Could not update port access settings: {0}".format(
-                    put.text
-                )
-            )
-        result["changed"] = True
+    for attr, value in supplied.items():
+        setattr(device, attr, value)
+
+    result["changed"] = device.update()
 
     ansible_module.exit_json(**result)
 
