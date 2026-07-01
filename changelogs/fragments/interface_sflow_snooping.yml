@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - aoscx_interface - add the C(sflow_enabled) option to enable or disable sFlow
+    sampling per interface (the per-port C(no sflow) override).
+  - aoscx_interface - add the C(arp_inspection_trust) option to mark the
+    interface as trusted for Dynamic ARP Inspection.
+  - aoscx_interface - add the C(dhcpv4_snooping_trust),
+    C(dhcpv4_snooping_max_bindings), C(dhcpv6_snooping_trust) and
+    C(dhcpv6_snooping_max_bindings) options to configure the per-interface
+    DHCP snooping trust and binding limits.
