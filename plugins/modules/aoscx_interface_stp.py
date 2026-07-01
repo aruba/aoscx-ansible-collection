@@ -55,6 +55,26 @@ options:
       changes to other ports.
     required: false
     type: bool
+  restricted_role_disable:
+    description: >
+      When true the port will not be selected as root port for any instance
+      (restricted role / root guard behaviour).
+    required: false
+    type: bool
+  protocol_migration_disable:
+    description: Disable spanning-tree protocol migration on the port.
+    required: false
+    type: bool
+  rpvst_filter:
+    description: >
+      When true the port stops sending and receiving RPVST BPDUs.
+    required: false
+    type: bool
+  rpvst_guard:
+    description: >
+      When true the port shuts down upon receiving an RPVST BPDU.
+    required: false
+    type: bool
   link_type:
     description: Spanning-tree link type.
     required: false
@@ -127,6 +147,10 @@ KEY_MAP = {
     "root_guard": "root_guard_enable",
     "loop_guard": "loop_guard_enable",
     "tcn_guard": "restricted_port_tcn_disable",
+    "restricted_role_disable": "restricted_port_role_disable",
+    "protocol_migration_disable": "protocol_migration_disable",
+    "rpvst_filter": "rpvst_filter_enable",
+    "rpvst_guard": "rpvst_guard_enable",
     "link_type": "link_type",
     "admin_path_cost": "admin_path_cost",
     "port_priority": "port_priority",
@@ -144,6 +168,10 @@ def main():
         root_guard=dict(type="bool", default=None),
         loop_guard=dict(type="bool", default=None),
         tcn_guard=dict(type="bool", default=None),
+        restricted_role_disable=dict(type="bool", default=None),
+        protocol_migration_disable=dict(type="bool", default=None),
+        rpvst_filter=dict(type="bool", default=None),
+        rpvst_guard=dict(type="bool", default=None),
         link_type=dict(
             type="str", default=None,
             choices=["point_to_point", "shared", "auto"],
@@ -195,6 +223,10 @@ def main():
             "root_guard_enable": False,
             "loop_guard_enable": False,
             "restricted_port_tcn_disable": False,
+            "restricted_port_role_disable": False,
+            "protocol_migration_disable": False,
+            "rpvst_filter_enable": False,
+            "rpvst_guard_enable": False,
             "link_type": "auto",
             "port_priority": 128,
             "bpdus_rx_disable": False,
