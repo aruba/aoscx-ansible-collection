@@ -39,6 +39,26 @@ options:
     type: str
     required: false
     default: startup-config
+  auto:
+    description: >
+      Manage the auto-checkpoint (confirmed commit) timer instead of copying a
+      configuration. C(start) arms the timer and takes an automatic rollback
+      checkpoint (the C(checkpoint auto <minutes>) command); if it is not
+      confirmed before the timer expires the switch automatically restores the
+      configuration. C(confirm) ends the timer and keeps the running
+      configuration (the C(checkpoint auto confirm) command). When set, the
+      C(source_config) and C(destination_config) options are ignored.
+    type: str
+    required: false
+    choices:
+      - start
+      - confirm
+  auto_timeout:
+    description: >
+      Auto-checkpoint timer interval in minutes (1-60). Required when C(auto)
+      is C(start).
+    type: int
+    required: false
 """
 
 EXAMPLES = """
@@ -56,9 +76,20 @@ EXAMPLES = """
   aoscx_checkpoint:
     source_config: 'running-config'
     destination_config: 'checkpoint_20200128'
+
+- name: Arm the auto-checkpoint timer for 2 minutes before a risky change
+  aoscx_checkpoint:
+    auto: start
+    auto_timeout: 2
+
+- name: Confirm the configuration and stop the auto-checkpoint timer
+  aoscx_checkpoint:
+    auto: confirm
 """
 
 RETURN = r""" # """
+
+import json
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
@@ -70,16 +101,27 @@ def main():
     module_args = dict(
         source_config=dict(type="str", default="running-config"),
         destination_config=dict(type="str", default="startup-config"),
+        auto=dict(type="str", required=False, choices=["start", "confirm"]),
+        auto_timeout=dict(type="int", required=False),
     )
     ansible_module = AnsibleModule(
-        argument_spec=module_args, supports_check_mode=True
+        argument_spec=module_args,
+        supports_check_mode=True,
+        required_if=[("auto", "start", ["auto_timeout"])],
     )
 
     # Get playbook's arguments
     source_config = ansible_module.params["source_config"]
     destination_config = ansible_module.params["destination_config"]
+    auto = ansible_module.params["auto"]
+    auto_timeout = ansible_module.params["auto_timeout"]
 
     result = dict(changed=False)
+
+    if auto == "start" and auto_timeout not in range(1, 61):
+        ansible_module.fail_json(
+            msg="auto_timeout must be between 1 and 60 minutes"
+        )
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -95,6 +137,27 @@ def main():
         ansible_module.fail_json(
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
+
+    # Auto-checkpoint (confirmed commit) timer management.
+    if auto is not None:
+        if auto == "start":
+            response = session.request(
+                "POST",
+                "configs/autocheckpoint",
+                data=json.dumps({"minutes": auto_timeout}),
+            )
+        else:
+            response = session.request(
+                "PUT", "configs/autocheckpoint", data=json.dumps({})
+            )
+        if not 200 <= response.status_code < 300:
+            ansible_module.fail_json(
+                msg="Could not {0} the auto-checkpoint timer: {1}".format(
+                    auto, response.text
+                )
+            )
+        result["changed"] = True
+        ansible_module.exit_json(**result)
 
     device = Device(session)
 
