@@ -52,6 +52,12 @@ options:
     description: Configure MTU value of the interface
     type: int
     required: false
+  client_probe_enable:
+    description: >
+      Enable the interface to send periodic client probe packets to discover
+      clients (the C(client probe enable) interface command).
+    type: bool
+    required: false
   autoneg:
     description: >
       Configure the auto-negotiation state of the interface. If `off` both
@@ -449,6 +455,11 @@ def get_argument_spec():
             "type": "int",
             "required": False,
         },
+        "client_probe_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
+        },
         "duplex": {
             "type": "str",
             "required": False,
@@ -714,6 +725,7 @@ def main():
     vsx_sync = ansible_module.params["vsx_sync"]
     state = ansible_module.params["state"]
     mtu = ansible_module.params["mtu"]
+    client_probe_enable = ansible_module.params["client_probe_enable"]
     acl_name = ansible_module.params["acl_name"]
     acl_type = ansible_module.params["acl_type"]
     acl_direction = ansible_module.params["acl_direction"]
@@ -857,13 +869,13 @@ def main():
                 interface.config_attrs.append(key)
     # Private VLAN port type: an empty string clears it (sent as null).
     if pvlan_port_type is not None:
-        new_pvlan_port_type = (
-            None if pvlan_port_type == "" else pvlan_port_type
-        )
+        new_pvlan_port_type = None if pvlan_port_type == "" else pvlan_port_type
         if getattr(interface, "pvlan_port_type", None) != new_pvlan_port_type:
             interface.pvlan_port_type = new_pvlan_port_type
             if "pvlan_port_type" not in interface.config_attrs:
                 interface.config_attrs.append("pvlan_port_type")
+    if client_probe_enable is not None:
+        interface.client_probe_enable = client_probe_enable
     if vsx_sync:
         if not device.materialized:
             device.get()

@@ -5,3 +5,5 @@ minor_changes:
     VLAN, source IPv4/MAC, broadcast IPv4, directed IPv4 list and directed
     IPv4 range, as well as the global client probe settings C(enable),
     C(duration), C(time_interval), C(probe_types) and C(vlan_list).
+  - aoscx_interface - add the C(client_probe_enable) option to enable client
+    probing on a physical interface (the C(client probe enable) command).
