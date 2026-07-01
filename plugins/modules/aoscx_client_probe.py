@@ -47,7 +47,8 @@ options:
       - client-detection
   time_interval:
     description: >
-      Global time interval, in seconds, between two successive probe packets.
+      Global time interval, in seconds, between two successive probe packets
+      (30-300).
     type: int
     required: false
   probe_types:
@@ -275,6 +276,12 @@ def main():
     name = ansible_module.params["name"]
     entries = ansible_module.params["entries"]
     state = ansible_module.params["state"]
+
+    time_interval = ansible_module.params["time_interval"]
+    if time_interval is not None and not 30 <= time_interval <= 300:
+        ansible_module.fail_json(
+            msg="time_interval must be between 30 and 300 seconds"
+        )
 
     try:
         session = get_pyaoscx_session(ansible_module)
