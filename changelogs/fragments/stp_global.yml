@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_stp - add the global Spanning Tree settings C(enable), C(mode),
+    C(config_name) and C(config_revision) (system/stp_config), in addition to
+    the existing per-instance settings, so the global spanning-tree state, mode
+    and MSTP region name/revision can be managed.

@@ -21,8 +21,10 @@ module: aoscx_stp
 version_added: "4.6.0"
 short_description: Manage Spanning Tree instance settings
 description: >
-  This module provides configuration management of Spanning Tree instances
-  on AOS-CX devices (system/stp_instances).
+  This module provides configuration management of Spanning Tree on AOS-CX
+  devices: the global settings (system/stp_config, e.g. enable, mode, bridge
+  priority, MSTP region name and revision) and the per-instance settings
+  (system/stp_instances, e.g. timers and topology change traps).
 author: Aruba Networks (@ArubaNetworks)
 options:
   instance:
@@ -30,6 +32,31 @@ options:
     required: false
     type: str
     default: "mstp,0"
+  enable:
+    description: >
+      Global knob to enable or disable Spanning Tree on the device
+      (the C(spanning-tree) global command).
+    required: false
+    type: bool
+  mode:
+    description: Global spanning tree mode.
+    required: false
+    type: str
+    choices:
+      - mstp
+      - rpvst
+  config_name:
+    description: >
+      MSTP region configuration name (the C(spanning-tree config-name)
+      command). Global setting.
+    required: false
+    type: str
+  config_revision:
+    description: >
+      MSTP region configuration revision number (the
+      C(spanning-tree config-revision) command). Global setting.
+    required: false
+    type: int
   priority:
     description: Bridge priority multiplier (0-15).
     required: false
@@ -79,6 +106,8 @@ RETURN = r""" # """
 
 from ansible.module_utils.basic import AnsibleModule
 
+import json
+
 try:
     from pyaoscx.stp import Stp
 
@@ -95,6 +124,12 @@ if HAS_PYAOSCX_STP:
 def main():
     module_args = dict(
         instance=dict(type="str", required=False, default="mstp,0"),
+        enable=dict(type="bool", required=False),
+        mode=dict(
+            type="str", required=False, choices=["mstp", "rpvst"]
+        ),
+        config_name=dict(type="str", required=False),
+        config_revision=dict(type="int", required=False),
         priority=dict(type="int", required=False),
         hello_time=dict(type="int", required=False),
         forward_delay=dict(type="int", required=False),
@@ -164,6 +199,39 @@ def main():
 
     if changed:
         stp.apply()
+
+    # Global Spanning Tree settings live in system/stp_config.
+    global_map = {
+        "enable": "stp_enable",
+        "mode": "stp_mode",
+        "config_name": "mstp_config_name",
+        "config_revision": "mstp_config_revision",
+    }
+    global_supplied = {
+        attr: ansible_module.params[param]
+        for param, attr in global_map.items()
+        if ansible_module.params[param] is not None
+    }
+    if global_supplied:
+        response = session.request(
+            "GET", "system", params={"selector": "writable", "depth": 1}
+        )
+        system_doc = json.loads(response.text)
+        stp_cfg = dict(system_doc.get("stp_config") or {})
+        if any(stp_cfg.get(k) != v for k, v in global_supplied.items()):
+            stp_cfg.update(global_supplied)
+            system_doc["stp_config"] = stp_cfg
+            put = session.request(
+                "PUT", "system", data=json.dumps(system_doc)
+            )
+            if not 200 <= put.status_code < 300:
+                ansible_module.fail_json(
+                    msg="Could not update global STP config: {0}".format(
+                        put.text
+                    )
+                )
+            changed = True
+
     result["changed"] = changed
 
     ansible_module.exit_json(**result)
