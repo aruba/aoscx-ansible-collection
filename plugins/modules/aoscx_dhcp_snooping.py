@@ -72,12 +72,17 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-import json
-
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
+
+try:
+    from pyaoscx.device import Device
+
+    HAS_PYAOSCX = True
+except ImportError:
+    HAS_PYAOSCX = False
 
 GENERAL_CONFIG_KEY = "dhcpv4_snooping_general_configuration"
 
@@ -102,6 +107,11 @@ def main():
 
     result = dict(changed=False)
 
+    if not HAS_PYAOSCX:
+        ansible_module.fail_json(
+            msg="Could not find the PYAOSCX SDK. Make sure it is installed."
+        )
+
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
 
@@ -120,23 +130,14 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-    response = session.request(
-        "GET", "system", params={"selector": "writable", "depth": 2}
-    )
-    system_doc = json.loads(response.text)
-    general_config = dict(system_doc.get(GENERAL_CONFIG_KEY) or {})
+    device = Device(session)
+    device.get(selector="writable")
 
-    if any(general_config.get(k) != v for k, v in supplied.items()):
-        general_config.update(supplied)
-        system_doc[GENERAL_CONFIG_KEY] = general_config
-        put = session.request("PUT", "system", data=json.dumps(system_doc))
-        if not 200 <= put.status_code < 300:
-            ansible_module.fail_json(
-                msg="Could not update DHCPv4 snooping settings: {0}".format(
-                    put.text
-                )
-            )
-        result["changed"] = True
+    general_config = dict(getattr(device, GENERAL_CONFIG_KEY, None) or {})
+    general_config.update(supplied)
+    setattr(device, GENERAL_CONFIG_KEY, general_config)
+
+    result["changed"] = device.update()
 
     ansible_module.exit_json(**result)
 
