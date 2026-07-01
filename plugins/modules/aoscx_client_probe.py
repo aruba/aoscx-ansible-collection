@@ -183,8 +183,6 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-import json
-
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
@@ -193,6 +191,7 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
 try:
     from pyaoscx.client_probe_profile import ClientProbeProfile
     from pyaoscx.client_probe_profile_entry import ClientProbeProfileEntry
+    from pyaoscx.device import Device
 
     HAS_PYAOSCX = True
 except ImportError:
@@ -373,30 +372,22 @@ def _apply_globals(ansible_module, session):
     if not desired and params["vlan_list"] is None:
         return False
 
-    response = session.request(
-        "GET", "system", params={"selector": "writable", "depth": 2}
-    )
-    system_doc = json.loads(response.text)
+    device = Device(session)
+    device.get(selector="writable")
 
     if params["vlan_list"] is not None:
-        vlan_list = dict(system_doc.get("client_probe_vlan_list") or {})
+        vlan_list = dict(
+            getattr(device, "client_probe_vlan_list", None) or {}
+        )
         for key in ("secured", "unsecured"):
             if params["vlan_list"].get(key) is not None:
                 vlan_list[key] = params["vlan_list"][key]
         desired["client_probe_vlan_list"] = vlan_list
 
-    if all(system_doc.get(k) == v for k, v in desired.items()):
-        return False
+    for attr, value in desired.items():
+        setattr(device, attr, value)
 
-    system_doc.update(desired)
-    put = session.request("PUT", "system", data=json.dumps(system_doc))
-    if not 200 <= put.status_code < 300:
-        ansible_module.fail_json(
-            msg="Could not update global client probe settings: {0}".format(
-                put.text
-            )
-        )
-    return True
+    return device.update()
 
 
 if __name__ == "__main__":
