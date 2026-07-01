@@ -260,6 +260,20 @@ def main():
     except Exception:
         vlan_exists = False
 
+    # Validate the referenced primary VLAN exists before making any change so
+    # a secondary VLAN is not created when the association would be rejected.
+    if pvlan_association is not None and state != "delete":
+        primary_vlan = Vlan(session, pvlan_association)
+        try:
+            primary_vlan.get()
+        except Exception:
+            ansible_module.fail_json(
+                msg=(
+                    "Primary VLAN {0} referenced by pvlan_association does "
+                    "not exist".format(pvlan_association)
+                )
+            )
+
     if state == "delete":
         if acl_type:
             try:
