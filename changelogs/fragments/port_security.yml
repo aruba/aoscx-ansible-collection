@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_port_security - new module to manage the global port access port
+    security settings (C(enable) and C(trap_disable)), corresponding to the
+    C(port-access port-security enable) command.
