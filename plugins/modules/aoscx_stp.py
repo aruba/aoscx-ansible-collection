@@ -57,6 +57,75 @@ options:
       C(spanning-tree config-revision) command). Global setting.
     required: false
     type: int
+  max_hop_count:
+    description: >
+      Global MSTP maximum hop count (the C(spanning-tree max-hops) command).
+    required: false
+    type: int
+  tx_hold_count:
+    description: >
+      Global transmit hold count, limiting how many BPDUs are sent per hello
+      interval (the C(spanning-tree transmit-hold-count) command).
+    required: false
+    type: int
+  path_cost_type:
+    description: >
+      Global path cost calculation method (the C(spanning-tree cost) style).
+    required: false
+    type: str
+    choices:
+      - long
+      - short
+  bpdu_guard_timeout:
+    description: >
+      Global BPDU guard error-disable recovery timeout in seconds (0 keeps the
+      port disabled until it is re-enabled manually).
+    required: false
+    type: int
+  extended_system_id_disable:
+    description: Disable the use of the extended system-id in the bridge id.
+    required: false
+    type: bool
+  ignore_pvid_inconsistency:
+    description: Ignore PVID inconsistency for RPVST.
+    required: false
+    type: bool
+  qinq_pbridge_mode:
+    description: Enable MSTP QinQ provider-bridge mode.
+    required: false
+    type: bool
+  rpvst_auto_vlan:
+    description: Enable RPVST automatic VLAN handling.
+    required: false
+    type: bool
+  rpvst_auto_vlan_no_vport_limit:
+    description: Disable the virtual-port limit for RPVST automatic VLANs.
+    required: false
+    type: bool
+  rpvst_auto_vlan_priority:
+    description: Priority applied to RPVST automatic VLANs.
+    required: false
+    type: int
+  rpvst_mstp_interconnect_vlan:
+    description: VLAN used to interconnect RPVST and MSTP regions.
+    required: false
+    type: int
+  trap_errant_bpdu_rx:
+    description: Enable the SNMP trap for received errant BPDUs.
+    required: false
+    type: bool
+  trap_loop_guard_inconsistency:
+    description: Enable the SNMP trap for loop-guard inconsistencies.
+    required: false
+    type: bool
+  trap_new_root:
+    description: Enable the SNMP trap sent when the device becomes root.
+    required: false
+    type: bool
+  trap_root_guard_inconsistency:
+    description: Enable the SNMP trap for root-guard inconsistencies.
+    required: false
+    type: bool
   priority:
     description: Bridge priority multiplier (0-15).
     required: false
@@ -157,6 +226,23 @@ def main():
         ),
         config_name=dict(type="str", required=False),
         config_revision=dict(type="int", required=False),
+        max_hop_count=dict(type="int", required=False),
+        tx_hold_count=dict(type="int", required=False),
+        path_cost_type=dict(
+            type="str", required=False, choices=["long", "short"]
+        ),
+        bpdu_guard_timeout=dict(type="int", required=False),
+        extended_system_id_disable=dict(type="bool", required=False),
+        ignore_pvid_inconsistency=dict(type="bool", required=False),
+        qinq_pbridge_mode=dict(type="bool", required=False),
+        rpvst_auto_vlan=dict(type="bool", required=False),
+        rpvst_auto_vlan_no_vport_limit=dict(type="bool", required=False),
+        rpvst_auto_vlan_priority=dict(type="int", required=False),
+        rpvst_mstp_interconnect_vlan=dict(type="int", required=False),
+        trap_errant_bpdu_rx=dict(type="bool", required=False),
+        trap_loop_guard_inconsistency=dict(type="bool", required=False),
+        trap_new_root=dict(type="bool", required=False),
+        trap_root_guard_inconsistency=dict(type="bool", required=False),
         priority=dict(type="int", required=False),
         hello_time=dict(type="int", required=False),
         forward_delay=dict(type="int", required=False),
@@ -283,6 +369,25 @@ def main():
         "mode": "stp_mode",
         "config_name": "mstp_config_name",
         "config_revision": "mstp_config_revision",
+        "max_hop_count": "max_hop_count",
+        "tx_hold_count": "tx_hold_count",
+        "path_cost_type": "path_cost_type",
+        "bpdu_guard_timeout": "bpdu_guard_timeout",
+        "extended_system_id_disable": "extended_sysid_disable",
+        "ignore_pvid_inconsistency": "ignore_pvid_inconsistency_enable",
+        "qinq_pbridge_mode": "mstp_qinq_pbridge_mode_enable",
+        "rpvst_auto_vlan": "rpvst_auto_vlan_enable",
+        "rpvst_auto_vlan_no_vport_limit": "rpvst_auto_vlan_no_vport_limit",
+        "rpvst_auto_vlan_priority": "rpvst_auto_vlan_priority",
+        "rpvst_mstp_interconnect_vlan": "rpvst_mstp_interconnect_vlan",
+        "trap_errant_bpdu_rx": "stp_errant_bpdu_rx_trap_enable",
+        "trap_loop_guard_inconsistency": (
+            "stp_loop_guard_inconsistency_trap_enable"
+        ),
+        "trap_new_root": "stp_new_root_trap_enable",
+        "trap_root_guard_inconsistency": (
+            "stp_root_guard_inconsistency_trap_enable"
+        ),
     }
     global_supplied = {
         attr: ansible_module.params[param]
