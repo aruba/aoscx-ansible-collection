@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - New module ``aoscx_interface_stp`` to configure per-interface spanning-tree
+    settings (admin edge, BPDU filter/guard, root/loop guard, link type, path
+    cost, port priority).
