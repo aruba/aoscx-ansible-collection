@@ -26,9 +26,57 @@ description: >
 author: Aruba Networks (@ArubaNetworks)
 options:
   name:
-    description: Name of the Client Probe Profile.
+    description: >
+      Name of the Client Probe Profile. Required to manage a profile or its
+      entries, and to delete a profile. May be omitted when only the global
+      client probe settings are configured.
     type: str
-    required: true
+    required: false
+  enable:
+    description: Global switch to enable or disable client probing.
+    type: bool
+    required: false
+  duration:
+    description: >
+      Global duration mode of the probes. C(periodic) keeps sending probes
+      even after a client is detected.
+    type: str
+    required: false
+    choices:
+      - periodic
+      - client-detection
+  time_interval:
+    description: >
+      Global time interval, in seconds, between two successive probe packets.
+    type: int
+    required: false
+  probe_types:
+    description: >
+      Global list of probe packet types to use to discover clients. The
+      supplied list fully replaces the enabled types.
+    type: list
+    elements: str
+    required: false
+    choices:
+      - garp
+      - ping_broadcast
+      - ping_sweep
+      - ping_unicast
+  vlan_list:
+    description: Global VLANs on which clients are probed.
+    type: dict
+    required: false
+    suboptions:
+      secured:
+        description: >
+          Secured VLANs to probe (C(all) or a VLAN list such as C(1,2,3)).
+        type: str
+        required: false
+      unsecured:
+        description: >
+          Unsecured VLANs to probe (C(all) or a VLAN list such as C(1,2,3)).
+        type: str
+        required: false
   entries:
     description: >
       List of probe entries in the profile. Supplied entries are created or
@@ -114,6 +162,18 @@ EXAMPLES = """
           end_ip_addr: 10.0.0.20
     state: create
 
+- name: Configure the global client probe settings
+  aoscx_client_probe:
+    enable: true
+    duration: periodic
+    time_interval: 30
+    probe_types:
+      - garp
+      - ping_broadcast
+    vlan_list:
+      secured: all
+      unsecured: all
+
 - name: Delete a Client Probe Profile
   aoscx_client_probe:
     name: WakeUp-Clients
@@ -121,6 +181,8 @@ EXAMPLES = """
 """
 
 RETURN = r""" # """
+
+import json
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
@@ -144,10 +206,33 @@ ENTRY_FIELDS = (
     "directed_ipv4_range",
 )
 
+PROBE_TYPES = ("garp", "ping_broadcast", "ping_sweep", "ping_unicast")
+
 
 def main():
     module_args = dict(
-        name=dict(type="str", required=True),
+        name=dict(type="str", required=False),
+        enable=dict(type="bool", required=False),
+        duration=dict(
+            type="str",
+            required=False,
+            choices=["periodic", "client-detection"],
+        ),
+        time_interval=dict(type="int", required=False),
+        probe_types=dict(
+            type="list",
+            elements="str",
+            required=False,
+            choices=list(PROBE_TYPES),
+        ),
+        vlan_list=dict(
+            type="dict",
+            required=False,
+            options=dict(
+                secured=dict(type="str", required=False),
+                unsecured=dict(type="str", required=False),
+            ),
+        ),
         entries=dict(
             type="list",
             elements="dict",
@@ -198,51 +283,113 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-    profile = ClientProbeProfile(session, name)
-    try:
-        profile.get()
-        exists = True
-    except Exception:
-        exists = False
-
     if state == "delete":
+        if name is None:
+            ansible_module.fail_json(
+                msg="name is required to delete a Client Probe Profile"
+            )
+        profile = ClientProbeProfile(session, name)
+        try:
+            profile.get()
+            exists = True
+        except Exception:
+            exists = False
         if exists:
             profile.delete()
             result["changed"] = True
         ansible_module.exit_json(**result)
 
     changed = False
-    if not exists:
-        profile.apply()
-        changed = True
 
-    if entries:
-        current = ClientProbeProfileEntry.get_all(session, profile)
-        for entry in entries:
-            entry_id = entry["entry_id"]
-            supplied = {
-                field: entry[field]
-                for field in ENTRY_FIELDS
-                if entry.get(field) is not None
-            }
-            key = str(entry_id)
-            if key in current:
-                obj = current[key]
-                obj.get()
-                for field, value in supplied.items():
-                    setattr(obj, field, value)
-                    if field not in obj.config_attrs:
-                        obj.config_attrs.append(field)
-                changed |= obj.apply()
-            else:
-                obj = ClientProbeProfileEntry(
-                    session, entry_id, profile, **supplied
-                )
-                obj.apply()
-                changed = True
+    # Global (system-wide) client probe settings.
+    changed |= _apply_globals(ansible_module, session)
+
+    if name is not None:
+        profile = ClientProbeProfile(session, name)
+        try:
+            profile.get()
+            exists = True
+        except Exception:
+            exists = False
+
+        if not exists:
+            profile.apply()
+            changed = True
+
+        if entries:
+            current = ClientProbeProfileEntry.get_all(session, profile)
+            for entry in entries:
+                entry_id = entry["entry_id"]
+                supplied = {
+                    field: entry[field]
+                    for field in ENTRY_FIELDS
+                    if entry.get(field) is not None
+                }
+                key = str(entry_id)
+                if key in current:
+                    obj = current[key]
+                    obj.get()
+                    for field, value in supplied.items():
+                        setattr(obj, field, value)
+                        if field not in obj.config_attrs:
+                            obj.config_attrs.append(field)
+                    changed |= obj.apply()
+                else:
+                    obj = ClientProbeProfileEntry(
+                        session, entry_id, profile, **supplied
+                    )
+                    obj.apply()
+                    changed = True
 
     result["changed"] = changed
     ansible_module.exit_json(**result)
+
+
+def _apply_globals(ansible_module, session):
+    """Apply the system-wide client probe settings, return True if changed."""
+    params = ansible_module.params
+    scalar_map = {
+        "enable": "client_probe_enable",
+        "duration": "client_probe_duration",
+        "time_interval": "client_probe_time_interval",
+    }
+    desired = {
+        attr: params[param]
+        for param, attr in scalar_map.items()
+        if params[param] is not None
+    }
+    if params["probe_types"] is not None:
+        desired["client_probe_type"] = {
+            probe: probe in params["probe_types"] for probe in PROBE_TYPES
+        }
+
+    if not desired and params["vlan_list"] is None:
+        return False
+
+    response = session.request(
+        "GET", "system", params={"selector": "writable", "depth": 2}
+    )
+    system_doc = json.loads(response.text)
+
+    if params["vlan_list"] is not None:
+        vlan_list = dict(system_doc.get("client_probe_vlan_list") or {})
+        for key in ("secured", "unsecured"):
+            if params["vlan_list"].get(key) is not None:
+                vlan_list[key] = params["vlan_list"][key]
+        desired["client_probe_vlan_list"] = vlan_list
+
+    if all(system_doc.get(k) == v for k, v in desired.items()):
+        return False
+
+    system_doc.update(desired)
+    put = session.request("PUT", "system", data=json.dumps(system_doc))
+    if not 200 <= put.status_code < 300:
+        ansible_module.fail_json(
+            msg="Could not update global client probe settings: {0}".format(
+                put.text
+            )
+        )
+    return True
 
 
 if __name__ == "__main__":
