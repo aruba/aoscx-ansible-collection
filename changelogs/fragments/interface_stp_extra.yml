@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_interface_stp - add the per-interface options
+    C(restricted_role_disable), C(protocol_migration_disable), C(rpvst_filter)
+    and C(rpvst_guard) so root-guard, protocol migration and RPVST BPDU
+    filtering/guard can be managed on the port.
