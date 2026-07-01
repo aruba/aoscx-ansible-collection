@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - aoscx_dhcp_snooping - new module to manage the global DHCPv4 snooping
+    settings (system/dhcpv4_snooping_general_configuration), including
+    C(enable), C(allow_overwrite_binding), C(disable_mac_verification),
+    C(enable_client_attribute_caching), C(enable_client_event_log) and
+    C(vxlan_trusted).
+  - aoscx_vlan - add the per-VLAN DHCP snooping options
+    C(dhcpv4_snooping_enable), C(dhcpv4_snooping_ip_binding_disable),
+    C(dhcpv6_snooping_enable) and C(dhcpv6_snooping_ip_binding_disable).
