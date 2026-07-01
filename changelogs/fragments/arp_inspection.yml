@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - aoscx_vlan - add the C(arp_inspection_enable) option to enable Dynamic ARP
+    inspection on a VLAN (the C(arp inspection) command).
