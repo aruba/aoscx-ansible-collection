@@ -127,19 +127,29 @@ options:
     required: false
     type: bool
   priority:
-    description: Bridge priority multiplier (0-15).
+    description: >
+      Bridge priority multiplier (0-15). For the default instance C(mstp,0)
+      this is the global CIST priority (the C(spanning-tree priority)
+      command); for an MST instance it is that instance's priority (the
+      C(spanning-tree instance N priority) command).
     required: false
     type: int
   hello_time:
-    description: Hello time in seconds.
+    description: >
+      Global bridge hello time in seconds (the C(spanning-tree hello-time)
+      command). Bridge-wide setting.
     required: false
     type: int
   forward_delay:
-    description: Forward delay in seconds.
+    description: >
+      Global bridge forward delay in seconds (the
+      C(spanning-tree forward-delay) command). Bridge-wide setting.
     required: false
     type: int
   max_age:
-    description: Maximum age in seconds.
+    description: >
+      Global bridge maximum age in seconds (the C(spanning-tree max-age)
+      command). Bridge-wide setting.
     required: false
     type: int
   topology_change_trap_enable:
@@ -336,13 +346,14 @@ def main():
         stp.get()
         exists = True
 
-    for field in (
-        "priority",
-        "hello_time",
-        "forward_delay",
-        "max_age",
-        "topology_change_trap_enable",
-    ):
+    # The bridge-wide priority and timers (hello_time, forward_delay,
+    # max_age) are global settings on AOS-CX and are applied to
+    # system/stp_config below. Only the topology change trap and the priority
+    # of an MST instance (not the CIST, mstp,0) live on the instance itself.
+    instance_fields = ["topology_change_trap_enable"]
+    if instance != "mstp,0":
+        instance_fields.append("priority")
+    for field in instance_fields:
         value = ansible_module.params[field]
         if value is None:
             continue
@@ -369,6 +380,9 @@ def main():
         "mode": "stp_mode",
         "config_name": "mstp_config_name",
         "config_revision": "mstp_config_revision",
+        "hello_time": "hello_time",
+        "forward_delay": "forward_delay",
+        "max_age": "max_age",
         "max_hop_count": "max_hop_count",
         "tx_hold_count": "tx_hold_count",
         "path_cost_type": "path_cost_type",
@@ -394,6 +408,10 @@ def main():
         for param, attr in global_map.items()
         if ansible_module.params[param] is not None
     }
+    # The CIST (default instance mstp,0) bridge priority is a global setting
+    # (the C(spanning-tree priority) command), unlike an MST instance priority.
+    if instance == "mstp,0" and ansible_module.params["priority"] is not None:
+        global_supplied["priority"] = ansible_module.params["priority"]
     if global_supplied:
         response = session.request(
             "GET", "system", params={"selector": "writable", "depth": 1}
