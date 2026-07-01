@@ -77,6 +77,32 @@ options:
     description: Enable topology change traps for this instance.
     required: false
     type: bool
+  vlan_ids:
+    description: >
+      List of VLAN ids joined into this Spanning Tree (MSTP) instance. The
+      supplied list fully replaces the current set of VLANs.
+    required: false
+    type: list
+    elements: int
+  ports:
+    description: >
+      Per-instance, per-port Spanning Tree settings. Ports must already exist.
+    required: false
+    type: list
+    elements: dict
+    suboptions:
+      port:
+        description: Interface name (for example 1/1/5).
+        required: true
+        type: str
+      admin_path_cost:
+        description: Administrative path cost for the port in this instance.
+        required: false
+        type: int
+      port_priority:
+        description: Port priority for the port in this instance.
+        required: false
+        type: int
   state:
     description: Update or delete the Spanning Tree instance.
     required: false
@@ -107,6 +133,7 @@ RETURN = r""" # """
 from ansible.module_utils.basic import AnsibleModule
 
 import json
+from urllib.parse import quote
 
 try:
     from pyaoscx.stp import Stp
@@ -135,6 +162,17 @@ def main():
         forward_delay=dict(type="int", required=False),
         max_age=dict(type="int", required=False),
         topology_change_trap_enable=dict(type="bool", required=False),
+        vlan_ids=dict(type="list", elements="int", required=False),
+        ports=dict(
+            type="list",
+            elements="dict",
+            required=False,
+            options=dict(
+                port=dict(type="str", required=True),
+                admin_path_cost=dict(type="int", required=False),
+                port_priority=dict(type="int", required=False),
+            ),
+        ),
         state=dict(
             type="str",
             default="create",
@@ -180,7 +218,38 @@ def main():
             result["changed"] = True
         ansible_module.exit_json(**result)
 
+    vlan_ids = ansible_module.params["vlan_ids"]
+
     changed = not exists
+    # The pyaoscx Stp class cannot create a new instance (it posts a
+    # non-configurable "instance" key), so create it directly through REST
+    # with its compound index parts.
+    if not exists:
+        if "," not in instance:
+            ansible_module.fail_json(
+                msg="instance must be '<type>,<id>', for example 'mstp,1'"
+            )
+        instance_type, _sep, stp_instance_id = instance.partition(",")
+        body = {"instance_type": instance_type}
+        try:
+            body["stp_instance_id"] = int(stp_instance_id)
+        except ValueError:
+            body["stp_instance_id"] = stp_instance_id
+        if vlan_ids is not None:
+            body["vlan_ids"] = vlan_ids
+        post = session.request(
+            "POST", "system/stp_instances", data=json.dumps(body)
+        )
+        if not 200 <= post.status_code < 300:
+            ansible_module.fail_json(
+                msg="Could not create STP instance {0}: {1}".format(
+                    instance, post.text
+                )
+            )
+        stp = Stp(session, instance)
+        stp.get()
+        exists = True
+
     for field in (
         "priority",
         "hello_time",
@@ -191,10 +260,18 @@ def main():
         value = ansible_module.params[field]
         if value is None:
             continue
-        if not exists or getattr(stp, field, None) != value:
+        if getattr(stp, field, None) != value:
             setattr(stp, field, value)
             if field not in stp.config_attrs:
                 stp.config_attrs.append(field)
+            changed = True
+
+    if vlan_ids is not None:
+        current_vlans = getattr(stp, "vlan_ids", None) or []
+        if sorted(current_vlans) != sorted(vlan_ids):
+            stp.vlan_ids = vlan_ids
+            if "vlan_ids" not in stp.config_attrs:
+                stp.config_attrs.append("vlan_ids")
             changed = True
 
     if changed:
@@ -231,6 +308,40 @@ def main():
                     )
                 )
             changed = True
+
+    # Per-instance, per-port settings (system/stp_instances/.../
+    # stp_instance_ports/{port}); these entries are PUT-only.
+    ports = ansible_module.params["ports"]
+    if ports:
+        for entry in ports:
+            supplied = {
+                key: entry[key]
+                for key in ("admin_path_cost", "port_priority")
+                if entry.get(key) is not None
+            }
+            if not supplied:
+                continue
+            port_uri = "{0}/stp_instance_ports/{1}".format(
+                stp.path, quote(entry["port"], safe="")
+            )
+            get_resp = session.request(
+                "GET", port_uri,
+                params={"selector": "writable", "depth": 1},
+            )
+            port_doc = json.loads(get_resp.text)
+            if any(port_doc.get(k) != v for k, v in supplied.items()):
+                port_doc.update(supplied)
+                put = session.request(
+                    "PUT", port_uri, data=json.dumps(port_doc)
+                )
+                if not 200 <= put.status_code < 300:
+                    ansible_module.fail_json(
+                        msg=(
+                            "Could not update STP instance port {0}: "
+                            "{1}".format(entry["port"], put.text)
+                        )
+                    )
+                changed = True
 
     result["changed"] = changed
 

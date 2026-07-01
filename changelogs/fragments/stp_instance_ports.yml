@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - aoscx_stp - add the per-instance C(vlan_ids) mapping and the per-instance
+    C(ports) settings (admin_path_cost and port_priority via
+    stp_instance_ports), and support creating a new MSTP instance directly
+    through REST so that MST instances, their VLAN membership and per-port cost
+    and priority can be fully managed.
