@@ -276,12 +276,14 @@ options:
   pvlan_port_type:
     description: >
       Private VLAN port type. C(promiscuous) for a port in the primary VLAN,
-      C(secondary) for a port in a secondary VLAN.
+      C(secondary) for a port in a secondary VLAN. Set to an empty string to
+      clear the port type (back to a regular port).
     type: str
     required: false
     choices:
       - promiscuous
       - secondary
+      - ""
   state:
     description: Create, Update or Delete the Interface.
     type: str
@@ -618,7 +620,7 @@ def get_argument_spec():
             "type": "str",
             "required": False,
             "default": None,
-            "choices": ["promiscuous", "secondary"],
+            "choices": ["promiscuous", "secondary", ""],
         },
         "qos_rate": {
             "type": "dict",
@@ -847,13 +849,21 @@ def main():
         "loop_protect_action": loop_protect_action,
         "urpf_check": urpf_check,
         "ip_mtu": ip_mtu,
-        "pvlan_port_type": pvlan_port_type,
     }
     for key, val in top_level.items():
         if val is not None:
             setattr(interface, key, val)
             if key not in interface.config_attrs:
                 interface.config_attrs.append(key)
+    # Private VLAN port type: an empty string clears it (sent as null).
+    if pvlan_port_type is not None:
+        new_pvlan_port_type = (
+            None if pvlan_port_type == "" else pvlan_port_type
+        )
+        if getattr(interface, "pvlan_port_type", None) != new_pvlan_port_type:
+            interface.pvlan_port_type = new_pvlan_port_type
+            if "pvlan_port_type" not in interface.config_attrs:
+                interface.config_attrs.append("pvlan_port_type")
     if vsx_sync:
         if not device.materialized:
             device.get()
