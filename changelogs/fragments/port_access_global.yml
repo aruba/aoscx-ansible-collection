@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - aoscx_port_access - new module to manage the global (system level) port
+    access settings, including port security (C(port_security_enable),
+    C(port_security_trap_disable)), C(client_move_secure),
+    C(client_moves_disable), C(event_log_client), C(gbp_reflexive) and
+    C(policy_reflexive).
