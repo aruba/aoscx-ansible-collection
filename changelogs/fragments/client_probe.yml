@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_client_probe - new module to manage Client Probe Profiles
+    (system/client_probe_profiles) and their entries, including the per-entry
+    VLAN, source IPv4/MAC, broadcast IPv4, directed IPv4 list and directed
+    IPv4 range.
