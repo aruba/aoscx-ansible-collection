@@ -89,8 +89,6 @@ EXAMPLES = """
 
 RETURN = r""" # """
 
-import json
-
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
@@ -138,31 +136,20 @@ def main():
             msg="Could not get PYAOSCX Session: {0}".format(str(e))
         )
 
-    # Auto-checkpoint (confirmed commit) timer management.
-    if auto is not None:
-        if auto == "start":
-            response = session.request(
-                "POST",
-                "configs/autocheckpoint",
-                data=json.dumps({"minutes": auto_timeout}),
-            )
-        else:
-            response = session.request(
-                "PUT", "configs/autocheckpoint", data=json.dumps({})
-            )
-        if not 200 <= response.status_code < 300:
-            ansible_module.fail_json(
-                msg="Could not {0} the auto-checkpoint timer: {1}".format(
-                    auto, response.text
-                )
-            )
-        result["changed"] = True
-        ansible_module.exit_json(**result)
-
     device = Device(session)
 
     # Create a Configuration Object
     config = device.configuration()
+
+    # Auto-checkpoint (confirmed commit) timer management.
+    if auto is not None:
+        if auto == "start":
+            success = config.set_auto_checkpoint(auto_timeout)
+        else:
+            success = config.confirm_auto_checkpoint()
+        result["changed"] = success
+        ansible_module.exit_json(**result)
+
     success = config.create_checkpoint(source_config, destination_config)
 
     # Changed
