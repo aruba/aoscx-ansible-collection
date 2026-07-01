@@ -216,6 +216,7 @@ from urllib.parse import quote
 
 try:
     from pyaoscx.stp import Stp
+    from pyaoscx.device import Device
 
     HAS_PYAOSCX_STP = True
 except ImportError:
@@ -413,23 +414,12 @@ def main():
     if instance == "mstp,0" and ansible_module.params["priority"] is not None:
         global_supplied["priority"] = ansible_module.params["priority"]
     if global_supplied:
-        response = session.request(
-            "GET", "system", params={"selector": "writable", "depth": 1}
-        )
-        system_doc = json.loads(response.text)
-        stp_cfg = dict(system_doc.get("stp_config") or {})
-        if any(stp_cfg.get(k) != v for k, v in global_supplied.items()):
-            stp_cfg.update(global_supplied)
-            system_doc["stp_config"] = stp_cfg
-            put = session.request(
-                "PUT", "system", data=json.dumps(system_doc)
-            )
-            if not 200 <= put.status_code < 300:
-                ansible_module.fail_json(
-                    msg="Could not update global STP config: {0}".format(
-                        put.text
-                    )
-                )
+        device = Device(session)
+        device.get(selector="writable")
+        stp_cfg = dict(getattr(device, "stp_config", None) or {})
+        stp_cfg.update(global_supplied)
+        device.stp_config = stp_cfg
+        if device.update():
             changed = True
 
     # Per-instance, per-port settings (system/stp_instances/.../
