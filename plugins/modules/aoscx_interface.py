@@ -273,6 +273,15 @@ options:
       Maximum number of DHCPv6 snooping bindings allowed on the port (1-8192).
     type: int
     required: false
+  pvlan_port_type:
+    description: >
+      Private VLAN port type. C(promiscuous) for a port in the primary VLAN,
+      C(secondary) for a port in a secondary VLAN.
+    type: str
+    required: false
+    choices:
+      - promiscuous
+      - secondary
   state:
     description: Create, Update or Delete the Interface.
     type: str
@@ -605,6 +614,12 @@ def get_argument_spec():
             "required": False,
             "default": None,
         },
+        "pvlan_port_type": {
+            "type": "str",
+            "required": False,
+            "default": None,
+            "choices": ["promiscuous", "secondary"],
+        },
         "qos_rate": {
             "type": "dict",
             "required": False,
@@ -728,6 +743,7 @@ def main():
     dhcpv6_snooping_max_bindings = ansible_module.params[
         "dhcpv6_snooping_max_bindings"
     ]
+    pvlan_port_type = ansible_module.params["pvlan_port_type"]
 
     configure_speed = ansible_module.params["configure_speed"]
     autoneg = ansible_module.params["autoneg"]
@@ -831,6 +847,7 @@ def main():
         "loop_protect_action": loop_protect_action,
         "urpf_check": urpf_check,
         "ip_mtu": ip_mtu,
+        "pvlan_port_type": pvlan_port_type,
     }
     for key, val in top_level.items():
         if val is not None:
