@@ -24,7 +24,10 @@ description: >
   This module manages the global DHCPv4 snooping configuration
   (system/dhcpv4_snooping_general_configuration) on AOS-CX devices. Per-VLAN
   snooping is managed with the aoscx_vlan module and per-port trust with the
-  aoscx_interface module.
+  aoscx_interface module. Some advanced options (for example
+  C(enable_client_event_log)) require REST API version 10.16 or later (set
+  ansible_aoscx_rest_version to 10.16); the base C(enable) setting is
+  available on earlier versions.
 author: Aruba Networks (@ArubaNetworks)
 options:
   enable:
