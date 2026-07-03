@@ -22,7 +22,10 @@ version_added: "5.0.0"
 short_description: Manage Client Probe Profiles on AOS-CX switches.
 description: >
   This module provides configuration management of Client Probe Profiles and
-  their entries on AOS-CX devices.
+  their entries on AOS-CX devices. Managing client probe profiles (the
+  C(name) and C(entries) options) requires REST API version 10.16 or later
+  (set ansible_aoscx_rest_version to 10.16); the global client probe settings
+  are available from earlier versions.
 author: Aruba Networks (@ArubaNetworks)
 options:
   name:
