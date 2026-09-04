@@ -14,8 +14,8 @@ import traceback
 
 from contextlib import closing
 
-from ansible.module_utils._text import to_text
 from ansible.module_utils.basic import missing_required_lib
+from ansible.module_utils.common.text.converters import to_text
 
 PARAMIKO_IMP_ERR = None
 try:
