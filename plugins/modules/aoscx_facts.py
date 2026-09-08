@@ -47,6 +47,7 @@ options:
       - software_images
       - software_info
       - software_version
+      - stacking
     required: false
     default:
       - domain_name
@@ -160,6 +161,8 @@ ansible_net_mgmt_intf_status:
   returned: always
   type: dict
 """
+import json
+
 from ansible.module_utils.basic import AnsibleModule
 
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
@@ -204,6 +207,7 @@ def main():
                 "software_images",
                 "software_info",
                 "software_version",
+                "stacking",
             ],
         ),
         "gather_network_resources": dict(
@@ -418,6 +422,26 @@ def main():
                 else:
                     intfs = switch.subsystems[subsystem][subset]
                 ansible_facts[str_subset].update({subsystem: intfs})
+
+    # VSF (stacking) members: the number of switches in the stack and their
+    # role/status. A standalone switch is reported as a single VSF member.
+    if "stacking" in subset_list:
+        try:
+            vsf_depth = session.api.default_facts_depth
+            response = session.request(
+                "GET", "system/vsf_members?depth={0}".format(vsf_depth)
+            )
+            members_data = json.loads(response.text)
+        except Exception as e:
+            ansible_module.fail_json(msg="VSF members: {0}".format(str(e)))
+        vsf_members = {}
+        for member_id, data in members_data.items():
+            vsf_members[member_id] = {
+                "role": data.get("role"),
+                "status": data.get("status"),
+            }
+        ansible_facts["ansible_net_vsf_members"] = vsf_members
+        ansible_facts["ansible_net_vsf_member_count"] = len(members_data)
 
     ansible_module.exit_json(ansible_facts=ansible_facts)
 

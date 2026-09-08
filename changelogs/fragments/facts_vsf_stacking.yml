@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_facts - add the C(stacking) gather_subset which returns the number of
+    switches in the VSF stack (C(ansible_net_vsf_member_count)) and the VSF
+    members with their role and status (C(ansible_net_vsf_members)). A
+    standalone switch is reported as a single VSF member.
