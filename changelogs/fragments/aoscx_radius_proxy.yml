@@ -1,0 +1,6 @@
+minor_changes:
+  - Add ``aoscx_radius_proxy_client_group`` and ``aoscx_radius_proxy_profile``
+    modules to manage RADIUS proxy client groups (downstream NAS clients) and
+    proxy profiles (tying a client group and an AAA server group within a VRF).
+    Requires a pyaoscx release that ships the ``RadiusProxyClientGroup`` and
+    ``RadiusProxyProfile`` classes.
