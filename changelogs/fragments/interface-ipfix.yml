@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - New module ``aoscx_interface_ipfix`` to attach or detach an ingress IPFIX
+    flow monitor (IPv4 or IPv6) on an interface.
