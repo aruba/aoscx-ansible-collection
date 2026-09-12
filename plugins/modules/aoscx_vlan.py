@@ -76,6 +76,22 @@ options:
     description: Enable IP IGMP Snooping
     required: false
     type: bool
+  dhcpv4_snooping_enable:
+    description: Enable DHCPv4 snooping on the VLAN.
+    required: false
+    type: bool
+  dhcpv4_snooping_ip_binding_disable:
+    description: Disable the DHCPv4 snooping IP source binding on the VLAN.
+    required: false
+    type: bool
+  dhcpv6_snooping_enable:
+    description: Enable DHCPv6 snooping on the VLAN.
+    required: false
+    type: bool
+  dhcpv6_snooping_ip_binding_disable:
+    description: Disable the DHCPv6 snooping IP source binding on the VLAN.
+    required: false
+    type: bool
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -177,6 +193,22 @@ def get_argument_spec():
             "type": "bool",
             "required": False,
         },
+        "dhcpv4_snooping_enable": {
+            "type": "bool",
+            "required": False,
+        },
+        "dhcpv4_snooping_ip_binding_disable": {
+            "type": "bool",
+            "required": False,
+        },
+        "dhcpv6_snooping_enable": {
+            "type": "bool",
+            "required": False,
+        },
+        "dhcpv6_snooping_ip_binding_disable": {
+            "type": "bool",
+            "required": False,
+        },
         "state": {
             "type": "str",
             "default": "create",
@@ -213,6 +245,16 @@ def main():
     voice = ansible_module.params["voice"]
     vsx_sync = ansible_module.params["vsx_sync"]
     ip_igmp_snooping = ansible_module.params["ip_igmp_snooping"]
+    dhcp_snooping_attrs = {
+        key: ansible_module.params[key]
+        for key in (
+            "dhcpv4_snooping_enable",
+            "dhcpv4_snooping_ip_binding_disable",
+            "dhcpv6_snooping_enable",
+            "dhcpv6_snooping_ip_binding_disable",
+        )
+        if ansible_module.params[key] is not None
+    }
     state = ansible_module.params["state"]
     try:
         session = get_pyaoscx_session(ansible_module)
@@ -293,6 +335,10 @@ def main():
                 or vlan.mgmd_enable["igmp"] != ip_igmp_snooping
             )
             vlan.mgmd_enable["igmp"] = ip_igmp_snooping
+
+        for attr, value in dhcp_snooping_attrs.items():
+            modified |= getattr(vlan, attr, None) != value
+            setattr(vlan, attr, value)
 
         if modified:
             try:
