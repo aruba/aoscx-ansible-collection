@@ -1,0 +1,10 @@
+---
+bugfixes:
+  - aoscx_stp - the bridge-wide timers C(hello_time), C(forward_delay) and
+    C(max_age), and the CIST bridge C(priority) when targeting the default
+    instance C(mstp,0), are now written to the global system/stp_config (the
+    C(spanning-tree hello-time), C(forward-delay), C(max-age) and
+    C(spanning-tree priority) commands) instead of to the STP instance where
+    they were accepted but had no effect on the bridge. An MST instance
+    priority is still applied per instance (C(spanning-tree instance N
+    priority)).

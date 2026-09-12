@@ -1,0 +1,11 @@
+---
+minor_changes:
+  - aoscx_stp - add the remaining global Spanning Tree settings
+    (system/stp_config) C(max_hop_count), C(tx_hold_count), C(path_cost_type),
+    C(bpdu_guard_timeout), C(extended_system_id_disable),
+    C(ignore_pvid_inconsistency), C(qinq_pbridge_mode), C(rpvst_auto_vlan),
+    C(rpvst_auto_vlan_no_vport_limit), C(rpvst_auto_vlan_priority),
+    C(rpvst_mstp_interconnect_vlan) and the SNMP trap toggles
+    C(trap_errant_bpdu_rx), C(trap_loop_guard_inconsistency), C(trap_new_root)
+    and C(trap_root_guard_inconsistency) so the global spanning-tree bridge,
+    RPVST auto-vlan and trap configuration can be fully managed.
