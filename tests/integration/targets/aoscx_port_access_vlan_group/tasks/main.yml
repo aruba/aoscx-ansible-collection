@@ -1,0 +1,50 @@
+# Integration tests for the aoscx_port_access_vlan_group module.
+#
+# Run with:
+#   ansible-test integration aoscx_port_access_vlan_group --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the PortAccessVlanGroup class and a REST API version of 10.16.
+# Uses a temporary group named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test group does not exist yet
+  arubanetworks.aoscx.aoscx_port_access_vlan_group:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a port access VLAN group
+  arubanetworks.aoscx.aoscx_port_access_vlan_group:
+    name: ansible-test
+    vlans:
+      - 1
+  register: result
+
+- name: Assert the group was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the group again (idempotent)
+  arubanetworks.aoscx.aoscx_port_access_vlan_group:
+    name: ansible-test
+    vlans:
+      - 1
+    state: update
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Delete the port access VLAN group
+  arubanetworks.aoscx.aoscx_port_access_vlan_group:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the group was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed

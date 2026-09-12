@@ -1,0 +1,78 @@
+# Integration tests for the aoscx_port_access_abp module.
+#
+# Run with:
+#   ansible-test integration aoscx_port_access_abp --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a REST API version
+# of 10.16, and the referenced traffic class "ansible-test-abp1" (type
+# abp-ipv4) to already exist on the device. Uses a temporary policy named
+# "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test policy does not exist yet
+  arubanetworks.aoscx.aoscx_port_access_abp:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create an application based policy with an action entry
+  arubanetworks.aoscx.aoscx_port_access_abp:
+    name: ansible-test
+    entries:
+      - sequence_number: 10
+        class_name: ansible-test-abp1
+        class_type: abp-ipv4
+        comment: voice
+        dscp: 46
+        local_priority: 7
+  register: result
+
+- name: Assert the policy was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the policy again (idempotent)
+  arubanetworks.aoscx.aoscx_port_access_abp:
+    name: ansible-test
+    state: update
+    entries:
+      - sequence_number: 10
+        class_name: ansible-test-abp1
+        class_type: abp-ipv4
+        comment: voice
+        dscp: 46
+        local_priority: 7
+  register: result
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the action set (change dscp)
+  arubanetworks.aoscx.aoscx_port_access_abp:
+    name: ansible-test
+    state: update
+    entries:
+      - sequence_number: 10
+        class_name: ansible-test-abp1
+        class_type: abp-ipv4
+        comment: voice
+        dscp: 34
+  register: result
+
+- name: Assert the update was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the application based policy
+  arubanetworks.aoscx.aoscx_port_access_abp:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the policy was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed

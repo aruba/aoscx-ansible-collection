@@ -1,0 +1,24 @@
+---
+minor_changes:
+  - aoscx_captive_portal_profile - new module to create, update or delete
+    captive portal profiles (system/captive_portal_profiles).
+  - aoscx_class - new module to create, update or delete traffic classes
+    (system/classes), including their match and ignore entries; these classes
+    are referenced by the port access group based, application based and port
+    access policies.
+  - aoscx_port_access_gbp - new module to create, update or delete port access
+    group based policies (system/port_access_gbps), including their entries and
+    drop or reflect action sets.
+  - aoscx_port_access_abp - new module to create, update or delete port access
+    application based policies (system/port_access_abps), including their
+    entries and drop, dscp, local_priority or mirror action sets.
+  - aoscx_port_access_policy - new module to create, update or delete port
+    access policies (system/port_access_policies), including their entries and
+    drop, reflect, dscp, rate limiting and captive portal redirect action sets.
+  - aoscx_port_access_role - new module to create, update or delete port access
+    roles (system/port_access_roles), including the in_gbp, in_abp and
+    in_policy references to existing port access policies.
+  - aoscx_port_access_vlan_group - new module to create, update or delete port
+    access VLAN groups (system/port_access_vlan_groups).
+  - aoscx connection plugin - allow REST API version 10.16, which is required
+    by the port access modules.
