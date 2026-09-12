@@ -1,0 +1,2 @@
+minor_changes:
+  - Add ``aoscx_dhcp_relay`` module to manage DHCP relays.
