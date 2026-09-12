@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - New module ``aoscx_aaa`` to configure global AAA settings such as the
+    RADIUS server groups used for port access and the AAA fail-through
+    behaviour.
