@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - aoscx_checkpoint - add the C(auto) and C(auto_timeout) options to manage the
+    auto-checkpoint (confirmed commit) timer (the C(checkpoint auto <minutes>)
+    and C(checkpoint auto confirm) commands), so a risky change can be deployed
+    with an automatic rollback if it is not confirmed within the timer.
