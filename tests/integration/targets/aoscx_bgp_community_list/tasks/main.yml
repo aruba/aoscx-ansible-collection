@@ -1,0 +1,134 @@
+# Integration tests for the aoscx_bgp_community_list module.
+#
+# Run with:
+#   ansible-test integration aoscx_bgp_community_list --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the BgpCommunityFilter / BgpCommunityFilterEntry
+# classes.
+
+- name: Make sure the test filter does not exist yet
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    state: delete
+  ignore_errors: true
+
+- name: Create a BGP community filter with two entries
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    type: community-list
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        match_string: '65000:1'
+      - preference: 20
+        action: deny
+        match_string: '65000:666'
+    state: create
+  register: create_result
+
+- name: Assert the filter was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply the exact same configuration (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    type: community-list
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        match_string: '65000:1'
+      - preference: 20
+        action: deny
+        match_string: '65000:666'
+    state: create
+  register: idempotent_result
+
+- name: Assert the second run reports no change
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+- name: Update an entry match_string
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    type: community-list
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        match_string: '65000:2'
+      - preference: 20
+        action: deny
+        match_string: '65000:666'
+    state: update
+  register: update_result
+
+- name: Assert the update reports a change
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Prune the second entry
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    type: community-list
+    description: created by integration test
+    entries:
+      - preference: 10
+        action: permit
+        match_string: '65000:2'
+    state: update
+  register: prune_result
+
+- name: Assert the prune reports a change
+  ansible.builtin.assert:
+    that:
+      - prune_result is changed
+
+- name: Attempt a duplicate preference (expected failure)
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    type: community-list
+    state: update
+    entries:
+      - preference: 10
+        action: permit
+        match_string: 'a'
+      - preference: 10
+        action: deny
+        match_string: 'b'
+  register: dup_result
+  ignore_errors: true
+
+- name: Assert the duplicate preference was refused
+  ansible.builtin.assert:
+    that:
+      - dup_result is failed
+      - "'Duplicate entry preference' in dup_result.msg"
+
+- name: Delete the filter
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    state: delete
+  register: delete_result
+
+- name: Assert the filter was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again to confirm idempotent removal
+  arubanetworks.aoscx.aoscx_bgp_community_list:
+    name: QA_COMMUNITY
+    state: delete
+  register: delete_again_result
+
+- name: Assert the second delete reports no change
+  ansible.builtin.assert:
+    that:
+      - delete_again_result is not changed
