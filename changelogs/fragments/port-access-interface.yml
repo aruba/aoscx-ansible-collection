@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - New module ``aoscx_port_access_interface`` to configure port access (NAC)
+    settings on an interface (concurrent onboarding, client limit, allowed
+    BPDUs, authentication mode, client IP tracking and device fingerprint).
