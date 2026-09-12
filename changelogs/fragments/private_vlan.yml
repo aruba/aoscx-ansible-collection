@@ -1,0 +1,7 @@
+---
+minor_changes:
+  - aoscx_vlan - add the C(pvlan_type) and C(pvlan_association) options to
+    configure Private VLANs (primary, isolated or community VLANs and the
+    association of a secondary VLAN to its primary).
+  - aoscx_interface - add the C(pvlan_port_type) option to set the Private VLAN
+    port type (promiscuous or secondary) on an interface.
