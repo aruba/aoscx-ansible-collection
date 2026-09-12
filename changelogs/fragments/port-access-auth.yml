@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - New module ``aoscx_port_access_auth`` to configure per-method (dot1x,
+    mac-auth) port access authentication settings on an interface.
