@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - aoscx_macsec_policy - new module to create, update or delete MACsec policies
+    (system/macsec_policies), including their cipher suites and bypass options.
+  - aoscx_keychain - new module to create, update or delete keychains and their
+    authentication keys (system/keychains).
+  - aoscx_mka_policy - new module to create, update or delete MKA policies
+    (system/mka_policies), referencing a keychain and pre-shared CAK/CKN.
+  - aoscx connection plugin - allow REST API version 10.16, which is required
+    by the MACsec modules.

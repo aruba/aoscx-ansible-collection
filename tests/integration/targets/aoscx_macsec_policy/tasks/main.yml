@@ -1,0 +1,74 @@
+# Integration tests for the aoscx_macsec_policy module.
+#
+# Run with:
+#   ansible-test integration aoscx_macsec_policy --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a REST API version
+# of 10.16. Uses a temporary policy named "ansible-test" and cleans up
+# afterwards.
+
+- name: Make sure the test policy does not exist yet
+  arubanetworks.aoscx.aoscx_macsec_policy:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a MACsec policy with fields
+  arubanetworks.aoscx.aoscx_macsec_policy:
+    name: ansible-test
+    secure_mode: must-secure
+    confidentiality_offset: byte_0
+    replay_window: 100
+    cipher_suites:
+      gcm_aes_256_enabled: true
+    bypass:
+      ieee_bpdu_enabled: true
+  register: result
+
+- name: Assert the policy was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the policy again (idempotent)
+  arubanetworks.aoscx.aoscx_macsec_policy:
+    name: ansible-test
+    state: update
+    secure_mode: must-secure
+    confidentiality_offset: byte_0
+    replay_window: 100
+    cipher_suites:
+      gcm_aes_256_enabled: true
+    bypass:
+      ieee_bpdu_enabled: true
+  register: result
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update a scalar and merge a cipher suite
+  arubanetworks.aoscx.aoscx_macsec_policy:
+    name: ansible-test
+    state: update
+    secure_mode: should-secure
+    cipher_suites:
+      gcm_aes_128_enabled: true
+  register: result
+
+- name: Assert the update was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the MACsec policy
+  arubanetworks.aoscx.aoscx_macsec_policy:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the policy was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
