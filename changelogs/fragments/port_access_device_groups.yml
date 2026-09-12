@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - aoscx_port_access_cdp_group - new module to create, update or delete Port
+    Access CDP device classification groups and their match entries
+    (system/port_access_cdp_groups).
+  - aoscx_port_access_lldp_group - new module to create, update or delete Port
+    Access LLDP device classification groups and their match entries
+    (system/port_access_lldp_groups).
