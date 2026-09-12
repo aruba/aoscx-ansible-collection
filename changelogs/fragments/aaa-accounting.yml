@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - New module ``aoscx_aaa_accounting`` to configure AAA accounting attributes
+    (accounting mode and interim update settings) for a session type.
