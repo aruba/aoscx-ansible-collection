@@ -1,0 +1,71 @@
+# Integration tests for the aoscx_ipfix_flow_exporter module.
+#
+# Run with:
+#   ansible-test integration aoscx_ipfix_flow_exporter --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the IpfixFlowExporter class and a REST API version of 10.13 or
+# later. Uses a temporary flow exporter named "ansible-test" and cleans up
+# afterwards.
+
+- name: Make sure the test flow exporter does not exist yet
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a flow exporter
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    description: ansible exporter
+    destination_type: hostname-or-ip-addr
+    destination: 10.0.0.5
+    vrf: default
+    transport_port: 4739
+    template_data_timeout: 600
+  register: result
+
+- name: Assert the exporter was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Re-apply the same configuration (idempotent)
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    state: update
+    description: ansible exporter
+    destination_type: hostname-or-ip-addr
+    destination: 10.0.0.5
+    vrf: default
+    transport_port: 4739
+    template_data_timeout: 600
+  register: result
+
+- name: Assert nothing changed
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the template data timeout
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    state: update
+    template_data_timeout: 1200
+  register: result
+
+- name: Assert the exporter changed
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the flow exporter
+  arubanetworks.aoscx.aoscx_ipfix_flow_exporter:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the exporter was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
