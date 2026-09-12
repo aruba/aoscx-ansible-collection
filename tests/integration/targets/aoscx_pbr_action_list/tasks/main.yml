@@ -1,0 +1,99 @@
+# Integration tests for the aoscx_pbr_action_list module.
+#
+# Run with:
+#   ansible-test integration aoscx_pbr_action_list --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the PbrActionList / PbrActionListEntry classes.
+
+- name: Make sure the test action list does not exist yet
+  arubanetworks.aoscx.aoscx_pbr_action_list:
+    name: QA_PBR
+    state: delete
+  ignore_errors: true
+
+- name: Create a PBR action list with three entry types
+  arubanetworks.aoscx.aoscx_pbr_action_list:
+    name: QA_PBR
+    entries:
+      - sequence_number: 10
+        type: nexthop
+        ip: 10.0.0.1
+      - sequence_number: 20
+        type: interface
+        interface: 1/1/1
+      - sequence_number: 30
+        type: blackhole
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_pbr_action_list:
+    name: QA_PBR
+    entries:
+      - sequence_number: 10
+        type: nexthop
+        ip: 10.0.0.1
+      - sequence_number: 20
+        type: interface
+        interface: 1/1/1
+      - sequence_number: 30
+        type: blackhole
+    state: create
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Change an entry (immutable -> delete + recreate)
+  arubanetworks.aoscx.aoscx_pbr_action_list:
+    name: QA_PBR
+    entries:
+      - sequence_number: 10
+        type: nexthop
+        ip: 10.0.0.2
+      - sequence_number: 20
+        type: interface
+        interface: 1/1/1
+      - sequence_number: 30
+        type: blackhole
+    state: update
+  register: update_result
+
+- name: Assert change recreated the entry
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Prune the last two entries
+  arubanetworks.aoscx.aoscx_pbr_action_list:
+    name: QA_PBR
+    entries:
+      - sequence_number: 10
+        type: nexthop
+        ip: 10.0.0.2
+    state: update
+  register: prune_result
+
+- name: Assert prune changed
+  ansible.builtin.assert:
+    that:
+      - prune_result is changed
+
+- name: Delete the action list
+  arubanetworks.aoscx.aoscx_pbr_action_list:
+    name: QA_PBR
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
