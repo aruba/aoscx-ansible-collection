@@ -1,0 +1,86 @@
+# Integration tests for the aoscx_mirror module.
+#
+# Run with:
+#   ansible-test integration aoscx_mirror --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the Mirror class. Uses a temporary mirror session (3999) that is
+# kept inactive, and cleans up afterwards. Adjust the port names to match the
+# device under test.
+
+- name: Make sure the test mirror session does not exist yet
+  arubanetworks.aoscx.aoscx_mirror:
+    mirror_id: 3999
+    state: delete
+  ignore_errors: true
+
+- name: Create an inactive port mirror session
+  arubanetworks.aoscx.aoscx_mirror:
+    mirror_id: 3999
+    session_type: port
+    active: false
+    comment: mirror-integration-test
+    select_src_port:
+      - 1/1/27
+    output_port:
+      - 1/1/28
+    state: create
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply identical configuration
+  arubanetworks.aoscx.aoscx_mirror:
+    mirror_id: 3999
+    state: update
+    session_type: port
+    active: false
+    comment: mirror-integration-test
+    select_src_port:
+      - 1/1/27
+    output_port:
+      - 1/1/28
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Change the source port
+  arubanetworks.aoscx.aoscx_mirror:
+    mirror_id: 3999
+    state: update
+    select_src_port:
+      - 1/1/26
+  register: update_result
+
+- name: Assert update changed
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Delete the mirror session
+  arubanetworks.aoscx.aoscx_mirror:
+    mirror_id: 3999
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again (idempotent)
+  arubanetworks.aoscx.aoscx_mirror:
+    mirror_id: 3999
+    state: delete
+  register: delete_idem
+
+- name: Assert second delete did not change
+  ansible.builtin.assert:
+    that:
+      - delete_idem is not changed
