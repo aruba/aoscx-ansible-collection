@@ -1,0 +1,78 @@
+# Integration tests for the aoscx_ipsla_track_object module.
+#
+# Run with:
+#   ansible-test integration aoscx_ipsla_track_object --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the IpslaTrackObject class and a REST API version of 10.16. Uses
+# a temporary IP SLA source and track object both named "ansible-test" and
+# cleans up afterwards.
+
+- name: Make sure the test track object does not exist yet
+  arubanetworks.aoscx.aoscx_ipsla_track_object:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Make sure the test source exists for the track object
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    type: icmp_echo
+    vrf: default
+
+- name: Create an IP SLA track object
+  arubanetworks.aoscx.aoscx_ipsla_track_object:
+    name: ansible-test
+    tracked_ipsla_session:
+      - ansible-test
+    track_list_operator: or
+    up_delay: 5
+  register: result
+
+- name: Assert the track object was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the track object again (idempotent)
+  arubanetworks.aoscx.aoscx_ipsla_track_object:
+    name: ansible-test
+    tracked_ipsla_session:
+      - ansible-test
+    track_list_operator: or
+    up_delay: 5
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the track object timers
+  arubanetworks.aoscx.aoscx_ipsla_track_object:
+    name: ansible-test
+    state: update
+    up_delay: 10
+    down_delay: 5
+  register: result
+
+- name: Assert the track object was updated
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the track object
+  arubanetworks.aoscx.aoscx_ipsla_track_object:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the track object was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Clean up the test source
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    state: delete

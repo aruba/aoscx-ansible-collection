@@ -1,0 +1,69 @@
+# Integration tests for the aoscx_ipsla_responder module.
+#
+# Run with:
+#   ansible-test integration aoscx_ipsla_responder --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the IpslaResponder class and a REST API version of 10.16. Uses a
+# temporary responder named "ansible-test" and cleans up afterwards. The
+# responder has no modifiable attributes, so a change is applied by recreating
+# it.
+
+- name: Make sure the test responder does not exist yet
+  arubanetworks.aoscx.aoscx_ipsla_responder:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create an IP SLA responder
+  arubanetworks.aoscx.aoscx_ipsla_responder:
+    name: ansible-test
+    type: udp_echo
+    vrf: default
+    responder_port_number: 5000
+    responder_type: ipv4
+  register: result
+
+- name: Assert the responder was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the responder again (idempotent)
+  arubanetworks.aoscx.aoscx_ipsla_responder:
+    name: ansible-test
+    type: udp_echo
+    vrf: default
+    responder_port_number: 5000
+    responder_type: ipv4
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Recreate the responder with a new port
+  arubanetworks.aoscx.aoscx_ipsla_responder:
+    name: ansible-test
+    type: udp_echo
+    vrf: default
+    responder_port_number: 6000
+    responder_type: ipv4
+  register: result
+
+- name: Assert the responder was recreated
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the responder
+  arubanetworks.aoscx.aoscx_ipsla_responder:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the responder was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed

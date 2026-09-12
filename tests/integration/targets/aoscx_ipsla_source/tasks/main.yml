@@ -1,0 +1,65 @@
+# Integration tests for the aoscx_ipsla_source module.
+#
+# Run with:
+#   ansible-test integration aoscx_ipsla_source --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the IpslaSource class and a REST API version of 10.16. Uses a
+# temporary source named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test source does not exist yet
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create an IP SLA source
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    type: icmp_echo
+    vrf: default
+    frequency: 30
+    tos: 8
+  register: result
+
+- name: Assert the source was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the source again (idempotent)
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    type: icmp_echo
+    vrf: default
+    frequency: 30
+    tos: 8
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the source frequency
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    state: update
+    frequency: 90
+  register: result
+
+- name: Assert the source was updated
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the source
+  arubanetworks.aoscx.aoscx_ipsla_source:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the source was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
