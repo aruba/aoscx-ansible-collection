@@ -76,6 +76,12 @@ options:
     description: Enable IP IGMP Snooping
     required: false
     type: bool
+  arp_inspection_enable:
+    description: >
+      Enable Dynamic ARP inspection on the VLAN (the C(arp inspection)
+      command).
+    required: false
+    type: bool
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -177,6 +183,10 @@ def get_argument_spec():
             "type": "bool",
             "required": False,
         },
+        "arp_inspection_enable": {
+            "type": "bool",
+            "required": False,
+        },
         "state": {
             "type": "str",
             "default": "create",
@@ -213,6 +223,7 @@ def main():
     voice = ansible_module.params["voice"]
     vsx_sync = ansible_module.params["vsx_sync"]
     ip_igmp_snooping = ansible_module.params["ip_igmp_snooping"]
+    arp_inspection_enable = ansible_module.params["arp_inspection_enable"]
     state = ansible_module.params["state"]
     try:
         session = get_pyaoscx_session(ansible_module)
@@ -293,6 +304,13 @@ def main():
                 or vlan.mgmd_enable["igmp"] != ip_igmp_snooping
             )
             vlan.mgmd_enable["igmp"] = ip_igmp_snooping
+
+        if arp_inspection_enable is not None:
+            modified |= (
+                getattr(vlan, "arp_inspection_enable", None)
+                != arp_inspection_enable
+            )
+            vlan.arp_inspection_enable = arp_inspection_enable
 
         if modified:
             try:
