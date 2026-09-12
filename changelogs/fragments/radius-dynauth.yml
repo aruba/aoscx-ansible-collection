@@ -1,0 +1,6 @@
+---
+minor_changes:
+  - New module ``aoscx_radius_dynamic_authorization`` to configure the global
+    RADIUS dynamic authorization (Change of Authorization) settings.
+  - New module ``aoscx_radius_dynamic_authorization_client`` to manage RADIUS
+    dynamic authorization clients per VRF.
