@@ -1,0 +1,65 @@
+# Integration tests for the aoscx_traffic_insight module.
+#
+# Run with:
+#   ansible-test integration aoscx_traffic_insight --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the TrafficInsight class and a REST API version of 10.13 or
+# later. The switch supports a single Traffic Insight instance at a time, so
+# any pre-existing instance must be removed first. Uses a temporary instance
+# named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test instance does not exist yet
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a Traffic Insight instance
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    enable: true
+    source:
+      - ipfix
+  register: result
+
+- name: Assert the instance was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the instance again (idempotent)
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    enable: true
+    source:
+      - ipfix
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Disable the instance
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    state: update
+    enable: false
+  register: result
+
+- name: Assert the instance was updated
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the instance
+  arubanetworks.aoscx.aoscx_traffic_insight:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the instance was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
