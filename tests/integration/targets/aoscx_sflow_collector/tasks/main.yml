@@ -1,0 +1,67 @@
+# Integration tests for the aoscx_sflow_collector module.
+#
+# Run with:
+#   ansible-test integration aoscx_sflow_collector --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the SFlow and SFlowCollector classes. Creates a temporary sFlow
+# instance and a collector, then cleans up afterwards.
+
+- name: Make sure the test sFlow instance does not exist yet
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create the parent sFlow instance
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    enabled: false
+    state: create
+
+- name: Add a collector
+  arubanetworks.aoscx.aoscx_sflow_collector:
+    sflow_name: ansible-test
+    vrf: default
+    ip_address: 10.0.0.50
+    udp_port: 6343
+    state: create
+  register: create_result
+
+- name: Assert collector created
+  ansible.builtin.assert:
+    that:
+      - create_result.changed
+
+- name: Add the same collector again (idempotent)
+  arubanetworks.aoscx.aoscx_sflow_collector:
+    sflow_name: ansible-test
+    vrf: default
+    ip_address: 10.0.0.50
+    udp_port: 6343
+    state: create
+  register: idem_result
+
+- name: Assert collector is idempotent
+  ansible.builtin.assert:
+    that:
+      - not idem_result.changed
+
+- name: Delete the collector
+  arubanetworks.aoscx.aoscx_sflow_collector:
+    sflow_name: ansible-test
+    vrf: default
+    ip_address: 10.0.0.50
+    udp_port: 6343
+    state: delete
+  register: delete_result
+
+- name: Assert collector deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result.changed
+
+- name: Clean up the parent sFlow instance
+  arubanetworks.aoscx.aoscx_sflow:
+    name: ansible-test
+    state: delete
