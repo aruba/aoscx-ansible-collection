@@ -1,0 +1,139 @@
+# Integration tests for the aoscx_route_map module.
+#
+# Run with:
+#   ansible-test integration aoscx_route_map --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the RouteMap / RouteMapEntry classes.
+
+- name: Make sure the test route map does not exist yet
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    state: delete
+  ignore_errors: true
+
+- name: Create a route map with two entries
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    entries:
+      - preference: 10
+        action: permit
+        description: created by integration test
+        match:
+          source_protocol: bgp
+        set:
+          local_preference: 200
+          community: "65000:100"
+      - preference: 20
+        action: deny
+    state: create
+  register: create_result
+
+- name: Assert the route map was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply the exact same configuration (idempotency)
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    entries:
+      - preference: 10
+        action: permit
+        description: created by integration test
+        match:
+          source_protocol: bgp
+        set:
+          local_preference: 200
+          community: "65000:100"
+      - preference: 20
+        action: deny
+    state: create
+  register: idempotent_result
+
+- name: Assert the second run reports no change
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+- name: Update one set clause
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    entries:
+      - preference: 10
+        action: permit
+        description: created by integration test
+        match:
+          source_protocol: bgp
+        set:
+          local_preference: 300
+          community: "65000:100"
+      - preference: 20
+        action: deny
+    state: update
+  register: update_result
+
+- name: Assert the update reports a change
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Prune the second entry
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    entries:
+      - preference: 10
+        action: permit
+        description: created by integration test
+        match:
+          source_protocol: bgp
+        set:
+          local_preference: 300
+          community: "65000:100"
+    state: update
+  register: prune_result
+
+- name: Assert the prune reports a change
+  ansible.builtin.assert:
+    that:
+      - prune_result is changed
+
+- name: Attempt a duplicate preference (expected failure)
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    state: update
+    entries:
+      - preference: 10
+        action: permit
+      - preference: 10
+        action: deny
+  register: dup_result
+  ignore_errors: true
+
+- name: Assert the duplicate preference was refused
+  ansible.builtin.assert:
+    that:
+      - dup_result is failed
+      - "'Duplicate entry preference' in dup_result.msg"
+
+- name: Delete the route map
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    state: delete
+  register: delete_result
+
+- name: Assert the route map was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Delete again to confirm idempotent removal
+  arubanetworks.aoscx.aoscx_route_map:
+    name: QA_ROUTE_MAP
+    state: delete
+  register: delete_again_result
+
+- name: Assert the second delete reports no change
+  ansible.builtin.assert:
+    that:
+      - delete_again_result is not changed
