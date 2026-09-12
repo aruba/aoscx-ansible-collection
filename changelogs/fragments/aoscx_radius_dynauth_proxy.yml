@@ -1,0 +1,8 @@
+minor_changes:
+  - Add ``aoscx_radius_dynauth_proxy_server``,
+    ``aoscx_radius_dynauth_proxy_client_group`` and
+    ``aoscx_radius_dynauth_proxy_profile`` modules to manage RADIUS dynamic
+    authorization (Change of Authorization) proxy servers, client groups and
+    profiles. Requires a pyaoscx release that ships the
+    ``RadiusDynauthProxyServer``, ``RadiusDynauthProxyClientGroup`` and
+    ``RadiusDynauthProxyProfile`` classes.
