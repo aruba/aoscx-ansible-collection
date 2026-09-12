@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - aoscx_snmpv3_user - new module to manage SNMPv3 users.
+  - aoscx_snmp_community - new module to manage SNMP communities.
+  - aoscx_snmp_view - new module to manage SNMP views and their entries.
+  - aoscx_snmp_trap - new module to manage SNMP trap receivers.
+  - aoscx connection plugin - allow REST API versions 10.13 and 10.16,
+    required for the SNMP modules.
