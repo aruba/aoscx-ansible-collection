@@ -1,0 +1,127 @@
+# Integration tests for the aoscx_bgp_router module.
+#
+# Run with:
+#   ansible-test integration aoscx_bgp_router --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi. The tests
+# only touch the BGP router of a dedicated test VRF (QA_BGP). On AOS-CX all
+# the VRFs use the ASN of the switch BGP instance: set qa_bgp_asn to that ASN
+# when BGP is already configured on the default VRF.
+
+- name: Set the test ASN
+  ansible.builtin.set_fact:
+    qa_bgp_asn: "{{ qa_bgp_asn | default(65000) }}"
+
+- name: Create the test VRF
+  arubanetworks.aoscx.aoscx_vrf:
+    name: QA_BGP
+
+- name: Make sure the test BGP router does not exist yet
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    state: delete
+
+- name: Create the BGP router (check mode)
+  arubanetworks.aoscx.aoscx_bgp_router: &bgp_router
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    router_id: 10.147.253.160
+    maximum_paths: 8
+    log_neighbor_changes: true
+    deterministic_med: true
+    always_compare_med: true
+    bestpath_as_path_multipath_relax: true
+    redistribute:
+      - address_family: ipv4_unicast
+        route_types: [connected]
+  check_mode: true
+  register: check_result
+
+- name: Create the BGP router
+  arubanetworks.aoscx.aoscx_bgp_router: *bgp_router
+  register: create_result
+
+- name: Re-apply the exact same configuration (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_router: *bgp_router
+  register: idempotent_result
+
+- name: Assert create and idempotency results
+  ansible.builtin.assert:
+    that:
+      - check_result is changed
+      - create_result is changed
+      - idempotent_result is not changed
+
+- name: Add IPv6 redistribution and change maximum paths
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    maximum_paths: 4
+    redistribute:
+      - address_family: ipv6_unicast
+        route_types: [connected, static]
+  register: update_result
+
+- name: Re-apply the original configuration (IPv6 redistribution is kept)
+  arubanetworks.aoscx.aoscx_bgp_router: *bgp_router
+  register: revert_result
+
+- name: Remove the IPv6 redistribution
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    redistribute:
+      - address_family: ipv6_unicast
+        route_types: []
+  register: remove_result
+
+- name: Assert update results
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - revert_result is changed
+      - remove_result is changed
+
+- name: Attempt a duplicate address family (expected failure)
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    redistribute:
+      - address_family: ipv4_unicast
+        route_types: [connected]
+      - address_family: ipv4_unicast
+        route_types: [static]
+  register: dup_result
+  ignore_errors: true
+
+- name: Assert the duplicate address family was refused
+  ansible.builtin.assert:
+    that:
+      - dup_result is failed
+      - "'Duplicate redistribute address family' in dup_result.msg"
+
+- name: Delete the BGP router
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    state: delete
+  register: delete_result
+
+- name: Delete again to confirm idempotent removal
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    state: delete
+  register: delete_again_result
+
+- name: Assert delete results
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_again_result is not changed
+
+- name: Delete the test VRF
+  arubanetworks.aoscx.aoscx_vrf:
+    name: QA_BGP
+    state: delete

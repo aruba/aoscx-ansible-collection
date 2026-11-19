@@ -1,0 +1,425 @@
+# (C) Copyright 2019-2024 Hewlett Packard Enterprise Development LP.
+# GNU General Public License v3.0+
+# (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+"""
+Unit tests for the aoscx_bgp_neighbor module.
+
+The real module and pyaoscx SDK run against an in-memory REST transport, so
+no switch is required.
+"""
+
+import json
+from types import SimpleNamespace
+
+import pytest
+
+from ansible.module_utils import basic
+from ansible_collections.arubanetworks.aoscx.plugins.modules import (
+    aoscx_bgp_neighbor,
+)
+from pyaoscx import vrf
+from pyaoscx.rest.v10_16.api import v10_16
+
+PREFIX = "/rest/v10.16/"
+NEIGHBORS = "system/vrfs/default/bgp_routers/65000/bgp_neighbors"
+PG_REF = {"spine-RR": PREFIX + NEIGHBORS + "/spine-RR"}
+LO0_REF = {"loopback0": PREFIX + "system/interfaces/loopback0"}
+
+PEER_GROUP = {
+    "asn": 65000,
+    "neighbor": "spine-RR",
+    "is_peer_group": True,
+    "remote_as": 65000,
+    "description": "Spine and RR peer-group",
+    "update_source": "loopback 0",
+    "address_families": [
+        {"address_family": "l2vpn_evpn", "send_community": "both"}
+    ],
+}
+
+SPINE = {
+    "asn": 65000,
+    "neighbor": "10.147.253.132",
+    "peer_group": "spine-RR",
+    "address_families": [{"address_family": "l2vpn_evpn", "activate": True}],
+}
+
+
+class ModuleResult(Exception):
+    pass
+
+
+@pytest.fixture
+def switch(monkeypatch):
+    """Run the real module and SDK against an in-memory REST transport."""
+    state = SimpleNamespace(
+        routers={("default", "65000")},
+        neighbors={},
+        interfaces={"loopback0"},
+        writes=[],
+    )
+
+    def neighbor_response(name, params):
+        # The switch returns references as {name: uri}. is_peer_group is
+        # create-only, so it is not returned with the writable selector.
+        data = dict(state.neighbors[name], ip_or_ifname_or_group_name=name)
+        if params.get("selector") != "configuration":
+            data.pop("is_peer_group", None)
+        if "attributes" in params:
+            wanted = params["attributes"].split(",")
+            data = {k: v for k, v in data.items() if k in wanted}
+        return data
+
+    def request(method, path, params=None, data=None):
+        body = json.loads(data) if data is not None else None
+        if method != "GET":
+            state.writes.append((method, path, body))
+        parts = path.split("/")
+        code, response = 404, {}
+        if path.startswith("system/interfaces/"):
+            if parts[2] in state.interfaces:
+                # Interface sub-collections (IPv6 addresses, ...) are empty
+                code = 200
+                response = {"name": parts[2]} if len(parts) == 3 else {}
+        elif len(parts) == 3 and parts[2] == "default":
+            code, response = 200, {"name": "default"}
+        elif len(parts) >= 5 and (parts[2], parts[4]) in state.routers:
+            if len(parts) == 5:
+                code, response = 200, {"asn": int(parts[4])}
+            elif path == NEIGHBORS and method == "GET":
+                code = 200
+                response = {
+                    name: PREFIX + NEIGHBORS + "/" + name
+                    for name in state.neighbors
+                }
+            elif path == NEIGHBORS and method == "POST":
+                name = body.pop("ip_or_ifname_or_group_name")
+                state.neighbors[name] = body
+                code = 201
+            elif path.startswith(NEIGHBORS + "/"):
+                name = parts[-1]
+                if name in state.neighbors:
+                    if method == "GET":
+                        code = 200
+                        response = neighbor_response(name, params or {})
+                    elif method == "PUT":
+                        assert "is_peer_group" not in body
+                        is_pg = state.neighbors[name].get("is_peer_group")
+                        state.neighbors[name] = dict(body, is_peer_group=is_pg)
+                        code = 204
+                    elif method == "DELETE":
+                        del state.neighbors[name]
+                        code = 204
+            elif method == "GET":
+                # Other child collections (aggregate addresses, ...)
+                code = 200
+        elif method == "GET" and len(parts) == 4 and parts[2] == "default":
+            code = 200
+        return SimpleNamespace(status_code=code, text=json.dumps(response))
+
+    def run(**params):
+        monkeypatch.setattr(basic, "_load_params", lambda: params)
+        with pytest.raises(ModuleResult) as result:
+            aoscx_bgp_neighbor.main()
+        return result.value.args[0]
+
+    def finish(module, **result):
+        raise ModuleResult(result)
+
+    def fail(module, **result):
+        finish(module, failed=True, **result)
+
+    monkeypatch.setattr(basic.AnsibleModule, "exit_json", finish)
+    monkeypatch.setattr(basic.AnsibleModule, "fail_json", fail)
+    session = SimpleNamespace(
+        api=v10_16(), connected=True, request=request, resource_prefix=PREFIX
+    )
+    monkeypatch.setattr(
+        aoscx_bgp_neighbor, "get_pyaoscx_session", lambda _: session
+    )
+    monkeypatch.setattr(
+        vrf,
+        "Device",
+        lambda _: SimpleNamespace(materialized=True, capabilities=[]),
+    )
+    return state, run
+
+
+def test_user_config_create_then_rerun_is_idempotent(switch):
+    state, run = switch
+
+    assert run(_ansible_check_mode=True, **PEER_GROUP) == {"changed": True}
+    assert not state.writes
+
+    assert run(**PEER_GROUP) == {"changed": True}
+    assert state.neighbors["spine-RR"] == {
+        "is_peer_group": True,
+        "remote_as": 65000,
+        "description": "Spine and RR peer-group",
+        "local_interface": LO0_REF,
+        "send_community": {"l2vpn-evpn": "both"},
+    }
+
+    for ip in ("10.147.253.132", "10.147.253.165"):
+        assert run(**dict(SPINE, neighbor=ip)) == {"changed": True}
+        assert state.neighbors[ip] == {
+            "is_peer_group": False,
+            "bgp_peer_group": PG_REF,
+            "activate": {"l2vpn-evpn": True},
+        }
+
+    state.writes.clear()
+    assert run(**dict(PEER_GROUP, update_source="loopback0")) == {
+        "changed": False
+    }
+    for ip in ("10.147.253.132", "10.147.253.165"):
+        assert run(**dict(SPINE, neighbor=ip)) == {"changed": False}
+    assert not state.writes
+
+
+def test_update_only_changes_given_settings(switch):
+    state, run = switch
+    state.neighbors["10.0.0.1"] = {
+        "is_peer_group": False,
+        "remote_as": 65001,
+        "description": "keep",
+        "activate": {"ipv4-unicast": True, "l2vpn-evpn": False},
+        "send_community": {"ipv4-unicast": "standard", "l2vpn-evpn": "none"},
+    }
+    families = [
+        {
+            "address_family": "l2vpn_evpn",
+            "activate": True,
+            "send_community": "extended",
+        }
+    ]
+
+    result = run(
+        asn=65000,
+        neighbor="10.0.0.1",
+        remote_as=65002,
+        address_families=families,
+    )
+    assert result == {"changed": True}
+    assert state.writes == [
+        (
+            "PUT",
+            NEIGHBORS + "/10.0.0.1",
+            {
+                "remote_as": 65002,
+                "description": "keep",
+                "activate": {"ipv4-unicast": True, "l2vpn-evpn": True},
+                "send_community": {
+                    "ipv4-unicast": "standard",
+                    "l2vpn-evpn": "extended",
+                },
+            },
+        )
+    ]
+
+
+def test_update_source_ip_and_removal(switch):
+    state, run = switch
+    state.neighbors["spine-RR"] = {
+        "is_peer_group": True,
+        "local_interface": LO0_REF,
+    }
+    args = dict(asn=65000, neighbor="spine-RR", is_peer_group=True)
+
+    assert run(update_source="10.0.0.9", **args) == {"changed": True}
+    assert state.neighbors["spine-RR"]["update_source"] == "10.0.0.9"
+    assert state.neighbors["spine-RR"]["local_interface"] is None
+
+    assert run(update_source="", **args) == {"changed": True}
+    assert state.neighbors["spine-RR"]["update_source"] is None
+    assert run(update_source="", **args) == {"changed": False}
+
+
+def test_leave_peer_group(switch):
+    state, run = switch
+    state.neighbors["spine-RR"] = {"is_peer_group": True}
+    state.neighbors["10.0.0.1"] = {
+        "is_peer_group": False,
+        "bgp_peer_group": PG_REF,
+    }
+
+    assert run(asn=65000, neighbor="10.0.0.1", peer_group="") == {
+        "changed": True
+    }
+    assert state.neighbors["10.0.0.1"]["bgp_peer_group"] is None
+
+
+def test_neighbors_list_gets_same_settings(switch):
+    state, run = switch
+    state.neighbors["leaf"] = {"is_peer_group": True}
+    state.neighbors["10.0.0.9"] = {"is_peer_group": False}
+    leafs = dict(
+        asn=65000,
+        neighbors=["10.147.253.170", "10.147.253.171"],
+        peer_group="leaf",
+        address_families=[{"address_family": "l2vpn_evpn", "activate": True}],
+    )
+
+    assert run(_ansible_check_mode=True, **leafs) == {"changed": True}
+    assert not state.writes
+    assert run(**leafs) == {"changed": True}
+    for ip in leafs["neighbors"]:
+        assert state.neighbors[ip] == {
+            "is_peer_group": False,
+            "bgp_peer_group": {"leaf": PREFIX + NEIGHBORS + "/leaf"},
+            "activate": {"l2vpn-evpn": True},
+        }
+    assert state.neighbors["10.0.0.9"] == {"is_peer_group": False}
+
+    state.writes.clear()
+    assert run(**leafs) == {"changed": False}
+    assert not state.writes
+
+    delete = dict(asn=65000, neighbors=leafs["neighbors"], state="delete")
+    assert run(**delete) == {"changed": True}
+    assert sorted(state.neighbors) == ["10.0.0.9", "leaf"]
+
+
+def test_neighbors_list_validated_before_any_write(switch):
+    state, run = switch
+    state.neighbors["10.0.0.2"] = {"is_peer_group": True}
+    result = run(
+        asn=65000, neighbors=["10.0.0.1", "10.0.0.2"], remote_as=65001
+    )
+    assert result["failed"] is True
+    assert "delete 10.0.0.2 first" in result["msg"]
+    assert not state.writes
+
+
+def test_delete_only_given_neighbor(switch):
+    state, run = switch
+    state.neighbors["10.0.0.1"] = {"is_peer_group": False}
+    state.neighbors["10.0.0.2"] = {"is_peer_group": False}
+    args = dict(asn=65000, neighbor="10.0.0.1", state="delete")
+
+    assert run(_ansible_check_mode=True, **args) == {"changed": True}
+    assert not state.writes
+    assert run(**args) == {"changed": True}
+    assert state.writes == [("DELETE", NEIGHBORS + "/10.0.0.1", None)]
+    assert list(state.neighbors) == ["10.0.0.2"]
+    assert run(**args) == {"changed": False}
+
+
+def test_delete_without_router_is_no_change(switch):
+    state, run = switch
+    state.routers.clear()
+    assert run(asn=65000, neighbor="10.0.0.1", state="delete") == {
+        "changed": False
+    }
+
+
+@pytest.mark.parametrize(
+    "setup, params, message",
+    [
+        ("no_router", {}, "create it with aoscx_bgp_router first"),
+        (None, {"peer_group": "missing"}, "Could not find peer group"),
+        (None, {"update_source": "loopback9"}, "Could not find interface"),
+        ("neighbor", {"is_peer_group": True}, "is_peer_group cannot be"),
+        ("neighbor", {"peer_group": "10.0.0.2"}, "is not a peer group"),
+    ],
+)
+def test_errors(switch, setup, params, message):
+    state, run = switch
+    state.neighbors["10.0.0.2"] = {"is_peer_group": False}
+    if setup == "no_router":
+        state.routers.clear()
+    if setup == "neighbor":
+        state.neighbors["10.0.0.1"] = {"is_peer_group": False}
+    result = run(asn=65000, neighbor="10.0.0.1", **params)
+    assert result["failed"] is True
+    assert message in result["msg"]
+    assert not state.writes
+
+
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({"neighbor": "a/b"}, "Invalid neighbor"),
+        ({"neighbor": None, "neighbors": []}, "neighbors must not be empty"),
+        (
+            {"neighbor": None, "neighbors": ["10.0.0.1", "10.0.0.1"]},
+            "Duplicate entries in neighbors",
+        ),
+        (
+            {"neighbor": None, "neighbors": ["leaf"], "peer_group": "leaf"},
+            "cannot belong to itself",
+        ),
+        ({"neighbors": ["10.0.0.2"]}, "mutually exclusive"),
+        ({"neighbor": None}, "one of the following is required"),
+        ({"remote_as": 0}, "remote_as must be between"),
+        (
+            {"is_peer_group": True, "peer_group": "spine-RR"},
+            "peer_group is not supported",
+        ),
+        (
+            {
+                "address_families": [
+                    {"address_family": "l2vpn_evpn", "next_hop_self": True}
+                ]
+            },
+            "next_hop_self is not supported for l2vpn_evpn",
+        ),
+        (
+            {
+                "address_families": [
+                    {"address_family": "ipv4_unicast"},
+                    {"address_family": "ipv4_unicast"},
+                ]
+            },
+            "Duplicate address family",
+        ),
+    ],
+)
+def test_invalid_params_rejected(switch, params, message):
+    state, run = switch
+    args = dict({"asn": 65000, "neighbor": "10.0.0.1"}, **params)
+    result = run(**{k: v for k, v in args.items() if v is not None})
+    assert result["failed"] is True
+    assert message in result["msg"]
+    assert not state.writes
+
+
+def test_missing_parent_in_check_mode_or_delete(switch):
+    state, run = switch
+    state.routers.clear()
+    args = dict(asn=65000, neighbors=["10.0.0.1"], peer_group="spine-RR")
+    assert run(_ansible_check_mode=True, **args) == {"changed": True}
+    assert run(vrf="missing", _ansible_check_mode=True, **args) == {
+        "changed": True
+    }
+    assert run(
+        asn=65000, neighbor="10.0.0.1", vrf="missing", state="delete"
+    ) == {"changed": False}
+    assert not state.writes
+
+
+def test_ebgp_multihop(switch):
+    state, run = switch
+    args = dict(asn=65000, neighbor="spine-RR", is_peer_group=True)
+
+    assert run(ebgp_multihop=1, **args) == {"changed": True}
+    assert "ebgp_hop_count" not in state.neighbors["spine-RR"]
+    # Not configured on the switch is the same as 1
+    assert run(ebgp_multihop=1, **args) == {"changed": False}
+
+    assert run(ebgp_multihop=255, **args) == {"changed": True}
+    assert state.neighbors["spine-RR"]["ebgp_hop_count"] == 255
+    assert run(ebgp_multihop=255, **args) == {"changed": False}
+
+    assert run(ebgp_multihop=1, **args) == {"changed": True}
+    assert state.neighbors["spine-RR"]["ebgp_hop_count"] == 1
+
+
+@pytest.mark.parametrize("value", [0, 256])
+def test_invalid_ebgp_multihop(switch, value):
+    state, run = switch
+    result = run(asn=65000, neighbor="10.0.0.1", ebgp_multihop=value)
+    assert result["failed"] is True
+    assert "ebgp_multihop must be between 1 and 255" in result["msg"]
+    assert not state.writes
