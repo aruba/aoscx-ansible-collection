@@ -1,0 +1,140 @@
+# Integration tests for the aoscx_bgp_neighbor module.
+#
+# Run with:
+#   ansible-test integration aoscx_bgp_neighbor --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi, with a
+# loopback0 interface. The tests only touch a BGP router created in a
+# dedicated test VRF (QA_BGP). On AOS-CX all the VRFs use the ASN of the
+# switch BGP instance: set qa_bgp_asn to that ASN when BGP is already
+# configured on the default VRF.
+
+- name: Set the test ASN
+  ansible.builtin.set_fact:
+    qa_bgp_asn: "{{ qa_bgp_asn | default(65000) }}"
+
+- name: Create the test VRF
+  arubanetworks.aoscx.aoscx_vrf:
+    name: QA_BGP
+
+- name: Create the test BGP router
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+
+- name: Create the peer group (check mode)
+  arubanetworks.aoscx.aoscx_bgp_neighbor: &peer_group
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: QA-RR
+    is_peer_group: true
+    remote_as: "{{ qa_bgp_asn }}"
+    description: QA peer-group
+    update_source: loopback 0
+    ebgp_multihop: 255
+    address_families:
+      - address_family: l2vpn_evpn
+        send_community: both
+  check_mode: true
+  register: check_result
+
+- name: Create the peer group
+  arubanetworks.aoscx.aoscx_bgp_neighbor: *peer_group
+  register: pg_result
+
+- name: Create two neighbors in the peer group
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbors: [192.0.2.1, 192.0.2.2]
+    peer_group: QA-RR
+    address_families:
+      - address_family: l2vpn_evpn
+        activate: true
+  register: neighbors_result
+
+- name: Re-apply the peer group (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_neighbor: *peer_group
+  register: pg_again_result
+
+- name: Re-apply the neighbors (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbors: [192.0.2.1, 192.0.2.2]
+    peer_group: QA-RR
+    address_families:
+      - address_family: l2vpn_evpn
+        activate: true
+  register: neighbors_again_result
+
+- name: Assert create and idempotency results
+  ansible.builtin.assert:
+    that:
+      - check_result is changed
+      - pg_result is changed
+      - neighbors_result is changed
+      - pg_again_result is not changed
+      - neighbors_again_result is not changed
+
+- name: Update the description and the IPv4 settings of a neighbor
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: 192.0.2.1
+    description: updated
+    address_families:
+      - address_family: ipv4_unicast
+        activate: false
+  register: update_result
+
+- name: Delete one neighbor
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: 192.0.2.2
+    state: delete
+  register: delete_result
+
+- name: Delete it again (idempotent removal)
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: 192.0.2.2
+    state: delete
+  register: delete_again_result
+
+- name: Check the other neighbor was not modified (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: 192.0.2.1
+    peer_group: QA-RR
+    description: updated
+  register: other_result
+
+- name: Assert update and delete results
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - delete_result is changed
+      - delete_again_result is not changed
+      - other_result is not changed
+
+- name: Clean up the neighbor and the peer group
+  arubanetworks.aoscx.aoscx_bgp_neighbor:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbors: [192.0.2.1, QA-RR]
+    state: delete
+
+- name: Delete the test BGP router
+  arubanetworks.aoscx.aoscx_bgp_router:
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    state: delete
+
+- name: Delete the test VRF
+  arubanetworks.aoscx.aoscx_vrf:
+    name: QA_BGP
+    state: delete
