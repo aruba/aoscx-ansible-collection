@@ -274,7 +274,7 @@ options:
 """
 
 EXAMPLES = """
-- name: Create a route map that sets local preference on RFC1918 routes
+- name: Create a route map that sets local preference on BGP routes
   aoscx_route_map:
     name: SET_LOCAL_PREF
     entries:
@@ -285,6 +285,7 @@ EXAMPLES = """
           source_protocol: bgp
         set:
           local_preference: 200
+          community: "65000:100"
       - preference: 20
         action: deny
 
