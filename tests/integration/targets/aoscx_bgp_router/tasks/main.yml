@@ -101,6 +101,59 @@
       - dup_result is failed
       - "'Duplicate redistribute address family' in dup_result.msg"
 
+- name: Configure the global and per address family options
+  arubanetworks.aoscx.aoscx_bgp_router: &all_options
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    cluster_id: 1.1.1.1
+    default_local_preference: 150
+    maxas_limit: 20
+    trap_enable: true
+    bestpath_compare_routerid: true
+    timers: {keepalive: 20, holdtime: 60, connect_retry: 30}
+    distance: {ebgp: 30, ibgp: 210}
+    graceful_restart: {enable: true, restart_time: 200, stalepath_time: 400}
+    confederation: {identifier: 100, peers: [65010, 65011]}
+    address_families:
+      - address_family: ipv4_unicast
+        networks: [{prefix: 10.1.0.0/16}]
+        aggregate_addresses: [{prefix: 10.2.0.0/16, options: summary-only}]
+        dampening: {half_life: 10, reuse: 800, suppress: 3000, max_suppress_time: 40}
+      - address_family: ipv6_unicast
+        aggregate_addresses: [{prefix: "2001:db8::/32", options: as-set}]
+  register: options_result
+
+- name: Re-apply the options (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_router: *all_options
+  register: options_again_result
+
+- name: Remove the options
+  arubanetworks.aoscx.aoscx_bgp_router: &no_options
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    cluster_id: ""
+    confederation: {identifier: 0, peers: []}
+    address_families:
+      - address_family: ipv4_unicast
+        networks: []
+        aggregate_addresses: []
+        dampening: {}
+      - address_family: ipv6_unicast
+        aggregate_addresses: []
+  register: no_options_result
+
+- name: Remove the options again (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_router: *no_options
+  register: no_options_again_result
+
+- name: Assert the options results
+  ansible.builtin.assert:
+    that:
+      - options_result is changed
+      - options_again_result is not changed
+      - no_options_result is changed
+      - no_options_again_result is not changed
+
 - name: Delete the BGP router
   arubanetworks.aoscx.aoscx_bgp_router:
     asn: "{{ qa_bgp_asn }}"

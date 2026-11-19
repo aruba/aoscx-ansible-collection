@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - aoscx_bgp_router - add the ``cluster_id``, ``default_local_preference``, ``maxas_limit``, ``asnotation``, ``trap_enable``, ``disable``, ``aggregate_split_horizon``, ``timers``, ``distance``, ``graceful_restart``, ``confederation`` and ``bestpath_*`` options.
+  - aoscx_bgp_router - add the ``address_families`` option to manage per address family ``maximum_paths`` (REST API 10.13 or later), ``networks``, ``aggregate_addresses``, ``dampening`` and ``dampening_route_map``.
