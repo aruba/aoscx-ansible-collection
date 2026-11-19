@@ -1,0 +1,3 @@
+---
+minor_changes:
+  - Add ``aoscx_bgp_neighbor`` module to manage a BGP neighbor or peer group (single neighbor or list of neighbors sharing the same settings; remote AS, description, update source, eBGP multihop, peer group membership and per address family settings such as activate and send-community).
