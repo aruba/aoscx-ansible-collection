@@ -49,6 +49,19 @@ SWITCH_CONFIG = {
 }
 
 
+def flatten(value):
+    """{"a": {"b": x}} -> {"a,b": x}, as returned by the switch."""
+    return {
+        "{0},{1}".format(key, sub): item
+        for key, nested in (value or {}).items()
+        for sub, item in nested.items()
+    }
+
+
+def has_compound_keys(value):
+    return any("," in key for key in (value or {}))
+
+
 class ModuleResult(Exception):
     pass
 
@@ -57,7 +70,11 @@ class ModuleResult(Exception):
 def switch(monkeypatch):
     """Run the real module and SDK against an in-memory REST transport."""
     state = SimpleNamespace(
-        vrfs={"default", "sense"}, routers={}, writes=[], errors={}
+        vrfs={"default", "sense"},
+        routers={},
+        route_maps={"RM_CONN", "RM_STATIC"},
+        writes=[],
+        errors={},
     )
 
     def request(method, path, params=None, data=None):
@@ -66,8 +83,13 @@ def switch(monkeypatch):
             state.writes.append((method, path, body))
         parts = path.split("/")
         code, response = 404, {}
-        if path in state.errors:
+        if body and has_compound_keys(body.get("redistribute_route_map")):
+            # The switch rejects the format it returns
+            code = 400
+        elif path in state.errors:
             code = state.errors[path]
+        elif path.startswith("system/route_maps/"):
+            code = 200 if parts[2] in state.route_maps else 404
         elif len(parts) < 3 or parts[2] not in state.vrfs:
             pass
         elif len(parts) == 3:
@@ -83,7 +105,11 @@ def switch(monkeypatch):
                 elif method == "DELETE":
                     del state.routers[key]
                 code = 200 if method == "GET" else 204
-                response = state.routers.get(key, {})
+                response = dict(state.routers.get(key, {}))
+                if "redistribute_route_map" in response:
+                    response["redistribute_route_map"] = flatten(
+                        response["redistribute_route_map"]
+                    )
         elif method == "GET":
             # Child collections (address families, static routes, neighbors)
             code = 200
@@ -103,7 +129,12 @@ def switch(monkeypatch):
 
     monkeypatch.setattr(basic.AnsibleModule, "exit_json", finish)
     monkeypatch.setattr(basic.AnsibleModule, "fail_json", fail)
-    session = SimpleNamespace(api=v10_16(), connected=True, request=request)
+    session = SimpleNamespace(
+        api=v10_16(),
+        connected=True,
+        request=request,
+        resource_prefix="/rest/v10.16/",
+    )
     state.session = session
     monkeypatch.setattr(
         aoscx_bgp_router, "get_pyaoscx_session", lambda _: session
@@ -280,4 +311,80 @@ def test_missing_vrf_in_check_mode_or_delete(switch):
         "changed": True
     }
     assert run(asn=65000, vrf="missing", state="delete") == {"changed": False}
+    assert not state.writes
+
+
+def test_redistribute_route_maps(switch):
+    state, run = switch
+    rm = "/rest/v10.16/system/route_maps/"
+    state.routers[("default", "65000")] = {
+        "asn": 65000,
+        "redistribute": {"ipv6-unicast": ["connected"]},
+    }
+    redistribute = [
+        {
+            "address_family": "ipv4_unicast",
+            "route_types": ["connected", "static", "ospf"],
+            "route_maps": {"connected": "RM_CONN", "static": "RM_STATIC"},
+        }
+    ]
+
+    assert run(asn=65000, redistribute=redistribute) == {"changed": True}
+    router = state.routers[("default", "65000")]
+    assert router["redistribute"] == {
+        "ipv4-unicast": ["ospf"],
+        "ipv6-unicast": ["connected"],
+    }
+    assert router["redistribute_route_map"] == {
+        "ipv4-unicast": {
+            "connected": rm + "RM_CONN",
+            "static": rm + "RM_STATIC",
+        }
+    }
+
+    # The switch returns compound keys: no change, and a later update of
+    # another option sends nested dictionaries again
+    state.writes.clear()
+    assert run(asn=65000, redistribute=redistribute) == {"changed": False}
+    assert not state.writes
+    assert run(asn=65000, router_id="1.1.1.1") == {"changed": True}
+    assert router is not state.routers[("default", "65000")]
+    assert state.routers[("default", "65000")]["redistribute_route_map"] == {
+        "ipv4-unicast": {
+            "connected": rm + "RM_CONN",
+            "static": rm + "RM_STATIC",
+        }
+    }
+
+    # Without route_maps, the route types are redistributed without them
+    plain = [dict(redistribute[0], route_maps=None)]
+    assert run(asn=65000, redistribute=plain) == {"changed": True}
+    router = state.routers[("default", "65000")]
+    assert router["redistribute"]["ipv4-unicast"] == [
+        "connected",
+        "ospf",
+        "static",
+    ]
+    assert router["redistribute_route_map"] == {}
+
+
+@pytest.mark.parametrize(
+    "route_maps, message",
+    [
+        ({"static": "RM_STATIC"}, "static is not in the route_types"),
+        ({"connected": "MISSING"}, "Could not find route map MISSING"),
+    ],
+)
+def test_redistribute_route_map_errors(switch, route_maps, message):
+    state, run = switch
+    redistribute = [
+        {
+            "address_family": "ipv4_unicast",
+            "route_types": ["connected"],
+            "route_maps": route_maps,
+        }
+    ]
+    result = run(asn=65000, redistribute=redistribute)
+    assert result["failed"] is True
+    assert message in result["msg"]
     assert not state.writes

@@ -54,8 +54,10 @@ example BGP) to filter and modify routes through ordered match/set clauses.
         type: int
       match:
         description: >
-          Match conditions for the entry. Only the listed scalar clauses are
-          managed; clauses are compared on a per key basis.
+          Match conditions for the entry. An existing entry is updated only
+          if a given clause differs from the switch; it is then replaced by
+          the given entry, so match and set clauses that are not given are
+          removed. Always describe each entry entirely.
         required: false
         type: dict
         suboptions:
@@ -98,10 +100,54 @@ example BGP) to filter and modify routes through ordered match/set clauses.
           probability:
             description: Match a percentage of routes.
             type: int
+          ipv4_prefix_list:
+            description: >
+              Match routes permitted by this IPv4 prefix list
+              (match ip address prefix-list). The prefix list must exist,
+              see arubanetworks.aoscx.aoscx_prefix_list. Use an empty
+              string to remove the clause.
+            type: str
+          ipv6_prefix_list:
+            description: >
+              Match routes permitted by this IPv6 prefix list
+              (match ipv6 address prefix-list). The prefix list must
+              exist. Use an empty string to remove the clause.
+            type: str
+          community_list:
+            description: >
+              Match routes whose communities are permitted by this community
+              list (match community). The list must exist, see
+              arubanetworks.aoscx.aoscx_bgp_community_list. Use an empty
+              string to remove the clause.
+            type: str
+          community_list_exact_match:
+            description: >
+              Match only routes whose communities exactly match
+              community_list (exact-match).
+            type: bool
+          extcommunity_list:
+            description: >
+              Match routes whose extended communities are permitted by this
+              extended community list (match extcommunity). The list must
+              exist. Use an empty string to remove the clause.
+            type: str
+          as_path:
+            description: >
+              Match routes whose AS path is permitted by this AS-path list
+              (match aspath-list). The list must exist, see
+              arubanetworks.aoscx.aoscx_bgp_aspath_list. Use an empty
+              string to remove the clause.
+            type: str
+          tag:
+            description: >
+              Match routes with one of these tags (match tag). Use an
+              empty list to remove the clause.
+            type: list
+            elements: int
       set:
         description: >
-          Set actions applied to matched routes. Only the listed scalar
-          clauses are managed; clauses are compared on a per key basis.
+          Set actions applied to matched routes. Compared and replaced like
+          match.
         required: false
         type: dict
         suboptions:
@@ -143,6 +189,12 @@ example BGP) to filter and modify routes through ordered match/set clauses.
           atomic_aggregate:
             description: Set the atomic aggregate attribute.
             type: bool
+          tag:
+            description: >
+              Set the route tag (set tag). Use an empty list to remove the
+              clause.
+            type: list
+            elements: int
   state:
     description: Create, update or delete the route map.
     required: false
@@ -184,6 +236,29 @@ example BGP) to filter and modify routes through ordered match/set clauses.
         set:
           local_preference: 300
 
+# Equivalent CLI configuration:
+#   route-map RM_FROM_SPINES permit seq 10
+#       match ip address prefix-list PL_LOOPBACKS
+#       match community CL_FABRIC exact-match
+#       match aspath-list AS_SPINES
+#       set tag 100
+#   route-map RM_FROM_SPINES deny seq 20
+- name: Create a route map that references other routing policies
+  aoscx_route_map:
+    name: RM_FROM_SPINES
+    entries:
+      - preference: 10
+        action: permit
+        match:
+          ipv4_prefix_list: PL_LOOPBACKS
+          community_list: CL_FABRIC
+          community_list_exact_match: true
+          as_path: AS_SPINES
+        set:
+          tag: [100]
+      - preference: 20
+        action: deny
+
 - name: Delete a route map
   aoscx_route_map:
     name: SET_LOCAL_PREF
@@ -192,9 +267,13 @@ example BGP) to filter and modify routes through ordered match/set clauses.
 
 ##### NOTES
 
-- Only scalar match/set clauses are managed in this version. URI reference
-  clauses (prefix lists, community lists, AS-path lists), dampening and EVPN
-  specific fields are not yet handled.
+- Match clauses can reference prefix lists, community lists and AS-path
+  lists, which must exist. They are not checked in check mode, because they
+  may be created by a previous task of the playbook.
+- Dampening, EVPN specific fields and `set comm-list delete` are not handled.
+- An existing entry is updated only if a given clause differs from the
+  switch; it is then replaced by the given entry, so match and set clauses
+  that are not given are removed. Always describe each entry entirely.
 - When entries is provided with state create or update, it represents the full
   desired set of entries; entries present on the switch but not listed are
   removed.

@@ -8,9 +8,9 @@ family. BGP neighbors and peer groups are managed with
 
 ##### NOTES
 
-- Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor handling of earlier releases.
+- Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor and route map handling of earlier releases.
 - Tested on a switch with REST API version 10.09 (firmware 10.19).
-- In check mode, a missing VRF is reported as a change instead of an error, because it may be created by a previous task of the playbook.
+- In check mode, a missing VRF is reported as a change instead of an error, and referenced route maps are not checked, because they may be created by a previous task of the playbook.
 
 ##### ARGUMENTS
 
@@ -84,9 +84,9 @@ family. BGP neighbors and peer groups are managed with
           - ipv6_unicast
       route_types:
         description: >
-          Types of routes to redistribute. Replaces the list configured for
-          this address family. Use an empty list to remove the
-          redistribution.
+          Types of routes to redistribute. Replaces the redistribution
+          configured for this address family, route maps included. Use an
+          empty list to remove the redistribution.
         required: true
         type: list
         elements: str
@@ -96,6 +96,16 @@ family. BGP neighbors and peer groups are managed with
           - static
           - ospf
           - isis
+      route_maps:
+        description: >
+          Route map applied to a redistributed route type
+          (redistribute <type> route-map <name>), as a dictionary whose
+          keys are route types of route_types and values are route map
+          names. Route types of route_types that are not listed are
+          redistributed without route map. The route maps must exist, see
+          arubanetworks.aoscx.aoscx_route_map.
+        required: false
+        type: dict
   state:
     description: >
       Create or update (create) or delete (delete) the BGP router.
@@ -144,6 +154,21 @@ family. BGP neighbors and peer groups are managed with
     redistribute:
       - address_family: ipv4_unicast
         route_types: [connected]
+
+# Equivalent CLI configuration:
+#   router bgp 65000
+#       address-family ipv4 unicast
+#           redistribute connected route-map RM_CONNECTED
+#           redistribute static
+#       exit-address-family
+- name: Redistribute connected routes through a route map
+  aoscx_bgp_router:
+    asn: 65000
+    redistribute:
+      - address_family: ipv4_unicast
+        route_types: [connected, static]
+        route_maps:
+          connected: RM_CONNECTED
 
 - name: Stop redistributing IPv4 routes in the VRF sense
   aoscx_bgp_router:

@@ -29,11 +29,12 @@ description: >
   must exist, see M(arubanetworks.aoscx.aoscx_bgp_router).
 author: Aruba Networks (@ArubaNetworks)
 notes:
-  - Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor handling
-    of earlier releases.
+  - Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor and route
+    map handling of earlier releases.
   - Tested on a switch with REST API version 10.09 (firmware 10.19).
-  - In check mode, a missing VRF or BGP router is reported as a change instead of an
-    error, because it may be created by a previous task of the playbook.
+  - In check mode, a missing VRF or BGP router is reported as a change
+    instead of an error, and referenced route maps are not checked, because
+    they may be created by a previous task of the playbook.
 options:
   asn:
     description: Autonomous System Number of the BGP router.
@@ -158,6 +159,35 @@ options:
           (C(soft-reconfiguration inbound)). Not supported for C(l2vpn_evpn).
         required: false
         type: bool
+      route_map_in:
+        description: >
+          Route map applied to the routes received from the neighbor
+          (C(route-map <name> in)). The route map must exist, see
+          M(arubanetworks.aoscx.aoscx_route_map). Use an empty string to
+          remove it.
+        required: false
+        type: str
+      route_map_out:
+        description: >
+          Route map applied to the routes advertised to the neighbor
+          (C(route-map <name> out)). The route map must exist. Use an empty
+          string to remove it.
+        required: false
+        type: str
+      default_originate:
+        description: >
+          Advertise a default route to the neighbor (C(default-originate)).
+          Not supported for C(l2vpn_evpn).
+        required: false
+        type: bool
+      default_originate_route_map:
+        description: >
+          Route map that sets the criteria to advertise the default route
+          (C(default-originate route-map <name>)). Requires
+          I(default_originate). The route map must exist. Use an empty string
+          to remove it. Not supported for C(l2vpn_evpn).
+        required: false
+        type: str
   state:
     description: >
       Create or update (C(create)) or delete (C(delete)) the given
@@ -238,6 +268,32 @@ EXAMPLES = """
       - address_family: l2vpn_evpn
         activate: true
 
+# Equivalent CLI configuration:
+#   router bgp 65000
+#       address-family ipv4 unicast
+#           neighbor 192.0.2.1 route-map RM_IN in
+#           neighbor 192.0.2.1 route-map RM_OUT out
+#           neighbor 192.0.2.1 default-originate route-map RM_DEFAULT
+#       exit-address-family
+- name: Apply route maps to a neighbor
+  aoscx_bgp_neighbor:
+    asn: 65000
+    neighbor: 192.0.2.1
+    address_families:
+      - address_family: ipv4_unicast
+        route_map_in: RM_IN
+        route_map_out: RM_OUT
+        default_originate: true
+        default_originate_route_map: RM_DEFAULT
+
+- name: Remove the outbound route map
+  aoscx_bgp_neighbor:
+    asn: 65000
+    neighbor: 192.0.2.1
+    address_families:
+      - address_family: ipv4_unicast
+        route_map_out: ""
+
 - name: Delete a neighbor
   aoscx_bgp_neighbor:
     asn: 65000
@@ -252,12 +308,17 @@ changed:
   type: bool
 """
 
+import copy
 import ipaddress
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.six.moves.urllib.parse import unquote
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+)
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
+    check_reference,
+    reference_name,
+    reference_uri,
 )
 
 AF_SETTINGS = (
@@ -267,11 +328,24 @@ AF_SETTINGS = (
     "next_hop_self",
     "next_hop_unchanged",
     "inbound_soft_reconfiguration",
+    "default_originate",
 )
+
+# Per address family route map references: option -> (REST attribute, key)
+AF_ROUTE_MAPS = {
+    "route_map_in": ("route_maps", "in"),
+    "route_map_out": ("route_maps", "out"),
+    "default_originate_route_map": ("default_originate_route_map", None),
+}
 
 # Settings that do not exist in some address families
 UNSUPPORTED_AF_SETTINGS = {
-    "l2vpn_evpn": ("next_hop_self", "inbound_soft_reconfiguration"),
+    "l2vpn_evpn": (
+        "next_hop_self",
+        "inbound_soft_reconfiguration",
+        "default_originate",
+        "default_originate_route_map",
+    ),
     "ipv4_unicast": ("next_hop_unchanged",),
     "ipv6_unicast": ("next_hop_unchanged",),
 }
@@ -291,6 +365,8 @@ def get_argument_spec():
     }
     for setting in AF_SETTINGS:
         af_options.setdefault(setting, {"type": "bool"})
+    for option in AF_ROUTE_MAPS:
+        af_options[option] = {"type": "str"}
     return {
         "asn": {"type": "int", "required": True},
         "vrf": {"type": "str", "default": "default"},
@@ -364,6 +440,20 @@ def validate_params(ansible_module):
                 ansible_module.fail_json(
                     msg="{0} is not supported for {1}".format(setting, family)
                 )
+        if entry["default_originate_route_map"] and (
+            entry["default_originate"] is False
+        ):
+            ansible_module.fail_json(
+                msg="default_originate_route_map requires default_originate"
+            )
+
+
+def check_route_maps(ansible_module, session):
+    names = set()
+    for entry in ansible_module.params["address_families"] or []:
+        names.update(entry[option] for option in AF_ROUTE_MAPS)
+    for name in sorted(name for name in names if name):
+        check_reference(ansible_module, session, "route map", name)
 
 
 def is_ip_address(value):
@@ -372,20 +462,6 @@ def is_ip_address(value):
     except ValueError:
         return False
     return True
-
-
-def reference_name(reference):
-    """Name of a referenced resource, given as {name: uri} or as an uri."""
-    if not reference:
-        return None
-    if isinstance(reference, dict):
-        return next(iter(reference))
-    if isinstance(reference, str):
-        return unquote(reference.rstrip("/").rsplit("/", 1)[-1])
-    # pyaoscx object
-    return getattr(reference, "name", None) or getattr(
-        reference, "ip_or_ifname_or_group_name", None
-    )
 
 
 def read_is_peer_group(neighbor):
@@ -451,6 +527,38 @@ class NeighborConfig(object):
                     merged = self.changes.get(setting, current)
                     merged[family] = entry[setting]
                     self.changes[setting] = merged
+            for option, (attribute, key) in AF_ROUTE_MAPS.items():
+                if entry[option] is not None:
+                    self.compute_route_map(
+                        attribute, family, key, entry[option]
+                    )
+
+    def compute_route_map(self, attribute, family, direction, name):
+        """
+        Set a route map reference, kept by address family in a dictionary:
+        {family: uri}, or {family: {direction: uri}} when direction is set.
+        """
+        current = self.changes.get(attribute)
+        if current is None:
+            current = copy.deepcopy(
+                getattr(self.neighbor, attribute, None) or {}
+            )
+        if direction is None:
+            references, key = current, family
+        else:
+            references, key = current.setdefault(family, {}), direction
+        changed = reference_name(references.get(key)) != (name or None)
+        if changed:
+            if name:
+                references[key] = reference_uri(
+                    self.session, "route map", name
+                )
+            else:
+                references.pop(key, None)
+        if direction is not None and not references:
+            current.pop(family)
+        if changed:
+            self.changes[attribute] = current
 
     def compute_peer_group(self, name):
         current = reference_name(
@@ -612,6 +720,7 @@ def main():
                     result["changed"] = True
         else:
             # Read and validate every neighbor before the first write
+            check_route_maps(ansible_module, session)
             configs = []
             for neighbor in neighbors:
                 if neighbor.materialized and params[

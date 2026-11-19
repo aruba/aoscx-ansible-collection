@@ -83,6 +83,8 @@ def build_route_map(exists):
 
 def build_session(route_map, existing_entries=None, entry=None):
     session = MagicMock()
+    session.resource_prefix = "/rest/v10.09/"
+    session.request.return_value = MagicMock(status_code=200)
     existing_entries = existing_entries or {}
 
     def get_module(sess, module, index=None, **kwargs):
@@ -107,7 +109,11 @@ def build_session(route_map, existing_entries=None, entry=None):
 
 def run_module(args, session):
     set_module_args(args)
-    with patch(MODULE + ".get_pyaoscx_session", return_value=session):
+    # ansible-core 2.19+ no longer reads unprofiled _ANSIBLE_ARGS
+    load_params = patch.object(basic, "_load_params", return_value=args)
+    with load_params, patch(
+        MODULE + ".get_pyaoscx_session", return_value=session
+    ):
         with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
             aoscx_route_map.main()
     return exc.value.args[0]
@@ -321,3 +327,104 @@ def test_create_error_is_reported():
     result = run_module({"name": "RM1", "state": "create"}, session)
     assert result["failed"] is True
     assert "Could not create route map" in result["msg"]
+
+
+# --------------------------------------------------------------------------
+# Match / set clauses referencing other objects
+# --------------------------------------------------------------------------
+PREFIX = "/rest/v10.09/system/"
+REFERENCE_ENTRY = {
+    "preference": 10,
+    "action": "permit",
+    "match": {
+        "ipv4_prefix_list": "PL1",
+        "community_list": "CL1",
+        "community_list_exact_match": True,
+        "as_path": "AS1",
+        "tag": [100],
+    },
+    "set": {"tag": [200], "local_preference": 300},
+}
+
+
+def test_create_entry_with_references():
+    entry = MagicMock()
+    entry.config_attrs = []
+    entry.get.side_effect = Exception("not found")
+    session = build_session(build_route_map(False), entry=entry)
+    result = run_module({"name": "RM1", "entries": [REFERENCE_ENTRY]}, session)
+
+    assert result["changed"] is True
+    entry.create.assert_called_once()
+    called = [
+        c
+        for c in session.api.get_module.call_args_list
+        if c.args[1] == "RouteMapEntry"
+    ][-1]
+    assert called.kwargs == {
+        "parent_route_map": called.kwargs["parent_route_map"],
+        "action": "permit",
+        "match_ipv4_prefix_list": PREFIX + "prefix_lists/PL1",
+        "match_community_list": {PREFIX + "bgp_community_filters/CL1": True},
+        "match_as_path": PREFIX + "bgp_aspath_filters/AS1",
+        "match_tag": [100],
+        "set_tag": [200],
+        "set": {"local_preference": 300},
+    }
+    checked = sorted(c.args[1] for c in session.request.call_args_list)
+    assert checked == [
+        "system/bgp_aspath_filters/AS1",
+        "system/bgp_community_filters/CL1",
+        "system/prefix_lists/PL1",
+    ]
+
+
+def test_references_idempotent_with_switch_format():
+    entry = MagicMock()
+    entry.config_attrs = []
+    entry.get.return_value = True
+    entry.action = "permit"
+    # Format returned by the switch
+    entry.match_ipv4_prefix_list = {"PL1": PREFIX + "prefix_lists/PL1"}
+    entry.match_community_list = {PREFIX + "bgp_community_filters/CL1": True}
+    entry.match_as_path = {"AS1": PREFIX + "bgp_aspath_filters/AS1"}
+    entry.match_tag = [100]
+    entry.set_tag = [200]
+    entry.set = {"local_preference": 300}
+    session = build_session(build_route_map(True), entry=entry)
+
+    result = run_module(
+        {"name": "RM1", "state": "update", "entries": [REFERENCE_ENTRY]},
+        session,
+    )
+    assert result["changed"] is False
+    entry.update.assert_not_called()
+
+    removal = dict(
+        REFERENCE_ENTRY, match={"ipv4_prefix_list": "", "tag": []}, set=None
+    )
+    result = run_module(
+        {"name": "RM1", "state": "update", "entries": [removal]}, session
+    )
+    assert result["changed"] is True
+    entry.update.assert_called_once()
+    assert entry.match_ipv4_prefix_list is None
+    assert entry.match_tag == []
+
+
+def test_missing_reference_is_reported():
+    session = build_session(build_route_map(False))
+    session.request.return_value = MagicMock(status_code=404)
+    result = run_module({"name": "RM1", "entries": [REFERENCE_ENTRY]}, session)
+    assert result["failed"] is True
+    assert "Could not find prefix list PL1" in result["msg"]
+
+
+def test_exact_match_requires_community_list():
+    session = build_session(build_route_map(False))
+    entry = dict(REFERENCE_ENTRY, match={"community_list_exact_match": True})
+    result = run_module({"name": "RM1", "entries": [entry]}, session)
+    assert result["failed"] is True
+    assert "community_list_exact_match requires community_list" in (
+        result["msg"]
+    )

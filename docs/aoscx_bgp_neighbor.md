@@ -9,9 +9,9 @@ see [aoscx_bgp_router](aoscx_bgp_router.md).
 
 ##### NOTES
 
-- Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor handling of earlier releases.
+- Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor and route map handling of earlier releases.
 - Tested on a switch with REST API version 10.09 (firmware 10.19).
-- In check mode, a missing VRF or BGP router is reported as a change instead of an error, because it may be created by a previous task of the playbook.
+- In check mode, a missing VRF or BGP router is reported as a change instead of an error, and referenced route maps are not checked, because they may be created by a previous task of the playbook.
 
 ##### ARGUMENTS
 
@@ -139,6 +139,35 @@ see [aoscx_bgp_router](aoscx_bgp_router.md).
           (soft-reconfiguration inbound). Not supported for l2vpn_evpn.
         required: false
         type: bool
+      route_map_in:
+        description: >
+          Route map applied to the routes received from the neighbor
+          (route-map <name> in). The route map must exist, see
+          arubanetworks.aoscx.aoscx_route_map. Use an empty string to
+          remove it.
+        required: false
+        type: str
+      route_map_out:
+        description: >
+          Route map applied to the routes advertised to the neighbor
+          (route-map <name> out). The route map must exist. Use an empty
+          string to remove it.
+        required: false
+        type: str
+      default_originate:
+        description: >
+          Advertise a default route to the neighbor (default-originate).
+          Not supported for l2vpn_evpn.
+        required: false
+        type: bool
+      default_originate_route_map:
+        description: >
+          Route map that sets the criteria to advertise the default route
+          (default-originate route-map <name>). Requires
+          default_originate. The route map must exist. Use an empty string
+          to remove it. Not supported for l2vpn_evpn.
+        required: false
+        type: str
   state:
     description: >
       Create or update (create) or delete (delete) the given
@@ -220,6 +249,32 @@ see [aoscx_bgp_router](aoscx_bgp_router.md).
     address_families:
       - address_family: l2vpn_evpn
         activate: true
+
+# Equivalent CLI configuration:
+#   router bgp 65000
+#       address-family ipv4 unicast
+#           neighbor 192.0.2.1 route-map RM_IN in
+#           neighbor 192.0.2.1 route-map RM_OUT out
+#           neighbor 192.0.2.1 default-originate route-map RM_DEFAULT
+#       exit-address-family
+- name: Apply route maps to a neighbor
+  aoscx_bgp_neighbor:
+    asn: 65000
+    neighbor: 192.0.2.1
+    address_families:
+      - address_family: ipv4_unicast
+        route_map_in: RM_IN
+        route_map_out: RM_OUT
+        default_originate: true
+        default_originate_route_map: RM_DEFAULT
+
+- name: Remove the outbound route map
+  aoscx_bgp_neighbor:
+    asn: 65000
+    neighbor: 192.0.2.1
+    address_families:
+      - address_family: ipv4_unicast
+        route_map_out: ""
 
 - name: Delete a neighbor
   aoscx_bgp_neighbor:

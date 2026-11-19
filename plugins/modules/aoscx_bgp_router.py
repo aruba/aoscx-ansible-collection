@@ -28,11 +28,12 @@ description: >
   M(arubanetworks.aoscx.aoscx_bgp_neighbor).
 author: Aruba Networks (@ArubaNetworks)
 notes:
-  - Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor handling
-    of earlier releases.
+  - Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor and route
+    map handling of earlier releases.
   - Tested on a switch with REST API version 10.09 (firmware 10.19).
-  - In check mode, a missing VRF is reported as a change instead of an
-    error, because it may be created by a previous task of the playbook.
+  - In check mode, a missing VRF is reported as a change
+    instead of an error, and referenced route maps are not checked, because
+    they may be created by a previous task of the playbook.
 options:
   asn:
     description: >
@@ -103,9 +104,9 @@ options:
           - ipv6_unicast
       route_types:
         description: >
-          Types of routes to redistribute. Replaces the list configured for
-          this address family. Use an empty list to remove the
-          redistribution.
+          Types of routes to redistribute. Replaces the redistribution
+          configured for this address family, route maps included. Use an
+          empty list to remove the redistribution.
         required: true
         type: list
         elements: str
@@ -115,6 +116,16 @@ options:
           - static
           - ospf
           - isis
+      route_maps:
+        description: >
+          Route map applied to a redistributed route type
+          (C(redistribute <type> route-map <name>)), as a dictionary whose
+          keys are route types of I(route_types) and values are route map
+          names. Route types of I(route_types) that are not listed are
+          redistributed without route map. The route maps must exist, see
+          M(arubanetworks.aoscx.aoscx_route_map).
+        required: false
+        type: dict
   state:
     description: >
       Create or update (C(create)) or delete (C(delete)) the BGP router.
@@ -162,6 +173,21 @@ EXAMPLES = """
       - address_family: ipv4_unicast
         route_types: [connected]
 
+# Equivalent CLI configuration:
+#   router bgp 65000
+#       address-family ipv4 unicast
+#           redistribute connected route-map RM_CONNECTED
+#           redistribute static
+#       exit-address-family
+- name: Redistribute connected routes through a route map
+  aoscx_bgp_router:
+    asn: 65000
+    redistribute:
+      - address_family: ipv4_unicast
+        route_types: [connected, static]
+        route_maps:
+          connected: RM_CONNECTED
+
 - name: Stop redistributing IPv4 routes in the VRF sense
   aoscx_bgp_router:
     asn: 65000
@@ -187,6 +213,11 @@ changed:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+)
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
+    check_reference,
+    reference_name,
+    reference_uri,
 )
 
 BOOLEAN_OPTIONS = (
@@ -221,6 +252,7 @@ def get_argument_spec():
                     "required": True,
                     "choices": ROUTE_TYPES,
                 },
+                "route_maps": {"type": "dict"},
             },
         },
         "state": {
@@ -248,6 +280,24 @@ def validate_params(ansible_module):
                 msg="Duplicate redistribute address family: " + family
             )
         seen.add(family)
+        for route_type, route_map in (entry["route_maps"] or {}).items():
+            if route_type not in entry["route_types"]:
+                ansible_module.fail_json(
+                    msg="route_maps: {0} is not in the route_types of "
+                    "{1}".format(route_type, family)
+                )
+            if not isinstance(route_map, str) or not route_map:
+                ansible_module.fail_json(
+                    msg="route_maps: invalid route map for {0}".format(
+                        route_type
+                    )
+                )
+
+
+def check_route_maps(ansible_module, session):
+    for entry in ansible_module.params["redistribute"] or []:
+        for route_map in set((entry["route_maps"] or {}).values()):
+            check_reference(ansible_module, session, "route map", route_map)
 
 
 def get_desired(params, bgp_router):
@@ -274,17 +324,35 @@ def get_desired(params, bgp_router):
             desired["maximum_paths"] = params["maximum_paths"]
 
     if params["redistribute"] is not None:
+        session = bgp_router.session
         redistribute = normalize_redistribute(
             getattr(bgp_router, "redistribute", None)
         )
+        route_maps = normalize_route_maps(
+            getattr(bgp_router, "redistribute_route_map", None)
+        )
         for entry in params["redistribute"]:
             family = entry["address_family"].replace("_", "-")
-            route_types = sorted(set(entry["route_types"]))
+            family_maps = entry["route_maps"] or {}
+            # A route type redistributed through a route map is only listed
+            # in redistribute_route_map
+            route_types = sorted(set(entry["route_types"]) - set(family_maps))
             if route_types:
                 redistribute[family] = route_types
             else:
                 redistribute.pop(family, None)
+            if family_maps:
+                route_maps[family] = dict(family_maps)
+            else:
+                route_maps.pop(family, None)
         desired["redistribute"] = redistribute
+        desired["redistribute_route_map"] = {
+            family: {
+                route_type: reference_uri(session, "route map", name)
+                for route_type, name in maps.items()
+            }
+            for family, maps in route_maps.items()
+        }
     return desired
 
 
@@ -309,13 +377,34 @@ def normalize_redistribute(redistribute):
     }
 
 
+def normalize_route_maps(route_maps):
+    """Route maps by address family and route type, as names."""
+    return {
+        family: {
+            route_type: reference_name(route_map)
+            for route_type, route_map in maps.items()
+        }
+        for family, maps in (route_maps or {}).items()
+        if maps
+    }
+
+
+NORMALIZERS = {
+    "redistribute": normalize_redistribute,
+    "redistribute_route_map": normalize_route_maps,
+}
+
+
 def apply_configuration(bgp_router, desired, check_mode):
     changes = {}
     for key, value in desired.items():
         current = getattr(bgp_router, key, None)
-        if key == "redistribute":
-            current = normalize_redistribute(current)
-        if current != value:
+        normalize = NORMALIZERS.get(key)
+        if normalize:
+            changed = normalize(current) != normalize(value)
+        else:
+            changed = current != value
+        if changed:
             changes[key] = value
 
     if bgp_router.materialized and not changes:
@@ -395,6 +484,7 @@ def main():
                     bgp_router.delete()
                 result["changed"] = True
         else:
+            check_route_maps(ansible_module, session)
             desired = get_desired(params, bgp_router)
             result["changed"] = apply_configuration(
                 bgp_router, desired, check_mode

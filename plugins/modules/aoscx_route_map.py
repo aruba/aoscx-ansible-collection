@@ -25,6 +25,12 @@ description: >
   entries on AOS-CX devices. Route maps are used by routing protocols (for
   example BGP) to filter and modify routes through ordered match/set clauses.
 author: Aruba Networks (@ArubaNetworks)
+notes:
+  - Match clauses can reference prefix lists, community lists and AS-path
+    lists, which must exist. They are not checked in check mode, because
+    they may be created by a previous task of the playbook.
+  - Dampening, EVPN specific fields and C(set comm-list delete) are not
+    handled.
 options:
   name:
     description: Name of the route map.
@@ -73,8 +79,10 @@ options:
         type: int
       match:
         description: >
-          Match conditions for the entry. Only the listed scalar clauses are
-          managed; clauses are compared on a per key basis.
+          Match conditions for the entry. An existing entry is updated only
+          if a given clause differs from the switch; it is then replaced by
+          the given entry, so match and set clauses that are not given are
+          removed. Always describe each entry entirely.
         required: false
         type: dict
         suboptions:
@@ -133,10 +141,61 @@ options:
             description: Match a percentage of routes.
             required: false
             type: int
+          ipv4_prefix_list:
+            description: >
+              Match routes permitted by this IPv4 prefix list
+              (C(match ip address prefix-list)). The prefix list must exist,
+              see M(arubanetworks.aoscx.aoscx_prefix_list). Use an empty
+              string to remove the clause.
+            required: false
+            type: str
+          ipv6_prefix_list:
+            description: >
+              Match routes permitted by this IPv6 prefix list
+              (C(match ipv6 address prefix-list)). The prefix list must
+              exist. Use an empty string to remove the clause.
+            required: false
+            type: str
+          community_list:
+            description: >
+              Match routes whose communities are permitted by this community
+              list (C(match community)). The list must exist, see
+              M(arubanetworks.aoscx.aoscx_bgp_community_list). Use an empty
+              string to remove the clause.
+            required: false
+            type: str
+          community_list_exact_match:
+            description: >
+              Match only routes whose communities exactly match
+              I(community_list) (C(exact-match)).
+            required: false
+            type: bool
+          extcommunity_list:
+            description: >
+              Match routes whose extended communities are permitted by this
+              extended community list (C(match extcommunity)). The list must
+              exist. Use an empty string to remove the clause.
+            required: false
+            type: str
+          as_path:
+            description: >
+              Match routes whose AS path is permitted by this AS-path list
+              (C(match aspath-list)). The list must exist, see
+              M(arubanetworks.aoscx.aoscx_bgp_aspath_list). Use an empty
+              string to remove the clause.
+            required: false
+            type: str
+          tag:
+            description: >
+              Match routes with one of these tags (C(match tag)). Use an
+              empty list to remove the clause.
+            required: false
+            type: list
+            elements: int
       set:
         description: >
-          Set actions applied to matched routes. Only the listed scalar
-          clauses are managed; clauses are compared on a per key basis.
+          Set actions applied to matched routes. Compared and replaced like
+          I(match).
         required: false
         type: dict
         suboptions:
@@ -196,6 +255,13 @@ options:
             description: Set the atomic aggregate attribute.
             required: false
             type: bool
+          tag:
+            description: >
+              Set the route tag (C(set tag)). Use an empty list to remove the
+              clause.
+            required: false
+            type: list
+            elements: int
   state:
     description: Create, update or delete the route map.
     required: false
@@ -222,6 +288,29 @@ EXAMPLES = """
       - preference: 20
         action: deny
 
+# Equivalent CLI configuration:
+#   route-map RM_FROM_SPINES permit seq 10
+#       match ip address prefix-list PL_LOOPBACKS
+#       match community CL_FABRIC exact-match
+#       match aspath-list AS_SPINES
+#       set tag 100
+#   route-map RM_FROM_SPINES deny seq 20
+- name: Create a route map that references other routing policies
+  aoscx_route_map:
+    name: RM_FROM_SPINES
+    entries:
+      - preference: 10
+        action: permit
+        match:
+          ipv4_prefix_list: PL_LOOPBACKS
+          community_list: CL_FABRIC
+          community_list_exact_match: true
+          as_path: AS_SPINES
+        set:
+          tag: [100]
+      - preference: 20
+        action: deny
+
 - name: Delete a route map
   aoscx_route_map:
     name: SET_LOCAL_PREF
@@ -239,9 +328,33 @@ from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
 )
+from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
+    check_reference,
+    reference_name,
+    reference_uri,
+)
 
 # REST keys that differ from the Ansible suboption names.
 _SET_KEY_MAP = {"atomic_aggregate": "atomic-aggregate"}
+
+# Match clauses that reference another object. They are not part of the
+# REST "match" dictionary but separate attributes of the entry:
+# option -> (REST attribute, kind of the referenced object)
+_MATCH_REFERENCES = {
+    "ipv4_prefix_list": ("match_ipv4_prefix_list", "prefix list"),
+    "ipv6_prefix_list": ("match_ipv6_prefix_list", "prefix list"),
+    "community_list": ("match_community_list", "community list"),
+    "extcommunity_list": ("match_extcommunity_list", "community list"),
+    "as_path": ("match_as_path", "AS-path list"),
+}
+# REST attributes kept as {uri: exact_match}
+_COMMUNITY_ATTRS = ("match_community_list", "match_extcommunity_list")
+# Tag clauses, separate list attributes of the entry
+_TAGS = {"match": "match_tag", "set": "set_tag"}
+_SEPARATE_OPTIONS = {
+    "match": set(_MATCH_REFERENCES) | {"community_list_exact_match", "tag"},
+    "set": {"tag"},
+}
 
 
 def _clean(clause, key_map=None):
@@ -284,6 +397,13 @@ def main():
         ipv6_next_hop=dict(type="str"),
         vni=dict(type="int"),
         probability=dict(type="int"),
+        ipv4_prefix_list=dict(type="str"),
+        ipv6_prefix_list=dict(type="str"),
+        community_list=dict(type="str"),
+        community_list_exact_match=dict(type="bool"),
+        extcommunity_list=dict(type="str"),
+        as_path=dict(type="str"),
+        tag=dict(type="list", elements="int"),
     )
     set_spec = dict(
         local_preference=dict(type="int"),
@@ -301,6 +421,7 @@ def main():
         ipv6_next_hop_global=dict(type="str"),
         aggregator_as=dict(type="int"),
         atomic_aggregate=dict(type="bool"),
+        tag=dict(type="list", elements="int"),
     )
     entry_spec = dict(
         preference=dict(type="int", required=True),
@@ -394,6 +515,7 @@ def main():
 
     # --------------------------------------------------------------- entries
     if entries is not None:
+        _check_references(ansible_module, session, entries)
         _reconcile_entries(
             ansible_module, session, route_map, name, entries, result
         )
@@ -412,6 +534,17 @@ def _validate_entries(ansible_module, entries):
             )
         seen.add(preference)
 
+        match = entry.get("match") or {}
+        if match.get("community_list_exact_match") is not None and not (
+            match.get("community_list")
+        ):
+            ansible_module.fail_json(
+                msg=(
+                    "Entry {0}: community_list_exact_match requires "
+                    "community_list.".format(preference)
+                )
+            )
+
         if entry.get("exitpolicy") == "goto" and (
             entry.get("route_map_continue") is None
         ):
@@ -423,7 +556,45 @@ def _validate_entries(ansible_module, entries):
             )
 
 
-def _desired_entry_attrs(entry):
+def _check_references(ansible_module, session, entries):
+    """Fail if a referenced routing policy object does not exist."""
+    for entry in entries:
+        match = entry.get("match") or {}
+        for option, (attribute, kind) in _MATCH_REFERENCES.items():
+            if match.get(option):
+                check_reference(ansible_module, session, kind, match[option])
+
+
+def _reference_attrs(session, match):
+    """REST attributes of the match clauses referencing other objects."""
+    attrs = {}
+    for option, (attribute, kind) in _MATCH_REFERENCES.items():
+        name = match.get(option)
+        if name is None:
+            continue
+        uri = reference_uri(session, kind, name) if name else None
+        if attribute in _COMMUNITY_ATTRS:
+            exact = bool(match.get("community_list_exact_match"))
+            if attribute == "match_extcommunity_list":
+                exact = False
+            attrs[attribute] = {uri: exact} if uri else {}
+        else:
+            attrs[attribute] = uri
+    return attrs
+
+
+def _normalize_reference(attribute, value):
+    """Comparable form of a reference attribute (names instead of URIs)."""
+    if attribute in _COMMUNITY_ATTRS:
+        return {
+            reference_name(uri): exact for uri, exact in (value or {}).items()
+        }
+    if attribute in _TAGS.values():
+        return sorted(value or [])
+    return reference_name(value)
+
+
+def _desired_entry_attrs(entry, session):
     """Build the REST attribute dict for a desired entry."""
     attrs = {"action": entry["action"]}
     if entry.get("description") is not None:
@@ -432,13 +603,27 @@ def _desired_entry_attrs(entry):
         attrs["exitpolicy"] = entry["exitpolicy"]
     if entry.get("route_map_continue") is not None:
         attrs["route_map_continue"] = entry["route_map_continue"]
-    match = _clean(entry.get("match"))
+    for clause, attribute in _TAGS.items():
+        tags = (entry.get(clause) or {}).get("tag")
+        if tags is not None:
+            attrs[attribute] = sorted(set(tags))
+    attrs.update(_reference_attrs(session, entry.get("match") or {}))
+    match = _clean(_without_separate(entry, "match"))
     if match:
         attrs["match"] = match
-    set_clause = _clean(entry.get("set"), _SET_KEY_MAP)
+    set_clause = _clean(_without_separate(entry, "set"), _SET_KEY_MAP)
     if set_clause:
         attrs["set"] = set_clause
     return attrs
+
+
+def _without_separate(entry, clause):
+    """Clause options that belong to the REST match/set dictionary."""
+    return {
+        key: value
+        for key, value in (entry.get(clause) or {}).items()
+        if key not in _SEPARATE_OPTIONS[clause]
+    }
 
 
 def _entry_changed(entry_obj, desired):
@@ -450,6 +635,11 @@ def _entry_changed(entry_obj, desired):
             for sub_key, sub_value in value.items():
                 if current.get(sub_key) != sub_value:
                     return True
+        elif key.startswith(("match_", "set_")):
+            if _normalize_reference(key, current) != _normalize_reference(
+                key, value
+            ):
+                return True
         elif current != value:
             return True
     return False
@@ -470,7 +660,7 @@ def _reconcile_entries(
     for entry in entries:
         preference = entry["preference"]
         desired_prefs.add(str(preference))
-        desired = _desired_entry_attrs(entry)
+        desired = _desired_entry_attrs(entry, session)
 
         entry_obj = session.api.get_module(
             session,

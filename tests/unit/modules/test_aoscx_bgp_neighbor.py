@@ -46,6 +46,19 @@ SPINE = {
 }
 
 
+def flatten(value):
+    """{"a": {"b": x}} -> {"a,b": x}, as returned by the switch."""
+    return {
+        "{0},{1}".format(key, sub): item
+        for key, nested in (value or {}).items()
+        for sub, item in nested.items()
+    }
+
+
+def has_compound_keys(value):
+    return any("," in key for key in (value or {}))
+
+
 class ModuleResult(Exception):
     pass
 
@@ -57,6 +70,7 @@ def switch(monkeypatch):
         routers={("default", "65000")},
         neighbors={},
         interfaces={"loopback0"},
+        route_maps={"RM_IN", "RM_OUT", "RM_DEFAULT"},
         writes=[],
     )
 
@@ -64,6 +78,8 @@ def switch(monkeypatch):
         # The switch returns references as {name: uri}. is_peer_group is
         # create-only, so it is not returned with the writable selector.
         data = dict(state.neighbors[name], ip_or_ifname_or_group_name=name)
+        if "route_maps" in data:
+            data["route_maps"] = flatten(data["route_maps"])
         if params.get("selector") != "configuration":
             data.pop("is_peer_group", None)
         if "attributes" in params:
@@ -77,7 +93,12 @@ def switch(monkeypatch):
             state.writes.append((method, path, body))
         parts = path.split("/")
         code, response = 404, {}
-        if path.startswith("system/interfaces/"):
+        if body and has_compound_keys(body.get("route_maps")):
+            # The switch rejects the format it returns
+            code = 400
+        elif path.startswith("system/route_maps/"):
+            code = 200 if parts[2] in state.route_maps else 404
+        elif path.startswith("system/interfaces/"):
             if parts[2] in state.interfaces:
                 # Interface sub-collections (IPv6 addresses, ...) are empty
                 code = 200
@@ -422,4 +443,94 @@ def test_invalid_ebgp_multihop(switch, value):
     result = run(asn=65000, neighbor="10.0.0.1", ebgp_multihop=value)
     assert result["failed"] is True
     assert "ebgp_multihop must be between 1 and 255" in result["msg"]
+    assert not state.writes
+
+
+def test_route_maps_and_default_originate(switch):
+    state, run = switch
+    rm = PREFIX + "system/route_maps/"
+    state.neighbors["10.0.0.1"] = {
+        "is_peer_group": False,
+        "route_maps": {"ipv6-unicast": {"in": rm + "RM_IN"}},
+    }
+    families = [
+        {
+            "address_family": "ipv4_unicast",
+            "route_map_in": "RM_IN",
+            "route_map_out": "RM_OUT",
+            "default_originate": True,
+            "default_originate_route_map": "RM_DEFAULT",
+        }
+    ]
+    args = dict(asn=65000, neighbor="10.0.0.1", address_families=families)
+
+    assert run(_ansible_check_mode=True, **args) == {"changed": True}
+    assert not state.writes
+    assert run(**args) == {"changed": True}
+    neighbor = state.neighbors["10.0.0.1"]
+    assert neighbor["route_maps"] == {
+        "ipv4-unicast": {"in": rm + "RM_IN", "out": rm + "RM_OUT"},
+        "ipv6-unicast": {"in": rm + "RM_IN"},
+    }
+    assert neighbor["default_originate"] == {"ipv4-unicast": True}
+    assert neighbor["default_originate_route_map"] == {
+        "ipv4-unicast": rm + "RM_DEFAULT"
+    }
+
+    # The switch returns compound keys: no change
+    state.writes.clear()
+    assert run(**args) == {"changed": False}
+    assert not state.writes
+
+    # Another option is updated: route maps are sent as nested dicts
+    assert run(asn=65000, neighbor="10.0.0.1", description="x") == {
+        "changed": True
+    }
+
+    removal = [
+        {
+            "address_family": "ipv4_unicast",
+            "route_map_in": "",
+            "route_map_out": "",
+            "default_originate": False,
+            "default_originate_route_map": "",
+        },
+        {"address_family": "ipv6_unicast", "route_map_in": ""},
+    ]
+    assert run(asn=65000, neighbor="10.0.0.1", address_families=removal) == {
+        "changed": True
+    }
+    neighbor = state.neighbors["10.0.0.1"]
+    assert neighbor["route_maps"] == {}
+    assert neighbor["default_originate"] == {"ipv4-unicast": False}
+    assert neighbor["default_originate_route_map"] == {}
+
+
+@pytest.mark.parametrize(
+    "family, message",
+    [
+        (
+            {"address_family": "ipv4_unicast", "route_map_in": "MISSING"},
+            "Could not find route map MISSING",
+        ),
+        (
+            {"address_family": "l2vpn_evpn", "default_originate": True},
+            "default_originate is not supported for l2vpn_evpn",
+        ),
+        (
+            {
+                "address_family": "ipv4_unicast",
+                "default_originate": False,
+                "default_originate_route_map": "RM_DEFAULT",
+            },
+            "default_originate_route_map requires default_originate",
+        ),
+    ],
+)
+def test_route_map_errors(switch, family, message):
+    state, run = switch
+    state.neighbors["10.0.0.1"] = {"is_peer_group": False}
+    result = run(asn=65000, neighbor="10.0.0.1", address_families=[family])
+    assert result["failed"] is True
+    assert message in result["msg"]
     assert not state.writes
