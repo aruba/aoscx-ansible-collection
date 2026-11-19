@@ -1,7 +1,8 @@
 # module: aoscx_upload_config
 
 description: This module uploads a configuration onto the switch stored locally
-or it can also upload the configuration from a TFTP server.
+or it can also upload the configuration from a TFTP server. A local configuration
+in CLI format can also be pushed directly in the REST payload, without TFTP.
 
 ##### ARGUMENTS
 
@@ -35,6 +36,28 @@ or it can also upload the configuration from a TFTP server.
       remote_output_file_tftp_path is provided.
     type: str
     required: false
+  config_cli:
+    description: >
+      Local file name and path of a configuration in CLI format. Its content
+      is sent directly to the switch in the REST request payload, no TFTP
+      server is needed. Requires a pyaoscx version providing
+      Configuration.upload_switch_config_cli_from_local.
+    type: str
+    required: false
+  operation:
+    description: >
+      Operation to perform when uploading a CLI configuration with config_cli.
+      replace replaces the whole configuration, merge merges the CLI
+      configuration into the existing one. Only used with config_cli.
+      If the switch rejects commands, the task fails and the errors are
+      returned (errors). With replace nothing is applied, with merge the
+      valid lines are applied.
+    type: str
+    choices:
+      - replace
+      - merge
+    default: replace
+    required: false
 ```
 
 ##### EXAMPLES
@@ -62,4 +85,44 @@ or it can also upload the configuration from a TFTP server.
     config_name: 'startup-config'
     remote_config_file_tftp_path: 'tftp://192.168.1.2/startup.cli'
     vrf: 'mgmt'
+
+- name: Replace Running Config with a local CLI file (no TFTP)
+  aoscx_upload_config:
+    config_name: 'running-config'
+    config_cli: '/user/admin/running.cli'
+
+- name: Merge a local CLI file into the Running Config (no TFTP)
+  aoscx_upload_config:
+    config_name: 'running-config'
+    config_cli: '/user/admin/vlans.cli'
+    operation: merge
+
+- name: Upload a local CLI file and show the commands rejected by the switch
+  aoscx_upload_config:
+    config_cli: '/user/admin/running.cli'
+  register: upload
+  ignore_errors: true
+
+- name: Display the switch errors
+  debug:
+    var: upload.errors
+  when: upload is failed
+```
+
+##### RETURN VALUES
+
+```YAML
+errors:
+  description: >
+    Errors returned by the switch when a CLI configuration (config_cli) is
+    rejected. Each error gives the line number in the file, the configuration
+    context, the command and the error message.
+  returned: failure with config_cli
+  type: list
+  elements: dict
+  sample:
+    - line: 34
+      context: ["configure terminal", "interface 1/1/2"]
+      command: "    vlan acess 10"
+      message: "Invalid input: acess"
 ```
