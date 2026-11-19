@@ -1,0 +1,28 @@
+Manifest = {
+    'Name': 'qa_nae_script',
+    'Description': 'Integration test script',
+    'Version': '1.0',
+    'Author': 'QA'
+}
+
+ParameterDefinitions = {
+    'threshold': {
+        'Name': 'CPU threshold',
+        'Description': 'CPU utilization threshold in percent',
+        'Type': 'integer',
+        'Default': 90
+    }
+}
+
+
+class Agent(NAE):
+
+    def __init__(self):
+        uri = ('/rest/v1/system/subsystems/management_module/*'
+               '?attributes=resource_utilization.cpu')
+        self.m1 = Monitor(uri, 'CPU utilization')
+        self.r1 = Rule('CPU above threshold')
+        self.r1.condition('{} >= {}', [self.m1, self.params['threshold']])
+        self.r1.action('ALERT_LEVEL', AlertLevel.MINOR)
+        self.r1.clear_condition('{} < {}', [self.m1, self.params['threshold']])
+        self.r1.clear_action('ALERT_LEVEL', AlertLevel.NONE)

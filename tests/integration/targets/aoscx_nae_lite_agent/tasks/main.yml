@@ -1,0 +1,141 @@
+---
+# Integration tests for the aoscx_nae_lite_agent module.
+#
+# Run with:
+#   ansible-test integration aoscx_nae_lite_agent --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi, an
+# AOS-CX 10.10 or later switch, and a pyaoscx release that ships the
+# NaeLiteAgent and NaeLiteCondition classes.
+
+- name: Make sure the test agents do not exist yet
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: "{{ item }}"
+    state: delete
+  loop:
+    - qa_lite_cpu
+    - qa_lite_events
+
+- name: Create a NAE-Lite agent on the CPU utilization
+  arubanetworks.aoscx.aoscx_nae_lite_agent: &cpu_agent
+    name: qa_lite_cpu
+    description: Integration test
+    tags:
+      - integration
+    monitors:
+      - name: cpu
+        resource: system cpu
+    condition:
+      source: cpu
+      expression: ge 0
+      alert_level: critical
+      syslog:
+        text: QA high CPU
+        severity: warning
+      cli_commands:
+        - show clock
+        - show system resource-utilization
+    clear_condition:
+      source: cpu
+      expression: lt 0
+  register: create_result
+
+- name: Assert the agent was created and generated
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.nae_lite_agent.ready == true
+      - create_result.nae_lite_agent.state == 'AGENT_CREATED'
+      - create_result.nae_lite_agent.agent.error_description is none
+
+- name: Apply the same configuration (idempotency)
+  arubanetworks.aoscx.aoscx_nae_lite_agent: *cpu_agent
+  register: same_result
+
+- name: Assert nothing changed
+  ansible.builtin.assert:
+    that:
+      - same_result is not changed
+
+- name: Change the condition and remove the clear condition
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: qa_lite_cpu
+    monitors:
+      - name: cpu
+        resource: system cpu
+    condition:
+      source: cpu
+      expression: gt 95 for 2 minutes
+      alert_level: major
+    state: update
+  register: update_result
+
+- name: Assert the agent was generated again
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.nae_lite_agent.state == 'AGENT_CREATED'
+
+- name: Create a NAE-Lite agent on event logs
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: qa_lite_events
+    watches:
+      - name: psu_logs
+        event_ids:
+          - 1201
+          - 1202
+    condition:
+      source: psu_logs
+      expression: count 2
+      alert_level: minor
+      snmp_trap: QA power supply event
+  register: watch_result
+
+- name: Assert the watch agent was generated
+  ansible.builtin.assert:
+    that:
+      - watch_result is changed
+      - watch_result.nae_lite_agent.state == 'AGENT_CREATED'
+
+- name: Deactivate the watch agent
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: qa_lite_events
+    activate: false
+    state: update
+  register: deactivate_result
+
+- name: Assert the watch agent was deactivated
+  ansible.builtin.assert:
+    that:
+      - deactivate_result is changed
+      - deactivate_result.nae_lite_agent.ready == false
+
+- name: Refuse a condition on an unknown monitor
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: qa_lite_cpu
+    condition:
+      source: memory
+      expression: gt 90
+    state: update
+  register: unknown_result
+  ignore_errors: true
+
+- name: Assert the invalid request is refused
+  ansible.builtin.assert:
+    that:
+      - unknown_result is failed
+      - "'is not a monitor or watch' in unknown_result.msg"
+
+- name: Delete the test agents
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: "{{ item }}"
+    state: delete
+  loop:
+    - qa_lite_cpu
+    - qa_lite_events
+  register: delete_result
+
+- name: Assert the agents were deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed

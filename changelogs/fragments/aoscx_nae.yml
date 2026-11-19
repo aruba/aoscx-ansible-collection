@@ -1,0 +1,16 @@
+---
+minor_changes:
+  - Add the ``aoscx_nae_script`` module to upload, update and delete Network
+    Analytics Engine (NAE) scripts, from a file, a content or a content
+    encoded in Base64 (``script_base64``), and return their validation
+    status and parameters.
+  - Add the ``aoscx_nae_agent`` module to create, update, enable, disable
+    and delete NAE agents, with their parameters, encrypted parameters and
+    VRF, and return their status and alert information.
+  - Add the ``aoscx_nae_lite_agent`` module to manage NAE-Lite agents
+    (monitors or watches, condition, clear condition and actions), activate
+    them and return the status of the generated agent.
+  - Add the ``aoscx_nae_info`` module to collect the NAE status and alerts,
+    with the highest alert level of the switch, scripts, agents, NAE-Lite
+    agents, agents with an alert and, optionally, conditions and condition
+    events.
