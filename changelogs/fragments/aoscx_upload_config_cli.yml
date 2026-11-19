@@ -1,0 +1,7 @@
+minor_changes:
+  - aoscx_upload_config - add the ``config_cli`` option to upload a local
+    configuration in CLI format directly in the REST payload (no TFTP server
+    needed), and the ``operation`` option (``replace`` by default, or
+    ``merge``). Commands rejected by the switch make the task fail and are
+    returned in ``errors`` (requires a pyaoscx version providing
+    ``Configuration.upload_switch_config_cli_from_local``).
