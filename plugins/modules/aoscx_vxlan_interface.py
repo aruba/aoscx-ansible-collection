@@ -23,7 +23,8 @@ short_description: Create, update or delete a VXLAN tunnel interface on AOS-CX.
 description: >
   This module provides configuration management of the VXLAN tunnel interface
   (for example C(vxlan1)) on AOS-CX devices: its source IPv4 address, the
-  destination UDP port, the administrative state and the description. The
+  destination UDP port, the inter-VXLAN bridging mode, the administrative
+  state and the description. The
   VNI-to-VLAN and VNI-to-VRF mappings carried by the interface are managed with
   the M(arubanetworks.aoscx.aoscx_vni) module.
 author: Aruba Networks (@ArubaNetworks)
@@ -45,6 +46,20 @@ options:
       Destination UDP port used by the VXLAN tunnel. When omitted the switch
       default (4789) is kept.
     type: int
+    required: false
+  inter_vxlan_bridging_mode:
+    description: >
+      Inter-VXLAN bridging mode of the tunnel, equivalent to the CLI
+      C(inter-vxlan-bridging-mode) command. C(deny) disables traffic bridging
+      between tunnels on the same L2VNI, C(static-evpn) enables it between
+      static and dynamic (EVPN) tunnels, and C(static-all) enables it between
+      all tunnels. When omitted the current mode is left unchanged. Requires a
+      pyaoscx version providing C(Interface.set_inter_vxlan_bridging_mode).
+    type: str
+    choices:
+      - deny
+      - static-evpn
+      - static-all
     required: false
   description:
     description: Description of the VXLAN interface.
@@ -83,6 +98,12 @@ EXAMPLES = """
     description: EVPN-VXLAN overlay
     state: update
 
+- name: Allow bridging between static and EVPN tunnels on the same L2VNI
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    inter_vxlan_bridging_mode: static-evpn
+    state: update
+
 - name: Shut down the VXLAN interface
   arubanetworks.aoscx.aoscx_vxlan_interface:
     name: vxlan1
@@ -108,6 +129,12 @@ def main():
         name=dict(type="str", required=True),
         source_ip=dict(type="str", required=False, default=None),
         dest_udp_port=dict(type="int", required=False, default=None),
+        inter_vxlan_bridging_mode=dict(
+            type="str",
+            required=False,
+            default=None,
+            choices=["deny", "static-evpn", "static-all"],
+        ),
         description=dict(type="str", required=False, default=None),
         enabled=dict(type="bool", required=False, default=None),
         state=dict(
@@ -124,6 +151,9 @@ def main():
     name = ansible_module.params["name"]
     source_ip = ansible_module.params["source_ip"]
     dest_udp_port = ansible_module.params["dest_udp_port"]
+    inter_vxlan_bridging_mode = ansible_module.params[
+        "inter_vxlan_bridging_mode"
+    ]
     description = ansible_module.params["description"]
     enabled = ansible_module.params["enabled"]
     state = ansible_module.params["state"]
@@ -145,6 +175,14 @@ def main():
         )
 
     interface = session.api.get_module(session, "Interface", name)
+    if inter_vxlan_bridging_mode is not None and not hasattr(
+        interface, "set_inter_vxlan_bridging_mode"
+    ):
+        ansible_module.fail_json(
+            msg="inter_vxlan_bridging_mode requires a pyaoscx version "
+            "providing Interface.set_inter_vxlan_bridging_mode, please "
+            "upgrade pyaoscx."
+        )
     try:
         interface.get()
         exists = True
@@ -176,7 +214,13 @@ def main():
         # SDK on a real run.
         result["changed"] = (not exists) or any(
             value is not None
-            for value in (source_ip, dest_udp_port, description, enabled)
+            for value in (
+                source_ip,
+                dest_udp_port,
+                inter_vxlan_bridging_mode,
+                description,
+                enabled,
+            )
         )
         ansible_module.exit_json(**result)
 
@@ -190,6 +234,8 @@ def main():
         interface.options["local_ip"] = source_ip
     if dest_udp_port is not None:
         interface.options["vxlan_dest_udp_port"] = str(dest_udp_port)
+    if inter_vxlan_bridging_mode is not None:
+        interface.set_inter_vxlan_bridging_mode(inter_vxlan_bridging_mode)
     if description is not None:
         interface.description = description
     if enabled is not None:

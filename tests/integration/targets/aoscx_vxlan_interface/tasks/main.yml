@@ -51,6 +51,18 @@
     that:
       - update_result is changed
 
+- name: Set the inter-VXLAN bridging mode
+  arubanetworks.aoscx.aoscx_vxlan_interface:
+    name: vxlan1
+    inter_vxlan_bridging_mode: static-evpn
+    state: update
+  register: bridging_result
+
+- name: Assert bridging mode update changed
+  ansible.builtin.assert:
+    that:
+      - bridging_result is changed
+
 - name: Shut the interface down
   arubanetworks.aoscx.aoscx_vxlan_interface:
     name: vxlan1

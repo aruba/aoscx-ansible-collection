@@ -2,7 +2,8 @@
 
 description: This module provides configuration management of the VXLAN tunnel
 interface (for example vxlan1) on AOS-CX devices: its source IPv4 address, the
-destination UDP port, the administrative state and the description. The
+destination UDP port, the inter-VXLAN bridging mode, the administrative state
+and the description. The
 VNI-to-VLAN and VNI-to-VRF mappings carried by the interface are managed with
 the aoscx_vni module.
 
@@ -27,6 +28,20 @@ the aoscx_vni module.
       default (4789) is kept.
     required: false
     type: int
+  inter_vxlan_bridging_mode:
+    description: >
+      Inter-VXLAN bridging mode of the tunnel, equivalent to the CLI
+      inter-vxlan-bridging-mode command. deny disables traffic bridging
+      between tunnels on the same L2VNI, static-evpn enables it between
+      static and dynamic (EVPN) tunnels, and static-all enables it between
+      all tunnels. When omitted the current mode is left unchanged. Requires a
+      pyaoscx version providing Interface.set_inter_vxlan_bridging_mode.
+    required: false
+    choices:
+      - deny
+      - static-evpn
+      - static-all
+    type: str
   description:
     description: Description of the VXLAN interface.
     required: false
@@ -64,6 +79,12 @@ the aoscx_vni module.
     name: vxlan1
     dest_udp_port: 4789
     description: EVPN-VXLAN overlay
+    state: update
+
+- name: Allow bridging between static and EVPN tunnels on the same L2VNI
+  aoscx_vxlan_interface:
+    name: vxlan1
+    inter_vxlan_bridging_mode: static-evpn
     state: update
 
 - name: Shut down the VXLAN interface
