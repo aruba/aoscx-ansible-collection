@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_bgp_router - add the ``route_maps`` suboption of ``redistribute`` to redistribute route types through a route map (``redistribute <type> route-map <name>``).
+  - aoscx_bgp_neighbor - add the ``route_map_in``, ``route_map_out``, ``default_originate`` and ``default_originate_route_map`` per address family options.
+  - aoscx_route_map - add match clauses referencing prefix lists (``ipv4_prefix_list``, ``ipv6_prefix_list``), community lists (``community_list``, ``community_list_exact_match``, ``extcommunity_list``) and AS-path lists (``as_path``), and the ``tag`` match and set clauses.
