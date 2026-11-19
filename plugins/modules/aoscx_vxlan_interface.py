@@ -55,6 +55,8 @@ options:
       static and dynamic (EVPN) tunnels, and C(static-all) enables it between
       all tunnels. When omitted the current mode is left unchanged. Requires a
       pyaoscx version providing C(Interface.set_inter_vxlan_bridging_mode).
+      If the switch platform or firmware does not support it, the task fails
+      with the switch answer and nothing is applied.
     type: str
     choices:
       - deny
@@ -121,6 +123,7 @@ RETURN = r""" # """
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+    pyaoscx_error_message,
 )
 
 
@@ -227,7 +230,16 @@ def main():
     changed = False
     if not exists:
         interface.type = "vxlan"
-        interface.apply()
+        try:
+            interface.apply()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg=pyaoscx_error_message(
+                    session,
+                    "Could not create VXLAN interface {0}".format(name),
+                    e,
+                )
+            )
         changed = True
 
     if source_ip is not None:
@@ -244,7 +256,36 @@ def main():
         # A freshly created VXLAN interface is brought up by default.
         interface.admin_state = "up"
 
-    changed = interface.apply() or changed
+    try:
+        changed = interface.apply() or changed
+    except Exception as e:
+        options = [
+            option
+            for option in (
+                "source_ip",
+                "dest_udp_port",
+                "inter_vxlan_bridging_mode",
+                "description",
+                "enabled",
+            )
+            if ansible_module.params[option] is not None
+        ]
+        feature = "Could not configure VXLAN interface {0}".format(name)
+        if options:
+            feature += " ({0})".format(", ".join(options))
+        msg = pyaoscx_error_message(session, feature, e)
+        if not exists:
+            # Remove the interface created by this run, so nothing is applied
+            try:
+                interface.delete()
+                changed = False
+                msg += ". The VXLAN interface created by this task was removed"
+            except Exception as delete_error:
+                msg += (
+                    ". The VXLAN interface created by this task could not be "
+                    "removed: {0}".format(delete_error)
+                )
+        ansible_module.fail_json(msg=msg, changed=changed)
 
     result["changed"] = changed
     ansible_module.exit_json(**result)

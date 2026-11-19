@@ -213,6 +213,7 @@ changed:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+    pyaoscx_error_message,
 )
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
     check_reference,
@@ -490,7 +491,16 @@ def main():
                 bgp_router, desired, check_mode
             )
     except PyaoscxError as e:
-        ansible_module.fail_json(msg=str(e), **result)
+        ansible_module.fail_json(
+            msg=pyaoscx_error_message(
+                session,
+                "Could not configure BGP router {0} in VRF {1}".format(
+                    asn, vrf_name
+                ),
+                e,
+            ),
+            **result
+        )
 
     ansible_module.exit_json(**result)
 

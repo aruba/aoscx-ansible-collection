@@ -63,6 +63,9 @@ options:
       is sent directly to the switch in the REST request payload, no TFTP
       server is needed. Requires a pyaoscx version providing
       C(Configuration.upload_switch_config_cli_from_local).
+      If the switch refuses the CLI format upload itself (HTTP 400, 404, 405
+      or 415), the task fails stating it is probably not supported by the
+      switch platform or firmware version.
     type: str
     required: false
   operation:

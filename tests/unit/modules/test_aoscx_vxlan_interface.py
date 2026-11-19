@@ -201,3 +201,76 @@ def test_delete_non_vxlan_rejected():
     result = run_module({"name": "vxlan1", "state": "delete"}, session)
     assert result["failed"] is True
     assert "not a VXLAN" in result["msg"]
+
+
+# --------------------------------------------------------------------------
+# Switch errors (unsupported feature)
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "exists, text, code, unsupported",
+    [
+        # Firmware that does not know the attribute
+        (True, "invalid attribute: inter_vxlan_bridging_mode\n", 400, True),
+        # Resource unknown to the switch
+        (False, "Not Found", 404, True),
+        # Other validation error, not reported as unsupported
+        (True, "unknown string: allow\n", 400, False),
+    ],
+)
+def test_switch_error_reported(exists, text, code, unsupported):
+    from pyaoscx.exceptions.generic_op_error import GenericOperationError
+
+    interface = build_interface(exists)
+    interface.apply.side_effect = GenericOperationError(text, code)
+    session = build_session(interface)
+    session.api.__str__.return_value = "10.09"
+
+    def request(method, path, params=None):
+        response = MagicMock()
+        response.json.return_value = (
+            {"current_version": "FL.10.08.1010"}
+            if path == "firmware"
+            else {"platform_name": "6300"}
+        )
+        return response
+
+    session.request.side_effect = request
+    result = run_module(
+        {"name": "vxlan1", "inter_vxlan_bridging_mode": "static-all"}, session
+    )
+    assert result["failed"] is True
+    assert result.get("changed", False) is False
+    expected = (
+        "Could not configure VXLAN interface vxlan1 "
+        "(inter_vxlan_bridging_mode)"
+        if exists
+        else "Could not create VXLAN interface vxlan1"
+    )
+    assert result["msg"].startswith(expected + ": " + text.strip())
+    assert "(HTTP {0})".format(code) in result["msg"]
+    assert ("probably not supported" in result["msg"]) is unsupported
+    context = "Switch: 6300, firmware FL.10.08.1010, REST API v10.09"
+    assert (context in result["msg"]) is unsupported
+
+
+def test_created_interface_removed_when_configuration_rejected():
+    from pyaoscx.exceptions.generic_op_error import GenericOperationError
+
+    interface = build_interface(False)
+    interface.apply.side_effect = [
+        True,
+        GenericOperationError(
+            "invalid attribute: inter_vxlan_bridging_mode\n", 400
+        ),
+    ]
+    session = build_session(interface)
+    result = run_module(
+        {"name": "vxlan1", "inter_vxlan_bridging_mode": "static-all"}, session
+    )
+    assert result["failed"] is True
+    assert result["changed"] is False
+    interface.delete.assert_called_once()
+    assert "probably not supported" in result["msg"]
+    assert result["msg"].endswith(
+        "The VXLAN interface created by this task was removed"
+    )

@@ -145,6 +145,7 @@ RETURN = r""" # """
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+    pyaoscx_error_message,
 )
 
 
@@ -335,7 +336,12 @@ def main():
                 result,
             )
         except PyaoscxError as e:
-            ansible_module.fail_json(msg=str(e), **result)
+            ansible_module.fail_json(
+                msg=pyaoscx_error_message(
+                    session, "Could not configure VRF {0}".format(vrf_name), e
+                ),
+                **result
+            )
 
     ansible_module.exit_json(**result)
 

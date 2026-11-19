@@ -327,6 +327,7 @@ changed:
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+    pyaoscx_error_message,
 )
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
     check_reference,
@@ -510,7 +511,11 @@ def main():
                 route_map.create()
             except Exception as e:
                 ansible_module.fail_json(
-                    msg="Could not create route map: {0}".format(str(e))
+                    msg=pyaoscx_error_message(
+                        session,
+                        "Could not create route map {0}".format(name),
+                        e,
+                    )
                 )
 
     # --------------------------------------------------------------- entries
@@ -683,8 +688,13 @@ def _reconcile_entries(
                     entry_obj.create()
                 except Exception as e:
                     ansible_module.fail_json(
-                        msg="Could not create route map entry {0}: "
-                        "{1}".format(preference, str(e))
+                        msg=pyaoscx_error_message(
+                            session,
+                            "Could not create route map {0} entry {1}".format(
+                                name, preference
+                            ),
+                            e,
+                        )
                     )
         elif _entry_changed(entry_obj, desired):
             result["changed"] = True
@@ -697,8 +707,13 @@ def _reconcile_entries(
                     entry_obj.update()
                 except Exception as e:
                     ansible_module.fail_json(
-                        msg="Could not update route map entry {0}: "
-                        "{1}".format(preference, str(e))
+                        msg=pyaoscx_error_message(
+                            session,
+                            "Could not update route map {0} entry {1}".format(
+                                name, preference
+                            ),
+                            e,
+                        )
                     )
 
     # Remove entries that are no longer desired.

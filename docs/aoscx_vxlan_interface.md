@@ -36,6 +36,8 @@ the aoscx_vni module.
       static and dynamic (EVPN) tunnels, and static-all enables it between
       all tunnels. When omitted the current mode is left unchanged. Requires a
       pyaoscx version providing Interface.set_inter_vxlan_bridging_mode.
+      If the switch platform or firmware does not support it, the task fails
+      with the switch answer and nothing is applied.
     required: false
     choices:
       - deny

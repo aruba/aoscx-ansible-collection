@@ -314,6 +314,7 @@ import ipaddress
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
     get_pyaoscx_session,
+    pyaoscx_error_message,
 )
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
     check_reference,
@@ -741,7 +742,15 @@ def main():
                 if config.apply():
                     result["changed"] = True
     except PyaoscxError as e:
-        ansible_module.fail_json(msg=str(e), **result)
+        ansible_module.fail_json(
+            msg=pyaoscx_error_message(
+                session,
+                "Could not configure BGP neighbor(s) {0} of BGP router {1} "
+                "in VRF {2}".format(", ".join(names), asn, vrf_name),
+                e,
+            ),
+            **result
+        )
 
     ansible_module.exit_json(**result)
 
