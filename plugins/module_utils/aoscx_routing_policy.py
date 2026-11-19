@@ -24,6 +24,7 @@ COLLECTIONS = {
     "prefix list": "system/prefix_lists",
     "community list": "system/bgp_community_filters",
     "AS-path list": "system/bgp_aspath_filters",
+    "keychain": "system/keychains",
 }
 
 

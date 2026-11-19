@@ -32,6 +32,8 @@ notes:
   - Requires pyaoscx 2.7.1 or later, which fixes the BGP neighbor and route
     map handling of earlier releases.
   - Tested on a switch with REST API version 10.09 (firmware 10.19).
+  - The switch stores I(password) encrypted, so a change of password is only
+    applied with I(update_password=always).
   - In check mode, a missing VRF or BGP router is reported as a change
     instead of an error, and referenced route maps are not checked, because
     they may be created by a previous task of the playbook.
@@ -47,8 +49,9 @@ options:
     type: str
   neighbor:
     description: >
-      IPv4/IPv6 address of the neighbor, or name of the peer group. Mutually
-      exclusive with I(neighbors), one of them is required.
+      IPv4/IPv6 address of the neighbor, name of the peer group, or interface
+      name of an unnumbered neighbor. Mutually exclusive with I(neighbors),
+      one of them is required.
     required: false
     type: str
   neighbors:
@@ -102,6 +105,169 @@ options:
     description: Administratively shut down the neighbor (C(shutdown)).
     required: false
     type: bool
+  fall_over:
+    description: >
+      Reset the session as soon as the route to the neighbor is lost
+      (C(fall-over)).
+    required: false
+    type: bool
+  fall_over_bfd:
+    description: >
+      Track the session with BFD (C(fall-over bfd)).
+    required: false
+    type: bool
+  passive:
+    description: >
+      Do not initiate the session, only accept it (C(passive)).
+    required: false
+    type: bool
+  remove_private_as:
+    description: >
+      Remove the private AS numbers from the updates sent to the neighbor
+      (C(remove-private-as)).
+    required: false
+    type: bool
+  slow_peer:
+    description: >
+      Place the neighbor in a separate update group for slow peers
+      (C(slow-peer)).
+    required: false
+    type: bool
+  weight:
+    description: >
+      Default weight of the routes received from the neighbor, between 0 and
+      65535 (C(weight)).
+    required: false
+    type: int
+  local_as:
+    description: >
+      Local AS number used with this external neighbor, between 1 and
+      4294967295 (C(local-as)). Use C(0) to remove it.
+    required: false
+    type: int
+  local_as_mode:
+    description: >
+      Options of I(local_as): C(no-prepend), C(no-prepend-replace-as),
+      C(no-prepend-replace-as-dual-as), or C(none) for no option.
+    required: false
+    type: str
+    choices:
+      - none
+      - no-prepend
+      - no-prepend-replace-as
+      - no-prepend-replace-as-dual-as
+  port:
+    description: >
+      TCP port of the session, between 1 and 65535 (C(port)). Use C(0) to
+      remove it.
+    required: false
+    type: int
+  ttl_security_hops:
+    description: >
+      Maximum number of hops to the neighbor checked with TTL security,
+      between 1 and 254 (C(ttl-security-hops)). Takes precedence over
+      I(ebgp_multihop). Use C(0) to remove it.
+    required: false
+    type: int
+  password:
+    description: >
+      Password of the session (C(password)). The switch stores it encrypted,
+      so it cannot be compared: see I(update_password). Use an empty string
+      to remove it. Mutually exclusive with the TCP-AO keychain of I(ao).
+    required: false
+    type: str
+  update_password:
+    description: >
+      C(on_create) sets I(password) only when the neighbor has no password,
+      so that the module stays idempotent. C(always) sets it on every run,
+      and then always reports a change.
+    required: false
+    default: on_create
+    type: str
+    choices:
+      - on_create
+      - always
+  timers:
+    description: >
+      Timers of the session in seconds (C(timers)). Only the given timers are
+      changed.
+    required: false
+    type: dict
+    suboptions:
+      keepalive:
+        description: Keepalive interval, between 0 and 65535.
+        required: false
+        type: int
+      holdtime:
+        description: Hold time, between 0 and 65535.
+        required: false
+        type: int
+      connect_retry:
+        description: >
+          Connect retry interval, between 1 and 65535
+          (C(timers connect-retry)).
+        required: false
+        type: int
+  graceful_shutdown:
+    description: >
+      Graceful shutdown parameters (C(graceful-shutdown)). Only the given
+      parameters are changed.
+    required: false
+    type: dict
+    suboptions:
+      timer:
+        description: >
+          Maximum time in seconds to wait for the convergence, between 10 and
+          1200.
+        required: false
+        type: int
+      local_preference:
+        description: >
+          Local preference of the routes advertised with the graceful
+          shutdown community, between 0 and 4294967295.
+        required: false
+        type: int
+  accept_invalid_attributes:
+    description: >
+      Accept the routes received with invalid attributes instead of resetting
+      the session (C(invalid-attribute all accept)). Enabled by default on the
+      switch.
+    required: false
+    type: bool
+  ao:
+    description: >
+      TCP Authentication Option settings (C(ao)). Only the given settings are
+      changed.
+    required: false
+    type: dict
+    suboptions:
+      keychain:
+        description: >
+          Keychain used by TCP-AO (C(ao keychain)). The keychain must exist.
+          Use an empty string to remove it. Mutually exclusive with
+          I(password).
+        required: false
+        type: str
+      accept_ao_mismatch:
+        description: >
+          Accept the segments whose TCP-AO MAC does not match
+          (C(ao accept-ao-mismatch)).
+        required: false
+        type: bool
+      include_tcp_options:
+        description: >
+          Include the other TCP options in the MAC calculation
+          (C(ao include-tcp-options)).
+        required: false
+        type: bool
+  interface:
+    description: >
+      Interface of an unnumbered neighbor (C(interface)), for example
+      C(1/1/3); the neighbor is then usually named after the interface. Only
+      used on creation, it cannot be changed on an existing neighbor. The
+      interface must exist.
+    required: false
+    type: str
   address_families:
     description: >
       Per address family settings (C(neighbor) commands of the
@@ -188,6 +354,93 @@ options:
           to remove it. Not supported for C(l2vpn_evpn).
         required: false
         type: str
+      allowas_in:
+        description: >
+          Number of times the local AS may appear in the AS path of the
+          received routes, between 1 and 10 (C(allowas-in)). Use C(0) to
+          remove it.
+        required: false
+        type: int
+      advertisement_interval:
+        description: >
+          Minimum interval in seconds between two updates, between 0 and 600
+          (C(advertisement-interval)). Not supported for C(l2vpn_evpn).
+        required: false
+        type: int
+      add_paths:
+        description: >
+          Additional paths capability (C(add-paths)). Not supported for
+          C(l2vpn_evpn).
+        required: false
+        type: str
+        choices:
+          - send
+          - recv
+          - both
+          - disable
+      add_paths_advertise_best:
+        description: >
+          Number of paths advertised to the neighbor, between 1 and 4
+          (C(add-paths advertise-best)). Not supported for C(l2vpn_evpn).
+        required: false
+        type: int
+      maximum_prefix:
+        description: >
+          Maximum number of prefixes accepted from the neighbor
+          (C(maximum-prefix)). Replaces the settings of this address family.
+        required: false
+        type: dict
+        suboptions:
+          limit:
+            description: >
+              Maximum number of prefixes, between 1 and 4294967295. Use C(0)
+              to remove the limit.
+            required: true
+            type: int
+          threshold:
+            description: >
+              Percentage of the limit that triggers a warning, between 1 and
+              100.
+            required: false
+            type: int
+          restart:
+            description: >
+              Seconds before the session is restarted once the limit is
+              reached, between 30 and 65535.
+            required: false
+            type: int
+          warning_only:
+            description: >
+              Only log a warning when the limit is reached, instead of
+              closing the session (C(warning-only)). The switch uses
+              C(true) when it is not given.
+            required: false
+            type: bool
+      orf_capability:
+        description: >
+          Outbound Route Filtering capability for prefix lists
+          (C(capability orf prefix-list)). C(none) removes it. C(both) is not
+          available, because the switch ignores it when set through the REST
+          API. Not supported for C(l2vpn_evpn).
+        required: false
+        type: str
+        choices:
+          - send
+          - receive
+          - none
+      orf_prefix_list:
+        description: >
+          Inbound prefix list advertised to the neighbor with ORF
+          (C(orf-prefix-list <name> in)). The prefix list must exist. Use an
+          empty string to remove it. Not supported for C(l2vpn_evpn).
+        required: false
+        type: str
+      replace_rt_asn:
+        description: >
+          Replace the AS number of the received route targets by the local AS
+          number (C(replace-rt-asn)). Only supported for C(l2vpn_evpn).
+        required: false
+        type: bool
   state:
     description: >
       Create or update (C(create)) or delete (C(delete)) the given
@@ -294,6 +547,50 @@ EXAMPLES = """
       - address_family: ipv4_unicast
         route_map_out: ""
 
+# Equivalent CLI configuration:
+#   router bgp 65000
+#       neighbor 192.0.2.1 remote-as 65001
+#       neighbor 192.0.2.1 password ciphertext ...
+#       neighbor 192.0.2.1 timers 20 60
+#       neighbor 192.0.2.1 fall-over bfd
+#       neighbor 192.0.2.1 local-as 65100 no-prepend
+#       address-family ipv4 unicast
+#           neighbor 192.0.2.1 allowas-in 2
+#           neighbor 192.0.2.1 maximum-prefix 1000 threshold 80 restart 60
+#       exit-address-family
+- name: Configure session and per address family options of an external peer
+  aoscx_bgp_neighbor:
+    asn: 65000
+    neighbor: 192.0.2.1
+    remote_as: 65001
+    password: "{{ bgp_password }}"
+    timers:
+      keepalive: 20
+      holdtime: 60
+    fall_over_bfd: true
+    local_as: 65100
+    local_as_mode: no-prepend
+    address_families:
+      - address_family: ipv4_unicast
+        activate: true
+        allowas_in: 2
+        maximum_prefix:
+          limit: 1000
+          threshold: 80
+          restart: 60
+          warning_only: false
+
+# Equivalent CLI configuration:
+#   router bgp 65000
+#       neighbor 1/1/3 remote-as 65002
+#       neighbor 1/1/3 interface 1/1/3
+- name: Configure an unnumbered neighbor
+  aoscx_bgp_neighbor:
+    asn: 65000
+    neighbor: 1/1/3
+    interface: 1/1/3
+    remote_as: 65002
+
 - name: Delete a neighbor
   aoscx_bgp_neighbor:
     asn: 65000
@@ -310,6 +607,10 @@ changed:
 
 import copy
 import ipaddress
+import json
+import re
+
+from ansible.module_utils.six.moves.urllib.parse import quote
 
 from ansible.module_utils.basic import AnsibleModule
 from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
@@ -329,7 +630,71 @@ AF_SETTINGS = (
     "next_hop_unchanged",
     "inbound_soft_reconfiguration",
     "default_originate",
+    "replace_rt_asn",
 )
+
+# Per address family values whose REST attribute has another name, or that
+# are removed with 0: option -> (REST attribute, removable with 0)
+AF_VALUES = {
+    "allowas_in": ("allow_as_in", True),
+    "advertisement_interval": ("advertisement_interval", False),
+    "add_paths": ("add_paths", False),
+    "add_paths_advertise_best": ("add_paths_adv_best_n", False),
+}
+
+AF_RANGES = {
+    "allowas_in": (0, 10),
+    "advertisement_interval": (0, 600),
+    "add_paths_advertise_best": (1, 4),
+}
+
+MAXIMUM_PREFIX = {
+    "limit": "maximum_prefix_limit",
+    "threshold": "threshold",
+    "restart": "restart",
+}
+
+MAXIMUM_PREFIX_RANGES = {
+    "limit": (0, 4294967295),
+    "threshold": (1, 100),
+    "restart": (30, 65535),
+}
+
+# Session options whose REST attribute has another name
+SESSION_OPTIONS = {
+    "remote_as": "remote_as",
+    "description": "description",
+    "shutdown": "shutdown",
+    "fall_over": "fall_over",
+    "fall_over_bfd": "bfd_enable",
+    "passive": "passive",
+    "remove_private_as": "remove_private_as",
+    "slow_peer": "slow_peer",
+    "weight": "weight",
+    "local_as_mode": "local_as_mode",
+}
+
+# Session options removed with 0: option -> REST attribute
+REMOVABLE_OPTIONS = {
+    "local_as": "local_as",
+    "port": "tcp_port_number",
+    "ttl_security_hops": "ttl_security_hops",
+}
+
+RANGES = {
+    ("weight", None): (0, 65535),
+    ("local_as", None): (0, 4294967295),
+    ("port", None): (0, 65535),
+    ("ttl_security_hops", None): (0, 254),
+    ("timers", "keepalive"): (0, 65535),
+    ("timers", "holdtime"): (0, 65535),
+    ("timers", "connect_retry"): (1, 65535),
+    ("graceful_shutdown", "timer"): (10, 1200),
+    ("graceful_shutdown", "local_preference"): (0, 4294967295),
+}
+
+# Unnumbered neighbors are named after their interface, for example 1/1/3
+INTERFACE_NAME = re.compile(r"^\d+(/\d+)+$")
 
 # Per address family route map references: option -> (REST attribute, key)
 AF_ROUTE_MAPS = {
@@ -345,9 +710,14 @@ UNSUPPORTED_AF_SETTINGS = {
         "inbound_soft_reconfiguration",
         "default_originate",
         "default_originate_route_map",
+        "advertisement_interval",
+        "add_paths",
+        "add_paths_advertise_best",
+        "orf_capability",
+        "orf_prefix_list",
     ),
-    "ipv4_unicast": ("next_hop_unchanged",),
-    "ipv6_unicast": ("next_hop_unchanged",),
+    "ipv4_unicast": ("next_hop_unchanged", "replace_rt_asn"),
+    "ipv6_unicast": ("next_hop_unchanged", "replace_rt_asn"),
 }
 
 
@@ -367,6 +737,31 @@ def get_argument_spec():
         af_options.setdefault(setting, {"type": "bool"})
     for option in AF_ROUTE_MAPS:
         af_options[option] = {"type": "str"}
+    af_options.update(
+        {
+            "allowas_in": {"type": "int"},
+            "advertisement_interval": {"type": "int"},
+            "add_paths": {
+                "type": "str",
+                "choices": ["send", "recv", "both", "disable"],
+            },
+            "add_paths_advertise_best": {"type": "int"},
+            "maximum_prefix": {
+                "type": "dict",
+                "options": {
+                    "limit": {"type": "int", "required": True},
+                    "threshold": {"type": "int"},
+                    "restart": {"type": "int"},
+                    "warning_only": {"type": "bool"},
+                },
+            },
+            "orf_capability": {
+                "type": "str",
+                "choices": ["send", "receive", "none"],
+            },
+            "orf_prefix_list": {"type": "str"},
+        }
+    )
     return {
         "asn": {"type": "int", "required": True},
         "vrf": {"type": "str", "default": "default"},
@@ -379,6 +774,55 @@ def get_argument_spec():
         "update_source": {"type": "str"},
         "ebgp_multihop": {"type": "int"},
         "shutdown": {"type": "bool"},
+        "fall_over": {"type": "bool"},
+        "fall_over_bfd": {"type": "bool"},
+        "passive": {"type": "bool"},
+        "remove_private_as": {"type": "bool"},
+        "slow_peer": {"type": "bool"},
+        "weight": {"type": "int"},
+        "local_as": {"type": "int"},
+        "local_as_mode": {
+            "type": "str",
+            "choices": [
+                "none",
+                "no-prepend",
+                "no-prepend-replace-as",
+                "no-prepend-replace-as-dual-as",
+            ],
+        },
+        "port": {"type": "int"},
+        "ttl_security_hops": {"type": "int"},
+        "password": {"type": "str", "no_log": True},
+        "update_password": {
+            "type": "str",
+            "default": "on_create",
+            "choices": ["on_create", "always"],
+        },
+        "timers": {
+            "type": "dict",
+            "options": {
+                "keepalive": {"type": "int"},
+                "holdtime": {"type": "int"},
+                "connect_retry": {"type": "int"},
+            },
+        },
+        "graceful_shutdown": {
+            "type": "dict",
+            "options": {
+                "timer": {"type": "int"},
+                "local_preference": {"type": "int"},
+            },
+        },
+        "accept_invalid_attributes": {"type": "bool"},
+        "ao": {
+            "type": "dict",
+            "options": {
+                "keychain": {"type": "str", "no_log": False},
+                "accept_ao_mismatch": {"type": "bool"},
+                "include_tcp_options": {"type": "bool"},
+            },
+        },
+        "interface": {"type": "str"},
         "address_families": {
             "type": "list",
             "elements": "dict",
@@ -419,8 +863,30 @@ def validate_params(ansible_module):
         ansible_module.fail_json(msg="Duplicate entries in neighbors")
     for name in names:
         # The name is interpolated into the REST URI
-        if "/" in name or name in ("", ".", ".."):
+        if name in ("", ".", "..") or (
+            "/" in name and not INTERFACE_NAME.match(name)
+        ):
             ansible_module.fail_json(msg="Invalid neighbor: {0}".format(name))
+    for (option, suboption), (low, high) in RANGES.items():
+        value = params[option]
+        if suboption is not None:
+            value = (value or {}).get(suboption)
+        name = option if suboption is None else option + "." + suboption
+        check_range(ansible_module, name, value, low, high)
+    if params["password"] and (params["ao"] or {}).get("keychain"):
+        ansible_module.fail_json(
+            msg="password and ao.keychain are mutually exclusive"
+        )
+    if params["interface"] is not None and (
+        params["is_peer_group"] or not params["interface"]
+    ):
+        ansible_module.fail_json(
+            msg=(
+                "interface is not supported for a peer group"
+                if params["interface"]
+                else "interface must not be empty"
+            )
+        )
     if params["peer_group"] and params["peer_group"] in names:
         ansible_module.fail_json(
             msg="A neighbor cannot belong to itself as peer group"
@@ -446,14 +912,33 @@ def validate_params(ansible_module):
             ansible_module.fail_json(
                 msg="default_originate_route_map requires default_originate"
             )
+        for option, (low, high) in AF_RANGES.items():
+            check_range(ansible_module, option, entry[option], low, high)
+        for option, (low, high) in MAXIMUM_PREFIX_RANGES.items():
+            value = (entry["maximum_prefix"] or {}).get(option)
+            check_range(
+                ansible_module, "maximum_prefix." + option, value, low, high
+            )
 
 
-def check_route_maps(ansible_module, session):
-    names = set()
-    for entry in ansible_module.params["address_families"] or []:
-        names.update(entry[option] for option in AF_ROUTE_MAPS)
-    for name in sorted(name for name in names if name):
-        check_reference(ansible_module, session, "route map", name)
+def check_range(ansible_module, name, value, low, high):
+    if value is not None and not low <= value <= high:
+        ansible_module.fail_json(
+            msg="{0} must be between {1} and {2}".format(name, low, high)
+        )
+
+
+def check_references(ansible_module, session):
+    """Fail if a referenced route map, prefix list or keychain is missing."""
+    params = ansible_module.params
+    references = set()
+    for entry in params["address_families"] or []:
+        for option in AF_ROUTE_MAPS:
+            references.add(("route map", entry[option]))
+        references.add(("prefix list", entry["orf_prefix_list"]))
+    references.add(("keychain", (params["ao"] or {}).get("keychain")))
+    for kind, name in sorted(ref for ref in references if ref[1]):
+        check_reference(ansible_module, session, kind, name)
 
 
 def is_ip_address(value):
@@ -464,26 +949,33 @@ def is_ip_address(value):
     return True
 
 
-def read_is_peer_group(neighbor):
+def read_create_only(neighbor):
     """
-    is_peer_group can only be set on creation, so the switch does not return
-    it with the writable selector used by pyaoscx: read it separately.
+    is_peer_group and nbr_interface can only be set on creation, so the
+    switch does not return them with the writable selector used by pyaoscx:
+    read them separately.
     """
-    import json
-
     from pyaoscx.exceptions.generic_op_error import GenericOperationError
 
     uri = "{0}/{1}".format(
-        neighbor.base_uri, neighbor.ip_or_ifname_or_group_name
+        neighbor.base_uri,
+        quote(str(neighbor.ip_or_ifname_or_group_name), safe=""),
     )
     response = neighbor.session.request(
         "GET",
         uri,
-        params={"selector": "configuration", "attributes": "is_peer_group"},
+        params={
+            "selector": "configuration",
+            "attributes": "is_peer_group,nbr_interface",
+        },
     )
     if response.status_code != 200:
         raise GenericOperationError(response.text, response.status_code)
-    return bool(json.loads(response.text).get("is_peer_group", False))
+    return json.loads(response.text)
+
+
+def read_is_peer_group(neighbor):
+    return bool(read_create_only(neighbor).get("is_peer_group", False))
 
 
 class NeighborConfig(object):
@@ -501,12 +993,69 @@ class NeighborConfig(object):
         if current != value:
             self.changes[key] = value
 
+    def merge(self, attribute, values):
+        """Merge the given values into a dictionary attribute."""
+        current = self.changes.get(attribute)
+        if current is None:
+            current = dict(getattr(self.neighbor, attribute, None) or {})
+        merged = dict(current, **values)
+        if merged != current or attribute in self.changes:
+            self.changes[attribute] = merged
+
     def compute(self):
         params = self.params
         neighbor = self.neighbor
-        for key in ("remote_as", "description", "shutdown"):
-            if params[key] is not None:
-                self.set(key, params[key], getattr(neighbor, key, None))
+        for option, attribute in SESSION_OPTIONS.items():
+            if params[option] is not None:
+                self.set(
+                    attribute,
+                    params[option],
+                    getattr(neighbor, attribute, None),
+                )
+        for option, attribute in REMOVABLE_OPTIONS.items():
+            if params[option] is not None:
+                self.set(
+                    attribute,
+                    params[option] or None,
+                    getattr(neighbor, attribute, None),
+                )
+        if params["accept_invalid_attributes"] is not None:
+            accept = "all" if params["accept_invalid_attributes"] else "none"
+            self.merge("invalid_attributes", {"accept_route": accept})
+        if params["timers"] is not None:
+            self.merge(
+                "timers",
+                {
+                    key.replace("_", "-"): value
+                    for key, value in params["timers"].items()
+                    if value is not None
+                },
+            )
+        if params["graceful_shutdown"] is not None:
+            names = {"timer": "timer", "local_preference": "local_pref"}
+            self.merge(
+                "gshut",
+                {
+                    names[key]: value
+                    for key, value in params["graceful_shutdown"].items()
+                    if value is not None
+                },
+            )
+        if params["ao"] is not None:
+            self.compute_ao(params["ao"])
+        if params["password"] is not None:
+            self.compute_password(params["password"])
+        if params["interface"] is not None and neighbor.materialized:
+            current = reference_name(
+                read_create_only(neighbor).get("nbr_interface")
+            )
+            if current != params["interface"]:
+                self.module.fail_json(
+                    msg="interface cannot be changed on an existing neighbor, "
+                    "delete {0} first".format(
+                        neighbor.ip_or_ifname_or_group_name
+                    )
+                )
         if params["ebgp_multihop"] is not None:
             # The switch reports 1 when ebgp-multihop is not configured
             current = getattr(neighbor, "ebgp_hop_count", None) or 1
@@ -532,6 +1081,96 @@ class NeighborConfig(object):
                     self.compute_route_map(
                         attribute, family, key, entry[option]
                     )
+            self.compute_family_values(family, entry)
+
+    def compute_family_values(self, family, entry):
+        """Per address family values, kept in {family: value} attributes."""
+        for option, (attribute, removable) in AF_VALUES.items():
+            value = entry[option]
+            if value is None:
+                continue
+            current = self.changes.get(attribute)
+            if current is None:
+                current = dict(getattr(self.neighbor, attribute, None) or {})
+            if removable and not value:
+                if family in current:
+                    current.pop(family)
+                    self.changes[attribute] = current
+            elif current.get(family) != value:
+                current[family] = value
+                self.changes[attribute] = current
+        if entry["maximum_prefix"] is not None:
+            values = {
+                attribute: entry["maximum_prefix"][option]
+                for option, attribute in MAXIMUM_PREFIX.items()
+                if entry["maximum_prefix"][option] is not None
+            }
+            warning_only = entry["maximum_prefix"]["warning_only"]
+            if warning_only is False:
+                # The REST attribute has the opposite meaning, and the switch
+                # does not return it when it is false (the default)
+                values["warning_disable"] = True
+            if not values["maximum_prefix_limit"]:
+                values = {}
+            self.set_family_value("max_prefix_options", family, values)
+        if entry["orf_capability"] is not None:
+            mode = entry["orf_capability"]
+            value = {} if mode == "none" else {"prefix-list": mode}
+            self.set_family_value("ORF_capability", family, value)
+        if entry["orf_prefix_list"] is not None:
+            name = entry["orf_prefix_list"]
+            current = getattr(self.neighbor, "ORF_prefix_list", None) or {}
+            if reference_name((current.get(family) or {}).get("in")) != (
+                name or None
+            ):
+                value = (
+                    {"in": reference_uri(self.session, "prefix list", name)}
+                    if name
+                    else {}
+                )
+                self.set_family_value("ORF_prefix_list", family, value, True)
+
+    def set_family_value(self, attribute, family, value, force=False):
+        """Set {family: value} in a dictionary attribute, {} removes it."""
+        current = self.changes.get(attribute)
+        if current is None:
+            current = copy.deepcopy(
+                getattr(self.neighbor, attribute, None) or {}
+            )
+        if not force and (current.get(family) or {}) == value:
+            return
+        if value:
+            current[family] = value
+        else:
+            current.pop(family, None)
+        self.changes[attribute] = current
+
+    def compute_ao(self, ao):
+        values = {
+            key: ao[key]
+            for key in ("accept_ao_mismatch", "include_tcp_options")
+            if ao[key] is not None
+        }
+        if values:
+            self.merge("ao_options", values)
+        if ao["keychain"] is not None:
+            current = reference_name(
+                getattr(self.neighbor, "ao_keychain", None)
+            )
+            if current != (ao["keychain"] or None):
+                self.changes["ao_keychain"] = (
+                    reference_uri(self.session, "keychain", ao["keychain"])
+                    if ao["keychain"]
+                    else None
+                )
+
+    def compute_password(self, password):
+        current = getattr(self.neighbor, "password", None)
+        if not password:
+            if current:
+                self.changes["password"] = None
+        elif not current or self.params["update_password"] == "always":
+            self.changes["password"] = password
 
     def compute_route_map(self, attribute, family, direction, name):
         """
@@ -630,6 +1269,12 @@ class NeighborConfig(object):
         if not neighbor.materialized:
             neighbor.is_peer_group = self.params["is_peer_group"]
             self.changes.setdefault("is_peer_group", neighbor.is_peer_group)
+            if self.params["interface"]:
+                self.changes["nbr_interface"] = "{0}{1}/{2}".format(
+                    self.session.resource_prefix,
+                    "system/interfaces",
+                    quote(self.params["interface"], safe=""),
+                )
         for key, value in self.changes.items():
             setattr(neighbor, key, value)
             if key not in neighbor.config_attrs:
@@ -720,7 +1365,20 @@ def main():
                     result["changed"] = True
         else:
             # Read and validate every neighbor before the first write
-            check_route_maps(ansible_module, session)
+            check_references(ansible_module, session)
+            if params["interface"] and not ansible_module.check_mode:
+                path = "system/interfaces/" + quote(
+                    params["interface"], safe=""
+                )
+                response = session.request(
+                    "GET", path, params={"attributes": "name"}
+                )
+                if response.status_code != 200:
+                    ansible_module.fail_json(
+                        msg="Could not find interface {0}".format(
+                            params["interface"]
+                        )
+                    )
             configs = []
             for neighbor in neighbors:
                 if neighbor.materialized and params[

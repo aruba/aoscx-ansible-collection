@@ -9,7 +9,9 @@ The real module and pyaoscx SDK run against an in-memory REST transport, so
 no switch is required.
 """
 
+import copy
 import json
+from urllib.parse import quote, unquote
 from types import SimpleNamespace
 
 import pytest
@@ -55,6 +57,17 @@ def flatten(value):
     }
 
 
+COMPOUND = ("route_maps", "ORF_prefix_list")
+
+
+def encrypt(body):
+    """The switch stores the password encrypted."""
+    password = body.get("password")
+    if password and not password.startswith("ENC:"):
+        body["password"] = "ENC:" + password
+    return body
+
+
 def has_compound_keys(value):
     return any("," in key for key in (value or {}))
 
@@ -69,8 +82,10 @@ def switch(monkeypatch):
     state = SimpleNamespace(
         routers={("default", "65000")},
         neighbors={},
-        interfaces={"loopback0"},
+        interfaces={"loopback0", "1/1/3"},
         route_maps={"RM_IN", "RM_OUT", "RM_DEFAULT"},
+        prefix_lists={"PL_ORF"},
+        keychains={"KC1"},
         writes=[],
     )
 
@@ -78,10 +93,12 @@ def switch(monkeypatch):
         # The switch returns references as {name: uri}. is_peer_group is
         # create-only, so it is not returned with the writable selector.
         data = dict(state.neighbors[name], ip_or_ifname_or_group_name=name)
-        if "route_maps" in data:
-            data["route_maps"] = flatten(data["route_maps"])
+        for attribute in COMPOUND:
+            if attribute in data:
+                data[attribute] = flatten(data[attribute])
         if params.get("selector") != "configuration":
             data.pop("is_peer_group", None)
+            data.pop("nbr_interface", None)
         if "attributes" in params:
             wanted = params["attributes"].split(",")
             data = {k: v for k, v in data.items() if k in wanted}
@@ -90,16 +107,20 @@ def switch(monkeypatch):
     def request(method, path, params=None, data=None):
         body = json.loads(data) if data is not None else None
         if method != "GET":
-            state.writes.append((method, path, body))
+            state.writes.append((method, path, copy.deepcopy(body)))
         parts = path.split("/")
         code, response = 404, {}
-        if body and has_compound_keys(body.get("route_maps")):
+        if body and any(has_compound_keys(body.get(a)) for a in COMPOUND):
             # The switch rejects the format it returns
             code = 400
         elif path.startswith("system/route_maps/"):
             code = 200 if parts[2] in state.route_maps else 404
+        elif path.startswith("system/prefix_lists/"):
+            code = 200 if parts[2] in state.prefix_lists else 404
+        elif path.startswith("system/keychains/"):
+            code = 200 if parts[2] in state.keychains else 404
         elif path.startswith("system/interfaces/"):
-            if parts[2] in state.interfaces:
+            if unquote(parts[2]) in state.interfaces:
                 # Interface sub-collections (IPv6 addresses, ...) are empty
                 code = 200
                 response = {"name": parts[2]} if len(parts) == 3 else {}
@@ -111,23 +132,27 @@ def switch(monkeypatch):
             elif path == NEIGHBORS and method == "GET":
                 code = 200
                 response = {
-                    name: PREFIX + NEIGHBORS + "/" + name
+                    name: PREFIX + NEIGHBORS + "/" + quote(name, safe="")
                     for name in state.neighbors
                 }
             elif path == NEIGHBORS and method == "POST":
                 name = body.pop("ip_or_ifname_or_group_name")
-                state.neighbors[name] = body
+                state.neighbors[name] = encrypt(body)
                 code = 201
             elif path.startswith(NEIGHBORS + "/"):
-                name = parts[-1]
+                name = unquote(parts[-1])
                 if name in state.neighbors:
                     if method == "GET":
                         code = 200
                         response = neighbor_response(name, params or {})
                     elif method == "PUT":
                         assert "is_peer_group" not in body
-                        is_pg = state.neighbors[name].get("is_peer_group")
-                        state.neighbors[name] = dict(body, is_peer_group=is_pg)
+                        assert "nbr_interface" not in body
+                        current = state.neighbors[name]
+                        state.neighbors[name] = encrypt(body)
+                        for key in ("is_peer_group", "nbr_interface"):
+                            if key in current:
+                                state.neighbors[name][key] = current[key]
                         code = 204
                     elif method == "DELETE":
                         del state.neighbors[name]
@@ -531,6 +556,294 @@ def test_route_map_errors(switch, family, message):
     state, run = switch
     state.neighbors["10.0.0.1"] = {"is_peer_group": False}
     result = run(asn=65000, neighbor="10.0.0.1", address_families=[family])
+    assert result["failed"] is True
+    assert message in result["msg"]
+    assert not state.writes
+
+
+def test_session_options(switch):
+    state, run = switch
+    state.neighbors["10.0.0.1"] = {
+        "is_peer_group": False,
+        "timers": {"connect-retry": 120, "holdtime": 180, "keepalive": 60},
+        "gshut": {"local_pref": 0, "timer": 180},
+        "invalid_attributes": {"accept_route": "all"},
+        "ao_options": {
+            "accept_ao_mismatch": False,
+            "include_tcp_options": False,
+        },
+    }
+    params = dict(
+        asn=65000,
+        neighbor="10.0.0.1",
+        fall_over=True,
+        fall_over_bfd=True,
+        passive=True,
+        remove_private_as=True,
+        slow_peer=True,
+        weight=100,
+        local_as=65100,
+        local_as_mode="no-prepend",
+        port=1790,
+        ttl_security_hops=5,
+        timers={"keepalive": 20, "holdtime": 60},
+        graceful_shutdown={"timer": 60, "local_preference": 10},
+        accept_invalid_attributes=False,
+        ao={"keychain": "KC1", "include_tcp_options": True},
+    )
+
+    assert run(**params) == {"changed": True}
+    neighbor = state.neighbors["10.0.0.1"]
+    assert {k: v for k, v in neighbor.items() if k != "is_peer_group"} == {
+        "fall_over": True,
+        "bfd_enable": True,
+        "passive": True,
+        "remove_private_as": True,
+        "slow_peer": True,
+        "weight": 100,
+        "local_as": 65100,
+        "local_as_mode": "no-prepend",
+        "tcp_port_number": 1790,
+        "ttl_security_hops": 5,
+        "timers": {"connect-retry": 120, "holdtime": 60, "keepalive": 20},
+        "gshut": {"local_pref": 10, "timer": 60},
+        "invalid_attributes": {"accept_route": "none"},
+        "ao_options": {
+            "accept_ao_mismatch": False,
+            "include_tcp_options": True,
+        },
+        "ao_keychain": PREFIX + "system/keychains/KC1",
+    }
+    neighbor["ao_keychain"] = {"KC1": neighbor["ao_keychain"]}
+    state.writes.clear()
+    assert run(**params) == {"changed": False}
+    assert not state.writes
+
+    removal = dict(
+        asn=65000,
+        neighbor="10.0.0.1",
+        local_as=0,
+        port=0,
+        ttl_security_hops=0,
+        ao={"keychain": ""},
+    )
+    assert run(**removal) == {"changed": True}
+    neighbor = state.neighbors["10.0.0.1"]
+    for key in ("local_as", "tcp_port_number", "ttl_security_hops"):
+        assert neighbor[key] is None
+    assert neighbor["ao_keychain"] is None
+    assert run(**removal) == {"changed": False}
+
+
+def test_password(switch):
+    state, run = switch
+    state.neighbors["10.0.0.1"] = {"is_peer_group": False}
+    args = dict(asn=65000, neighbor="10.0.0.1")
+
+    assert run(password="secret", **args) == {"changed": True}
+    assert state.neighbors["10.0.0.1"]["password"] == "ENC:secret"
+    # on_create: the encrypted password cannot be compared, it is kept
+    assert run(password="other", **args) == {"changed": False}
+    # Another update sends back the encrypted password unchanged
+    assert run(description="x", **args) == {"changed": True}
+    assert state.neighbors["10.0.0.1"]["password"] == "ENC:secret"
+
+    assert run(password="other", update_password="always", **args) == {
+        "changed": True
+    }
+    assert state.neighbors["10.0.0.1"]["password"] == "ENC:other"
+    assert run(password="", **args) == {"changed": True}
+    assert state.neighbors["10.0.0.1"]["password"] is None
+    assert run(password="", **args) == {"changed": False}
+
+
+def test_family_options(switch):
+    state, run = switch
+    state.neighbors["10.0.0.1"] = {
+        "is_peer_group": False,
+        "add_paths": {"ipv4-unicast": "disable", "ipv6-unicast": "disable"},
+        "allow_as_in": {"l2vpn-evpn": 1},
+        "max_prefix_options": {"ipv6-unicast": {"maximum_prefix_limit": 10}},
+    }
+    families = [
+        {
+            "address_family": "ipv4_unicast",
+            "allowas_in": 2,
+            "advertisement_interval": 10,
+            "add_paths": "both",
+            "add_paths_advertise_best": 3,
+            "maximum_prefix": {
+                "limit": 1000,
+                "threshold": 80,
+                "restart": 60,
+                "warning_only": True,
+            },
+            "orf_capability": "receive",
+            "orf_prefix_list": "PL_ORF",
+        },
+        {
+            "address_family": "l2vpn_evpn",
+            "allowas_in": 3,
+            "replace_rt_asn": True,
+            "maximum_prefix": {"limit": 500, "warning_only": False},
+        },
+    ]
+    args = dict(asn=65000, neighbor="10.0.0.1", address_families=families)
+
+    assert run(**args) == {"changed": True}
+    neighbor = state.neighbors["10.0.0.1"]
+    assert neighbor["allow_as_in"] == {"ipv4-unicast": 2, "l2vpn-evpn": 3}
+    assert neighbor["advertisement_interval"] == {"ipv4-unicast": 10}
+    assert neighbor["add_paths"] == {
+        "ipv4-unicast": "both",
+        "ipv6-unicast": "disable",
+    }
+    assert neighbor["add_paths_adv_best_n"] == {"ipv4-unicast": 3}
+    assert neighbor["max_prefix_options"] == {
+        "ipv4-unicast": {
+            "maximum_prefix_limit": 1000,
+            "threshold": 80,
+            "restart": 60,
+        },
+        "ipv6-unicast": {"maximum_prefix_limit": 10},
+        "l2vpn-evpn": {"maximum_prefix_limit": 500, "warning_disable": True},
+    }
+    assert neighbor["ORF_capability"] == {
+        "ipv4-unicast": {"prefix-list": "receive"}
+    }
+    assert neighbor["ORF_prefix_list"] == {
+        "ipv4-unicast": {"in": PREFIX + "system/prefix_lists/PL_ORF"}
+    }
+    assert neighbor["replace_rt_asn"] == {"l2vpn-evpn": True}
+
+    # ORF_prefix_list is returned with compound keys
+    state.writes.clear()
+    assert run(**args) == {"changed": False}
+    assert not state.writes
+    assert run(asn=65000, neighbor="10.0.0.1", description="x") == {
+        "changed": True
+    }
+
+    removal = [
+        {
+            "address_family": "ipv4_unicast",
+            "allowas_in": 0,
+            "maximum_prefix": {"limit": 0},
+            "orf_capability": "none",
+            "orf_prefix_list": "",
+        }
+    ]
+    assert run(asn=65000, neighbor="10.0.0.1", address_families=removal) == {
+        "changed": True
+    }
+    neighbor = state.neighbors["10.0.0.1"]
+    assert neighbor["allow_as_in"] == {"l2vpn-evpn": 3}
+    assert "ipv4-unicast" not in neighbor["max_prefix_options"]
+    assert neighbor["ORF_capability"] == {}
+    assert neighbor["ORF_prefix_list"] == {}
+    assert run(asn=65000, neighbor="10.0.0.1", address_families=removal) == {
+        "changed": False
+    }
+
+
+def test_unnumbered_neighbor(switch):
+    state, run = switch
+    args = dict(
+        asn=65000, neighbor="1/1/3", interface="1/1/3", remote_as=65001
+    )
+
+    assert run(**args) == {"changed": True}
+    assert state.writes == [
+        (
+            "POST",
+            NEIGHBORS,
+            {
+                "ip_or_ifname_or_group_name": "1/1/3",
+                "is_peer_group": False,
+                "nbr_interface": PREFIX + "system/interfaces/1%2F1%2F3",
+                "remote_as": 65001,
+            },
+        )
+    ]
+    state.neighbors["1/1/3"]["nbr_interface"] = {
+        "1/1/3": PREFIX + "system/interfaces/1%2F1%2F3"
+    }
+    state.writes.clear()
+    assert run(**args) == {"changed": False}
+    assert run(asn=65000, neighbor="1/1/3", weight=5) == {"changed": True}
+    assert state.writes[-1][1] == NEIGHBORS + "/1%2F1%2F3"
+
+    state.interfaces.add("1/1/4")
+    result = run(asn=65000, neighbor="1/1/3", interface="1/1/4")
+    assert result["failed"] is True
+    assert "interface cannot be changed" in result["msg"]
+    assert run(asn=65000, neighbor="1/1/3", state="delete") == {
+        "changed": True
+    }
+    assert "1/1/3" not in state.neighbors
+
+
+@pytest.mark.parametrize(
+    "params, message",
+    [
+        ({"weight": 65536}, "weight must be between 0 and 65535"),
+        (
+            {"password": "x", "ao": {"keychain": "KC1"}},
+            "password and ao.keychain are mutually exclusive",
+        ),
+        ({"ttl_security_hops": 255}, "ttl_security_hops must be between"),
+        ({"graceful_shutdown": {"timer": 5}}, "graceful_shutdown.timer must"),
+        ({"neighbor": "a/b"}, "Invalid neighbor"),
+        ({"interface": "1/1/9"}, "Could not find interface 1/1/9"),
+        ({"ao": {"keychain": "NOPE"}}, "Could not find keychain NOPE"),
+        (
+            {
+                "address_families": [
+                    {"address_family": "ipv4_unicast", "orf_prefix_list": "NO"}
+                ]
+            },
+            "Could not find prefix list NO",
+        ),
+        (
+            {
+                "address_families": [
+                    {"address_family": "l2vpn_evpn", "add_paths": "both"}
+                ]
+            },
+            "add_paths is not supported for l2vpn_evpn",
+        ),
+        (
+            {
+                "address_families": [
+                    {"address_family": "ipv4_unicast", "replace_rt_asn": True}
+                ]
+            },
+            "replace_rt_asn is not supported for ipv4_unicast",
+        ),
+        (
+            {
+                "address_families": [
+                    {"address_family": "ipv4_unicast", "allowas_in": 11}
+                ]
+            },
+            "allowas_in must be between 0 and 10",
+        ),
+        (
+            {
+                "address_families": [
+                    {
+                        "address_family": "ipv4_unicast",
+                        "maximum_prefix": {"limit": 10, "restart": 5},
+                    }
+                ]
+            },
+            "maximum_prefix.restart must be between 30 and 65535",
+        ),
+    ],
+)
+def test_new_options_validation(switch, params, message):
+    state, run = switch
+    result = run(**dict({"asn": 65000, "neighbor": "10.0.0.1"}, **params))
     assert result["failed"] is True
     assert message in result["msg"]
     assert not state.writes

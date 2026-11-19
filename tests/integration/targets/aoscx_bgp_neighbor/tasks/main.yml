@@ -121,6 +121,63 @@
       - delete_again_result is not changed
       - other_result is not changed
 
+- name: Configure session and per address family options
+  arubanetworks.aoscx.aoscx_bgp_neighbor: &all_options
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: 192.0.2.1
+    fall_over_bfd: true
+    passive: true
+    weight: 100
+    local_as: 65100
+    local_as_mode: no-prepend
+    ttl_security_hops: 5
+    password: QaSecret1
+    timers: {keepalive: 20, holdtime: 60}
+    graceful_shutdown: {timer: 60, local_preference: 10}
+    address_families:
+      - address_family: ipv4_unicast
+        allowas_in: 2
+        add_paths: both
+        maximum_prefix: {limit: 1000, threshold: 80, warning_only: false}
+      - address_family: l2vpn_evpn
+        replace_rt_asn: true
+        maximum_prefix: {limit: 500}
+  register: options_result
+
+- name: Re-apply the options (idempotency, the password is kept)
+  arubanetworks.aoscx.aoscx_bgp_neighbor: *all_options
+  register: options_again_result
+
+- name: Remove the options
+  arubanetworks.aoscx.aoscx_bgp_neighbor: &no_options
+    asn: "{{ qa_bgp_asn }}"
+    vrf: QA_BGP
+    neighbor: 192.0.2.1
+    local_as: 0
+    ttl_security_hops: 0
+    password: ""
+    address_families:
+      - address_family: ipv4_unicast
+        allowas_in: 0
+        maximum_prefix: {limit: 0}
+      - address_family: l2vpn_evpn
+        replace_rt_asn: false
+        maximum_prefix: {limit: 0}
+  register: no_options_result
+
+- name: Remove the options again (idempotency)
+  arubanetworks.aoscx.aoscx_bgp_neighbor: *no_options
+  register: no_options_again_result
+
+- name: Assert the options results
+  ansible.builtin.assert:
+    that:
+      - options_result is changed
+      - options_again_result is not changed
+      - no_options_result is changed
+      - no_options_again_result is not changed
+
 - name: Clean up the neighbor and the peer group
   arubanetworks.aoscx.aoscx_bgp_neighbor:
     asn: "{{ qa_bgp_asn }}"

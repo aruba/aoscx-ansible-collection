@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - aoscx_bgp_neighbor - add the ``fall_over``, ``fall_over_bfd``, ``passive``, ``remove_private_as``, ``slow_peer``, ``weight``, ``local_as``, ``local_as_mode``, ``port``, ``ttl_security_hops``, ``password``, ``update_password``, ``timers``, ``graceful_shutdown``, ``accept_invalid_attributes``, ``ao`` and ``interface`` (unnumbered neighbor) options.
+  - aoscx_bgp_neighbor - add the ``allowas_in``, ``advertisement_interval``, ``add_paths``, ``add_paths_advertise_best``, ``maximum_prefix``, ``orf_capability``, ``orf_prefix_list`` and ``replace_rt_asn`` per address family options.
