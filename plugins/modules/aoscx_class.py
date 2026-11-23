@@ -549,6 +549,18 @@ def run_module(ansible_module, session):
             or changed
         )
 
+    # The switch only applies the entries of a class when its cfg_version
+    # changes.
+    if changed and not check_mode and hasattr(
+        traffic_class, "update_cfg_version"
+    ):
+        try:
+            traffic_class.update_cfg_version()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Could not apply {0}: {1}".format(name, str(e))
+            )
+
     result["changed"] = changed
     ansible_module.exit_json(**result)
 

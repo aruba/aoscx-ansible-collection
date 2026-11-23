@@ -192,6 +192,9 @@ class FakeContainer:
     def delete(self):
         self.session._writes.append(("container_delete", self.name, None))
 
+    def update_cfg_version(self):
+        self.session._version_updates.append(self.name)
+
 
 def build_session(
     gbp_exists=False, class_exists=True, entries=None, action_sets=None
@@ -206,6 +209,7 @@ def build_session(
     session._entries = entries or {}
     session._action_sets = action_sets or {}
     session._writes = []
+    session._version_updates = []
 
     def get_module(sess, name, index, **kwargs):
         return FakeClass(session, index, kwargs.get("type"))
@@ -258,6 +262,7 @@ def test_create_with_entry():
         "/rest/v10.16/system/classes/c1,gbp-ipv4"
     )
     assert creates[0][2]["comment"] == "x"
+    assert session._version_updates == [NAME]
 
 
 def test_class_missing_fails():
@@ -313,6 +318,7 @@ def test_idempotent():
     )
     assert result["changed"] is False
     assert not session._writes
+    assert not session._version_updates
 
 
 def test_remove_extra_entry():

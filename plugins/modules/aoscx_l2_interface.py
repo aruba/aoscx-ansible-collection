@@ -744,17 +744,27 @@ def main():
         modified_op |= _result
 
     # Spanning Tree
-    try:
-        modified_op = interface.configure_spanning_tree(
-            admin_edge_port_enable=stp_admin_edge_port_enable,
-            bpdu_filter_enable=stp_bpdu_filter_enable,
-            bpdu_guard_enable=stp_bpdu_guard_enable,
-            link_type=stp_link_type,
-            loop_guard_enable=stp_loop_guard_enable,
-            root_guard_enable=stp_root_guard_enable
-        )
-    except Exception as e:
-        ansible_module.fail_json(str(e))
+    stp_params = {
+        "admin_edge_port_enable": stp_admin_edge_port_enable,
+        "bpdu_filter_enable": stp_bpdu_filter_enable,
+        "bpdu_guard_enable": stp_bpdu_guard_enable,
+        "link_type": stp_link_type,
+        "loop_guard_enable": stp_loop_guard_enable,
+        "root_guard_enable": stp_root_guard_enable,
+    }
+    if any(value is not None for value in stp_params.values()):
+        if not hasattr(interface, "configure_spanning_tree"):
+            ansible_module.fail_json(
+                msg=(
+                    "This pyaoscx version does not support the stp_* options "
+                    "(Interface.configure_spanning_tree). Upgrade pyaoscx or "
+                    "use the aoscx_interface_stp module."
+                )
+            )
+        try:
+            modified_op |= interface.configure_spanning_tree(**stp_params)
+        except Exception as e:
+            ansible_module.fail_json(msg=str(e))
 
     if modified_op:
         result["changed"] = True

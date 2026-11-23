@@ -57,10 +57,10 @@ options:
     type: str
   group:
     description: >
-      List of AAA server group names this server belongs to. The referenced
-      groups must already exist. At least one group is required when the
-      server is created. The supplied list fully replaces the current group
-      membership.
+      List of AAA server group names this server belongs to (stored in the
+      server_group attribute of the server). The referenced groups must
+      already exist. At least one group is required when the server is
+      created. The supplied list fully replaces the current group membership.
     required: false
     type: list
     elements: str
@@ -71,7 +71,9 @@ options:
     default: 1
     type: int
   user_group_priority:
-    description: Priority of this server within a user-defined group.
+    description: >
+      Priority of this server within the groups listed in group. Defaults to
+      1 when group is supplied.
     required: false
     type: int
   auth_type:
@@ -131,9 +133,12 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
 )
 
 
-def group_uris(session, ansible_module, names):
-    """Validate each group exists and return a list of group URIs."""
-    uris = []
+def group_uris(session, ansible_module, names, priority):
+    """
+    Validate each group exists and return the {group_uri: priority} mapping
+    expected by the server_group attribute of the TACACS+ server.
+    """
+    uris = {}
     for name in names:
         group = session.api.get_module(session, "AaaServerGroup", name)
         try:
@@ -142,20 +147,11 @@ def group_uris(session, ansible_module, names):
             ansible_module.fail_json(
                 msg="Could not find AAA server group {0}".format(name)
             )
-        uris.append(
-            "{0}system/aaa_server_groups/{1}".format(
-                session.resource_prefix, name
-            )
+        uri = "{0}system/aaa_server_groups/{1}".format(
+            session.resource_prefix, name
         )
+        uris[uri] = priority
     return uris
-
-
-def current_group_names(server):
-    """Return the set of group names currently bound to the server."""
-    current = getattr(server, "group", None)
-    if isinstance(current, dict):
-        return set(current.keys())
-    return set()
 
 
 def main():
@@ -195,7 +191,6 @@ def main():
     state = ansible_module.params["state"]
 
     scalar_attrs = [
-        "user_group_priority",
         "auth_type",
         "timeout",
         "tracking_enable",
@@ -245,7 +240,12 @@ def main():
 
     desired_group_uris = None
     if group is not None:
-        desired_group_uris = group_uris(session, ansible_module, group)
+        desired_group_uris = group_uris(
+            session,
+            ansible_module,
+            group,
+            ansible_module.params["user_group_priority"] or 1,
+        )
 
     # --------------------------------------------------------------- delete
     if state == "delete":
@@ -266,7 +266,7 @@ def main():
                 msg="group is required to create a TACACS+ server"
             )
         create_kwargs = dict(supplied)
-        create_kwargs["group"] = desired_group_uris
+        create_kwargs["server_group"] = desired_group_uris
         create_kwargs["default_group_priority"] = default_group_priority
         if passkey is not None:
             create_kwargs["passkey"] = passkey
@@ -308,11 +308,11 @@ def main():
             server.config_attrs.append("default_group_priority")
 
     if desired_group_uris is not None:
-        if current_group_names(server) != set(group):
+        if getattr(server, "server_group", None) != desired_group_uris:
             changed = True
-            server.group = desired_group_uris
-            if "group" not in server.config_attrs:
-                server.config_attrs.append("group")
+            server.server_group = desired_group_uris
+            if "server_group" not in server.config_attrs:
+                server.config_attrs.append("server_group")
 
     # passkey is write-only: re-apply whenever it is supplied.
     if passkey is not None:

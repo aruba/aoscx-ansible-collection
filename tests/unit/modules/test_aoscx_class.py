@@ -107,6 +107,9 @@ class FakeClass:
     def delete(self):
         self.session._class_deletes.append((self.name, self.type))
 
+    def update_cfg_version(self):
+        self.session._version_updates.append((self.name, self.type))
+
 
 class FakeClassEntry:
     def __init__(self, session, sequence_number, parent_class, **kwargs):
@@ -156,6 +159,7 @@ def build_session(exists=False, entries=None):
     session._class_creates = []
     session._class_deletes = []
     session._writes = []
+    session._version_updates = []
 
     def get_module(sess, name, index, **kwargs):
         return FakeClass(session, index, kwargs.get("type"))
@@ -214,6 +218,7 @@ def test_create_with_entry():
     assert attrs["protocol"] == 6
     assert attrs["dst_ip"] == "10.0.0.0/255.255.255.0"
     assert attrs["count"] is True
+    assert session._version_updates == [(NAME, TYPE)]
 
 
 def test_delete():
@@ -265,6 +270,7 @@ def test_idempotent_entry():
     )
     assert result["changed"] is False
     assert not session._writes
+    assert not session._version_updates
 
 
 def test_match_change_recreates_entry():

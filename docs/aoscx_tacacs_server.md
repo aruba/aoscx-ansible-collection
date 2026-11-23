@@ -35,10 +35,10 @@ module always (re)applies it, which is reported as a change.
     type: str
   group:
     description: >
-      List of AAA server group names this server belongs to. The referenced
-      groups must already exist. At least one group is required when the
-      server is created. The supplied list fully replaces the current group
-      membership.
+      List of AAA server group names this server belongs to (stored in the
+      server_group attribute of the server). The referenced groups must
+      already exist. At least one group is required when the server is
+      created. The supplied list fully replaces the current group membership.
     required: false
     type: list
     elements: str
@@ -49,7 +49,9 @@ module always (re)applies it, which is reported as a change.
     default: 1
     type: int
   user_group_priority:
-    description: Priority of this server within a user-defined group.
+    description: >
+      Priority of this server within the groups listed in group. Defaults to
+      1 when group is supplied.
     required: false
     type: int
   auth_type:

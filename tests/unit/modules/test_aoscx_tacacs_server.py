@@ -30,8 +30,9 @@ MODULE = (
     "aoscx_tacacs_server"
 )
 
+GROUP_URI = "/rest/v10.16/system/aaa_server_groups/{0}"
+
 SCALAR_ATTRS = (
-    "user_group_priority",
     "auth_type",
     "timeout",
     "tracking_enable",
@@ -72,12 +73,12 @@ def patch_ansible_module():
         yield
 
 
-def build_server(exists, group=None, default_group_priority=1, **attrs):
+def build_server(exists, server_group=None, default_group_priority=1, **attrs):
     server = MagicMock()
     server.config_attrs = []
     for attr in SCALAR_ATTRS:
         setattr(server, attr, attrs.get(attr))
-    server.group = group
+    server.server_group = server_group
     server.default_group_priority = default_group_priority
     if exists:
         server.get.return_value = True
@@ -100,7 +101,7 @@ def build_session(existing, new_instance=None):
         if module == "AaaServerGroup":
             return group_obj
         if module == "TacacsServer":
-            if "group" in kwargs and new_instance is not None:
+            if "server_group" in kwargs and new_instance is not None:
                 return new_instance
             return existing
         raise AssertionError("unexpected module {0}".format(module))
@@ -132,6 +133,27 @@ def test_create():
     )
     assert result["changed"] is True
     new.create.assert_called_once()
+    create_kwargs = session.api.get_module.call_args.kwargs
+    assert create_kwargs["server_group"] == {GROUP_URI.format("tacacs"): 1}
+    assert "group" not in create_kwargs
+
+
+def test_create_uses_user_group_priority():
+    new = build_server(False)
+    session = build_session(build_server(False), new_instance=new)
+    run_module(
+        {
+            "address": "192.0.2.20",
+            "group": ["clearpass-tacacs"],
+            "user_group_priority": 2,
+        },
+        session,
+    )
+    create_kwargs = session.api.get_module.call_args.kwargs
+    assert create_kwargs["server_group"] == {
+        GROUP_URI.format("clearpass-tacacs"): 2
+    }
+    assert "user_group_priority" not in create_kwargs
 
 
 def test_create_requires_group():
@@ -184,7 +206,7 @@ def test_update_idempotent():
 def test_update_group():
     existing = build_server(
         True,
-        group={"tacacs": "/rest/v10.16/system/aaa_server_groups/tacacs"},
+        server_group={GROUP_URI.format("tacacs"): 1},
     )
     session = build_session(existing)
     result = run_module(
@@ -197,12 +219,13 @@ def test_update_group():
     )
     assert result["changed"] is True
     existing.update.assert_called_once()
+    assert existing.server_group == {GROUP_URI.format("my-tacacs"): 1}
 
 
 def test_update_group_idempotent():
     existing = build_server(
         True,
-        group={"tacacs": "/rest/v10.16/system/aaa_server_groups/tacacs"},
+        server_group={GROUP_URI.format("tacacs"): 1},
     )
     session = build_session(existing)
     result = run_module(

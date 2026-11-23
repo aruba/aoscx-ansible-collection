@@ -218,17 +218,18 @@ def main():
         if ansible_module.params[attr] is not None
     }
 
+    new_config = dict(current)
     if state == "delete":
-        new_values = {}
+        # Booleans are reset to false; other settings (server groups, ...)
+        # are removed, as an empty string is kept by the switch and shown as
+        # "radius server-group" with no group in the running-config.
         for attr in supplied:
             if isinstance(current.get(attr), bool):
-                new_values[attr] = False
+                new_config[attr] = False
             else:
-                new_values[attr] = ""
-        supplied = new_values
-
-    new_config = dict(current)
-    new_config.update(supplied)
+                new_config.pop(attr, None)
+    else:
+        new_config.update(supplied)
 
     changed = new_config != current
     if changed:

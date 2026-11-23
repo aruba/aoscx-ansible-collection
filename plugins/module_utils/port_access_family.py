@@ -204,6 +204,18 @@ def run_port_access_family(
             changed,
         )
 
+    # The switch only applies the entries of a policy when its cfg_version
+    # changes.
+    if changed and not check_mode:
+        container = container_cls(session, name)
+        if hasattr(container, "update_cfg_version"):
+            try:
+                container.update_cfg_version()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Could not apply {0}: {1}".format(name, str(e))
+                )
+
     result["changed"] = changed
     ansible_module.exit_json(**result)
 

@@ -1,0 +1,17 @@
+---
+bugfixes:
+  - aoscx_tacacs_server - the server is now added to the groups listed in
+    ``group`` (``server_group`` attribute). It was previously left in the
+    default ``tacacs`` group, and ``user_group_priority`` was ignored by the
+    switch and always reported as changed.
+  - aoscx_l2_interface - ``Interface.configure_spanning_tree()`` is only called
+    when an ``stp_*`` option is supplied. It failed on every run with the
+    released pyaoscx versions, and its result overwrote the layer 2 changes.
+  - aoscx_aaa - ``state=delete`` now removes the server group settings
+    instead of setting them to an empty string, which the switch displayed as
+    ``radius server-group`` with no group.
+  - aoscx_class, aoscx_port_access_gbp, aoscx_port_access_abp,
+    aoscx_port_access_policy - the ``cfg_version`` of the class or policy is
+    updated after its entries change. Without it the switch does not apply the
+    entries and reports the configuration as "currently being processed".
+    Requires a pyaoscx release that ships ``update_cfg_version()``.
