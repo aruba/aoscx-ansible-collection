@@ -1,9 +1,11 @@
 ---
 bugfixes:
   - aoscx_tacacs_server - the server is now added to the groups listed in
-    ``group`` (``server_group`` attribute). It was previously left in the
-    default ``tacacs`` group, and ``user_group_priority`` was ignored by the
-    switch and always reported as changed.
+    ``group`` on every firmware. From 10.19 the membership is stored in the
+    ``server_group`` attribute (``group`` was accepted but ignored, leaving the
+    server in the default ``tacacs`` group); up to 10.18 it uses ``group`` and
+    ``user_group_priority``, where ``server_group`` is rejected as not
+    configurable.
   - aoscx_l2_interface - ``Interface.configure_spanning_tree()`` is only called
     when an ``stp_*`` option is supplied. It failed on every run with the
     released pyaoscx versions, and its result overwrote the layer 2 changes.

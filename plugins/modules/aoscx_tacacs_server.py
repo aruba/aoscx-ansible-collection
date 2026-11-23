@@ -57,9 +57,9 @@ options:
     type: str
   group:
     description: >
-      List of AAA server group names this server belongs to (stored in the
-      server_group attribute of the server). The referenced groups must
-      already exist. At least one group is required when the server is
+      List of AAA server group names this server belongs to (server_group
+      attribute from firmware 10.19, group and user_group_priority before).
+      The referenced groups must already exist. At least one group is required when the server is
       created. The supplied list fully replaces the current group membership.
     required: false
     type: list
@@ -238,13 +238,11 @@ def main():
     except Exception:
         exists = False
 
+    group_priority = ansible_module.params["user_group_priority"] or 1
     desired_group_uris = None
     if group is not None:
         desired_group_uris = group_uris(
-            session,
-            ansible_module,
-            group,
-            ansible_module.params["user_group_priority"] or 1,
+            session, ansible_module, group, group_priority
         )
 
     # --------------------------------------------------------------- delete
@@ -265,27 +263,51 @@ def main():
             ansible_module.fail_json(
                 msg="group is required to create a TACACS+ server"
             )
-        create_kwargs = dict(supplied)
-        create_kwargs["server_group"] = desired_group_uris
-        create_kwargs["default_group_priority"] = default_group_priority
-        if passkey is not None:
-            create_kwargs["passkey"] = passkey
-        server = session.api.get_module(
-            session,
-            "TacacsServer",
-            vrf,
-            address=address,
-            tcp_port=tcp_port,
-            **create_kwargs
-        )
+
+        def build_server(membership):
+            create_kwargs = dict(supplied)
+            create_kwargs.update(membership)
+            create_kwargs["default_group_priority"] = default_group_priority
+            if passkey is not None:
+                create_kwargs["passkey"] = passkey
+            return session.api.get_module(
+                session,
+                "TacacsServer",
+                vrf,
+                address=address,
+                tcp_port=tcp_port,
+                **create_kwargs
+            )
+
+        server = build_server({"server_group": desired_group_uris})
         result["changed"] = True
         if not ansible_module.check_mode:
             try:
                 server.create()
             except Exception as e:
-                ansible_module.fail_json(
-                    msg="Could not create TACACS+ server: {0}".format(str(e))
+                # Up to firmware 10.18 the membership is set with group and
+                # user_group_priority; server_group is rejected as not
+                # configurable. From 10.19 group is accepted but ignored.
+                if "not configurable" not in str(e):
+                    ansible_module.fail_json(
+                        msg="Could not create TACACS+ server: {0}".format(
+                            str(e)
+                        )
+                    )
+                server = build_server(
+                    {
+                        "group": list(desired_group_uris),
+                        "user_group_priority": group_priority,
+                    }
                 )
+                try:
+                    server.create()
+                except Exception as e:
+                    ansible_module.fail_json(
+                        msg="Could not create TACACS+ server: {0}".format(
+                            str(e)
+                        )
+                    )
         ansible_module.exit_json(**result)
 
     # --------------------------------------------------------------- update
@@ -308,11 +330,25 @@ def main():
             server.config_attrs.append("default_group_priority")
 
     if desired_group_uris is not None:
-        if getattr(server, "server_group", None) != desired_group_uris:
-            changed = True
-            server.server_group = desired_group_uris
-            if "server_group" not in server.config_attrs:
-                server.config_attrs.append("server_group")
+        if "server_group" in server.config_attrs:
+            if server.server_group != desired_group_uris:
+                changed = True
+                server.server_group = desired_group_uris
+        else:
+            # Firmware up to 10.18: group ({name: uri}) and
+            # user_group_priority.
+            current_groups = set(getattr(server, "group", None) or {})
+            if (
+                current_groups != set(group)
+                or getattr(server, "user_group_priority", None)
+                != group_priority
+            ):
+                changed = True
+                server.group = list(desired_group_uris)
+                server.user_group_priority = group_priority
+                for attr in ("group", "user_group_priority"):
+                    if attr not in server.config_attrs:
+                        server.config_attrs.append(attr)
 
     # passkey is write-only: re-apply whenever it is supplied.
     if passkey is not None:

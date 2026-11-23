@@ -35,9 +35,9 @@ module always (re)applies it, which is reported as a change.
     type: str
   group:
     description: >
-      List of AAA server group names this server belongs to (stored in the
-      server_group attribute of the server). The referenced groups must
-      already exist. At least one group is required when the server is
+      List of AAA server group names this server belongs to (server_group
+      attribute from firmware 10.19, group and user_group_priority before).
+      The referenced groups must already exist. At least one group is required when the server is
       created. The supplied list fully replaces the current group membership.
     required: false
     type: list

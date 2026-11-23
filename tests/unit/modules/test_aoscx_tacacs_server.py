@@ -73,12 +73,22 @@ def patch_ansible_module():
         yield
 
 
-def build_server(exists, server_group=None, default_group_priority=1, **attrs):
+def build_server(
+    exists,
+    server_group=None,
+    default_group_priority=1,
+    group=None,
+    user_group_priority=None,
+    **attrs
+):
+    """server_group: firmware 10.19+ model; group: firmware 10.18 model."""
     server = MagicMock()
-    server.config_attrs = []
+    server.config_attrs = [] if server_group is None else ["server_group"]
     for attr in SCALAR_ATTRS:
         setattr(server, attr, attrs.get(attr))
     server.server_group = server_group
+    server.group = group
+    server.user_group_priority = user_group_priority
     server.default_group_priority = default_group_priority
     if exists:
         server.get.return_value = True
@@ -88,12 +98,18 @@ def build_server(exists, server_group=None, default_group_priority=1, **attrs):
 
 
 def build_session(existing, new_instance=None):
+    """new_instance: server, or list of servers returned for each creation."""
     session = MagicMock()
     session.resource_prefix = "/rest/v10.16/"
     vrf = MagicMock()
     vrf.get.return_value = True
     group_obj = MagicMock()
     group_obj.get.return_value = True
+    new_instances = (
+        list(new_instance)
+        if isinstance(new_instance, (list, tuple))
+        else [new_instance]
+    )
 
     def get_module(sess, module, index=None, **kwargs):
         if module == "Vrf":
@@ -101,8 +117,13 @@ def build_session(existing, new_instance=None):
         if module == "AaaServerGroup":
             return group_obj
         if module == "TacacsServer":
-            if "server_group" in kwargs and new_instance is not None:
-                return new_instance
+            membership = "server_group" in kwargs or "group" in kwargs
+            if membership and new_instances[0] is not None:
+                return (
+                    new_instances.pop(0)
+                    if len(new_instances) > 1
+                    else new_instances[0]
+                )
             return existing
         raise AssertionError("unexpected module {0}".format(module))
 
@@ -257,3 +278,61 @@ def test_delete():
     result = run_module({"address": "192.0.2.20", "state": "delete"}, session)
     assert result["changed"] is True
     existing.delete.assert_called_once()
+
+
+def test_create_falls_back_to_group_on_firmware_10_18():
+    rejected = build_server(False)
+    rejected.create.side_effect = Exception(
+        "GENERIC OPERATION ERROR: values in post body not configurable"
+    )
+    accepted = build_server(False)
+    session = build_session(
+        build_server(False), new_instance=[rejected, accepted]
+    )
+    result = run_module(
+        {"address": "192.0.2.20", "group": ["clearpass-tacacs"]}, session
+    )
+    assert result["changed"] is True
+    accepted.create.assert_called_once()
+    create_kwargs = session.api.get_module.call_args.kwargs
+    assert create_kwargs["group"] == [GROUP_URI.format("clearpass-tacacs")]
+    assert create_kwargs["user_group_priority"] == 1
+    assert "server_group" not in create_kwargs
+
+
+def test_update_group_on_firmware_10_18():
+    existing = build_server(
+        True,
+        group={"tacacs": GROUP_URI.format("tacacs")},
+        user_group_priority=1,
+    )
+    result = run_module(
+        {
+            "address": "192.0.2.20",
+            "state": "update",
+            "group": ["clearpass-tacacs"],
+        },
+        build_session(existing),
+    )
+    assert result["changed"] is True
+    assert existing.group == [GROUP_URI.format("clearpass-tacacs")]
+    assert "group" in existing.config_attrs
+    existing.update.assert_called_once()
+
+
+def test_group_idempotent_on_firmware_10_18():
+    existing = build_server(
+        True,
+        group={"clearpass-tacacs": GROUP_URI.format("clearpass-tacacs")},
+        user_group_priority=1,
+    )
+    result = run_module(
+        {
+            "address": "192.0.2.20",
+            "state": "update",
+            "group": ["clearpass-tacacs"],
+        },
+        build_session(existing),
+    )
+    assert result["changed"] is False
+    existing.update.assert_not_called()
