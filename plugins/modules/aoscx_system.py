@@ -78,6 +78,13 @@ options:
     type: bool
     default: false
     required: false
+  gbp_enable:
+    description: >
+      Enable (C(gbp enable)) or disable (C(no gbp enable)) Group Based Policy
+      enforcement. Requires a pyaoscx release that ships
+      Device.set_gbp_enable().
+    type: bool
+    required: false
 """
 
 EXAMPLES = """
@@ -116,6 +123,10 @@ EXAMPLES = """
 - name: Remove the global virtual MAC address
   aoscx_system:
     use_default_virtual_mac: true
+
+- name: Enable Group Based Policy enforcement
+  aoscx_system:
+    gbp_enable: true
 """
 
 RETURN = r""" # """
@@ -178,6 +189,11 @@ def get_argument_spec():
             "type": "bool",
             "required": False,
             "default": False,
+        },
+        "gbp_enable": {
+            "type": "bool",
+            "required": False,
+            "default": None,
         },
     }
     return argument_spec
@@ -252,6 +268,18 @@ def main():
 
     if ansible_module.params["use_default_virtual_mac"]:
         result["changed"] |= Device(session).set_virtual_mac(None)
+
+    gbp_enable = ansible_module.params["gbp_enable"]
+    if gbp_enable is not None:
+        device = Device(session)
+        if not hasattr(device, "set_gbp_enable"):
+            ansible_module.fail_json(
+                msg=(
+                    "This pyaoscx version does not support gbp_enable. "
+                    "Upgrade pyaoscx."
+                )
+            )
+        result["changed"] |= device.set_gbp_enable(gbp_enable)
 
     ansible_module.exit_json(**result)
 

@@ -3,7 +3,8 @@
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 """
-Unit tests for the virtual_mac options of the aoscx_system module.
+Unit tests for the virtual_mac and gbp_enable options of the aoscx_system
+module.
 
 The pyaoscx session and Device are fully mocked, so no switch is required.
 """
@@ -63,7 +64,7 @@ def patch_ansible_module():
         yield
 
 
-def run_module(args, changed=True):
+def run_module(args, changed=True, device=None):
     if patch_module_args is None:
         basic._ANSIBLE_ARGS = to_bytes(
             json.dumps({"ANSIBLE_MODULE_ARGS": args})
@@ -71,8 +72,10 @@ def run_module(args, changed=True):
         args_context = nullcontext()
     else:
         args_context = patch_module_args(args)
-    device = MagicMock()
-    device.set_virtual_mac.return_value = changed
+    if device is None:
+        device = MagicMock()
+        device.set_virtual_mac.return_value = changed
+        device.set_gbp_enable.return_value = changed
     with args_context:
         with patch(MODULE + ".get_pyaoscx_session", return_value=MagicMock()):
             with patch(MODULE + ".Device", return_value=device):
@@ -110,3 +113,27 @@ def test_virtual_mac_options_are_mutually_exclusive():
         {"virtual_mac": "02:00:00:00:00:01", "use_default_virtual_mac": True}
     )
     assert result["failed"] is True
+
+
+@pytest.mark.parametrize("enable", [True, False])
+def test_set_gbp_enable(enable):
+    result, device = run_module({"gbp_enable": enable})
+    assert result["changed"] is True
+    device.set_gbp_enable.assert_called_once_with(enable)
+
+
+def test_gbp_enable_unchanged():
+    result, _ = run_module({"gbp_enable": True}, changed=False)
+    assert result["changed"] is False
+
+
+def test_gbp_enable_omitted_is_not_applied():
+    _, device = run_module({"virtual_mac": "02:00:00:00:00:01"})
+    device.set_gbp_enable.assert_not_called()
+
+
+def test_gbp_enable_unsupported_pyaoscx_reports_error():
+    device = MagicMock(spec=["set_virtual_mac"])
+    result, _ = run_module({"gbp_enable": True}, device=device)
+    assert result["failed"] is True
+    assert "Upgrade pyaoscx" in result["msg"]

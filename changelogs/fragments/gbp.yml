@@ -1,0 +1,8 @@
+---
+minor_changes:
+  - aoscx_gbp_role - new module to create, update or delete Group Based Policy
+    roles (``gbp role <name> <id>``, system/gbp_role_name_id_maps). Requires a
+    pyaoscx release that ships the ``GbpRole`` class.
+  - aoscx_system - add the ``gbp_enable`` option to enable or disable Group
+    Based Policy enforcement (``gbp enable``). Requires a pyaoscx release that
+    ships ``Device.set_gbp_enable()``.
