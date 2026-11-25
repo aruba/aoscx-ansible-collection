@@ -1,0 +1,64 @@
+# Integration tests for the aoscx_port_access_role module.
+#
+# Run with:
+#   ansible-test integration aoscx_port_access_role --venv
+#
+# Requires an inventory entry named "aoscx" reachable with a pyaoscx release
+# that ships the PortAccessRole class and a REST API version of 10.16. Uses a
+# temporary role named "ansible-test" and cleans up afterwards.
+
+- name: Make sure the test role does not exist yet
+  arubanetworks.aoscx.aoscx_port_access_role:
+    name: ansible-test
+    state: delete
+  ignore_errors: true
+
+- name: Create a port access role
+  arubanetworks.aoscx.aoscx_port_access_role:
+    name: ansible-test
+    description: Ansible integration test
+    vlan_mode: access
+    vlan_tag: 1
+  register: result
+
+- name: Assert the role was created
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Create the role again (idempotent)
+  arubanetworks.aoscx.aoscx_port_access_role:
+    name: ansible-test
+    description: Ansible integration test
+    vlan_mode: access
+    vlan_tag: 1
+    state: update
+  register: result
+
+- name: Assert no change on re-create
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Update the description
+  arubanetworks.aoscx.aoscx_port_access_role:
+    name: ansible-test
+    description: Ansible integration test updated
+    state: update
+  register: result
+
+- name: Assert the description change was applied
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Delete the port access role
+  arubanetworks.aoscx.aoscx_port_access_role:
+    name: ansible-test
+    state: delete
+  register: result
+
+- name: Assert the role was deleted
+  ansible.builtin.assert:
+    that:
+      - result.changed
