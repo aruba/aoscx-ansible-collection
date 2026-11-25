@@ -81,6 +81,7 @@ def run_module(args, changed=True, device=None):
         device.set_virtual_mac.return_value = changed
         device.set_gbp_enable.return_value = changed
         device.set_internal_vlan_range.return_value = changed
+        device.delete_internal_vlan_range.return_value = changed
         device.set_interface_group_speed.return_value = changed
     with args_context:
         with patch(MODULE + ".get_pyaoscx_session", return_value=MagicMock()):
@@ -179,6 +180,34 @@ def test_internal_vlan_range_unsupported_pyaoscx_reports_error():
     )
     assert result["failed"] is True
     assert "Upgrade pyaoscx" in result["msg"]
+
+
+def test_remove_internal_vlan_range():
+    result, device = run_module({"use_default_internal_vlan_range": True})
+    assert result["changed"] is True
+    device.delete_internal_vlan_range.assert_called_once_with()
+
+
+def test_remove_internal_vlan_range_refused_fails():
+    device = MagicMock()
+    device.delete_internal_vlan_range.side_effect = ParameterError(
+        "routing is enabled on: 1/1/23"
+    )
+    result, _ = run_module(
+        {"use_default_internal_vlan_range": True}, device=device
+    )
+    assert result["failed"] is True
+    assert "1/1/23" in result["msg"]
+
+
+def test_internal_vlan_range_options_are_mutually_exclusive():
+    result, _ = run_module(
+        {
+            "internal_vlan_range": {"start": 3000, "end": 3999},
+            "use_default_internal_vlan_range": True,
+        }
+    )
+    assert result["failed"] is True
 
 
 def test_set_interface_groups():

@@ -86,8 +86,9 @@ left unchanged. Check mode is supported but does not report changes.
       by default and refuse to enable routing on a port ("Configure system
       internal VLAN range before enabling routing") until a range is
       configured. The task fails on platforms where the range is not
-      configurable (6300, 6400, 8360, ...). Requires a pyaoscx release that
-      ships Device.set_internal_vlan_range().
+      configurable (6300, 6400, 8360, ...). This option is mutually exclusive
+      with the use_default_internal_vlan_range option. Requires a pyaoscx
+      release that ships Device.set_internal_vlan_range().
     type: dict
     required: false
     suboptions:
@@ -100,6 +101,17 @@ left unchanged. Check mode is supported but does not report changes.
           Last VLAN ID of the range (2-4094), not lower than start.
         type: int
         required: true
+
+  use_default_internal_vlan_range:
+    description: >
+      Remove the internal VLAN range (no system internal-vlan-range). As with
+      the CLI, the task fails while routing is enabled on a port or LAG, as
+      these use the internal VLANs. This option is mutually exclusive with the
+      internal_vlan_range option. Requires a pyaoscx release that ships
+      Device.delete_internal_vlan_range().
+    type: bool
+    default: false
+    required: false
 
   interface_groups:
     description: >
@@ -182,6 +194,10 @@ left unchanged. Check mode is supported but does not report changes.
     internal_vlan_range:
       start: 3000
       end: 3999
+
+- name: Remove the internal VLAN range (no routed port or LAG left)
+  aoscx_system:
+    use_default_internal_vlan_range: true
 
 - name: Allow 10G transceivers in interface group 1 of an 8360
   aoscx_system:

@@ -91,8 +91,9 @@ options:
       <start> end <end>)). Platforms such as the 6200 reserve no internal VLAN
       by default and refuse to enable routing on a port until a range is
       configured. The task fails on platforms where the range is not
-      configurable (6300, 6400, 8360, ...). Requires a pyaoscx release that
-      ships Device.set_internal_vlan_range().
+      configurable (6300, 6400, 8360, ...). This option is mutually exclusive
+      with the use_default_internal_vlan_range option. Requires a pyaoscx
+      release that ships Device.set_internal_vlan_range().
     type: dict
     required: false
     suboptions:
@@ -104,6 +105,16 @@ options:
         description: Last VLAN ID of the range (2-4094).
         type: int
         required: true
+  use_default_internal_vlan_range:
+    description: >
+      Remove the internal VLAN range (C(no system internal-vlan-range)). As
+      with the CLI, the task fails while routing is enabled on a port or LAG,
+      as these use the internal VLANs. This option is mutually exclusive with
+      the internal_vlan_range option. Requires a pyaoscx release that ships
+      Device.delete_internal_vlan_range().
+    type: bool
+    default: false
+    required: false
   interface_groups:
     description: >
       Permitted transceiver speed of interface groups (C(system
@@ -180,6 +191,10 @@ EXAMPLES = """
     internal_vlan_range:
       start: 3000
       end: 3999
+
+- name: Remove the internal VLAN range (no routed port or LAG left)
+  aoscx_system:
+    use_default_internal_vlan_range: true
 
 - name: Allow 10G transceivers in interface group 1 of an 8360
   aoscx_system:
@@ -272,6 +287,11 @@ def get_argument_spec():
                 "end": {"type": "int", "required": True},
             },
         },
+        "use_default_internal_vlan_range": {
+            "type": "bool",
+            "required": False,
+            "default": False,
+        },
         "interface_groups": {
             "type": "list",
             "elements": "dict",
@@ -295,6 +315,7 @@ def main():
             ("global_queue_profile", "use_default_global_queue_profile"),
             ("global_schedule_profile", "use_default_global_schedule_profile"),
             ("virtual_mac", "use_default_virtual_mac"),
+            ("internal_vlan_range", "use_default_internal_vlan_range"),
         ],
     )
 
@@ -387,6 +408,25 @@ def main():
             ansible_module.fail_json(
                 msg=pyaoscx_error_message(
                     session, "Could not set the internal VLAN range", e
+                ),
+                **result
+            )
+
+    if ansible_module.params["use_default_internal_vlan_range"]:
+        device = Device(session)
+        if not hasattr(device, "delete_internal_vlan_range"):
+            ansible_module.fail_json(
+                msg=(
+                    "This pyaoscx version does not support "
+                    "use_default_internal_vlan_range. Upgrade pyaoscx."
+                )
+            )
+        try:
+            result["changed"] |= device.delete_internal_vlan_range()
+        except PyaoscxError as e:
+            ansible_module.fail_json(
+                msg=pyaoscx_error_message(
+                    session, "Could not remove the internal VLAN range", e
                 ),
                 **result
             )

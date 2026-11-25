@@ -4,6 +4,11 @@ minor_changes:
     <start> end <end>``), required on platforms such as the 6200 before
     enabling routing on a port (requires a pyaoscx version providing
     ``Device.set_internal_vlan_range``).
+  - aoscx_system - add the ``use_default_internal_vlan_range`` option to
+    remove the internal VLAN range (CLI ``no system internal-vlan-range``);
+    as with the CLI, the task fails while routing is enabled on a port or LAG
+    (requires a pyaoscx version providing
+    ``Device.delete_internal_vlan_range``).
   - aoscx_system - add the ``interface_groups`` option to set the permitted
     transceiver speed of interface groups (CLI ``system interface-group
     <group> [line-module <line_module>] speed <speed>``), ``default``
