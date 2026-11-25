@@ -1,0 +1,12 @@
+minor_changes:
+  - aoscx_vxlan_interface, aoscx_upload_config (config_cli), aoscx_bgp_router,
+    aoscx_bgp_neighbor, aoscx_route_map, aoscx_vrf - when the switch refuses
+    a configuration, the task fails with the switch answer and the HTTP code.
+    When the answer shows the feature is probably not supported (HTTP 404,
+    405 or 415, or HTTP 400 "invalid attribute"), the message says so and
+    gives the switch platform, firmware and REST API version.
+bugfixes:
+  - aoscx_vxlan_interface - a configuration refused by the switch made the
+    module crash with a Python traceback (MODULE FAILURE), it now fails with
+    an explicit message. A VXLAN interface created by the task is removed
+    when its configuration is then refused, so nothing is left applied.

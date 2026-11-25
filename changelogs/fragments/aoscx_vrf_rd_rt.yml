@@ -1,0 +1,10 @@
+---
+minor_changes:
+  - aoscx_vrf - add the C(rd) option to manage the VRF route distinguisher.
+  - aoscx_vrf - add the C(address_families) option to manage import/export
+    route targets per address family (C(evpn), C(ipv4_unicast),
+    C(ipv6_unicast)), equivalent to the C(route-target) VRF commands.
+  - aoscx_vrf - support check mode (previously always reported no change).
+bugfixes:
+  - aoscx_vrf - only treat a 404 response as a missing VRF; other read errors
+    now fail instead of triggering a VRF creation.

@@ -1,0 +1,118 @@
+---
+# Integration tests for the aoscx_nae_script module.
+#
+# Run with:
+#   ansible-test integration aoscx_nae_script --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the NaeScript class.
+
+- name: Make sure the test script does not exist yet
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    state: delete
+
+- name: Upload a NAE script from a file
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    src: "{{ role_path }}/files/qa_nae_script.nae"
+  register: upload_result
+
+- name: Assert the script was uploaded and validated
+  ansible.builtin.assert:
+    that:
+      - upload_result is changed
+      - upload_result.script.state == 'VALIDATED'
+      - upload_result.script.origin == 'user'
+      - upload_result.parameters.threshold.type == 'INTEGER'
+
+- name: Upload the same script again (idempotency)
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    script: "{{ lookup('ansible.builtin.file', role_path + '/files/qa_nae_script.nae') }}\n"
+  register: same_result
+
+- name: Assert nothing changed
+  ansible.builtin.assert:
+    that:
+      - same_result is not changed
+
+- name: Upload the same script encoded in Base64 (idempotency)
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    script_base64: "{{ (lookup('ansible.builtin.file', role_path + '/files/qa_nae_script.nae') + '\n') | b64encode }}"
+  register: base64_result
+
+- name: Assert the Base64 content matches the uploaded file
+  ansible.builtin.assert:
+    that:
+      - base64_result is not changed
+
+- name: Refuse an invalid Base64 content
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    script_base64: "not base64!"
+  register: invalid_base64_result
+  ignore_errors: true
+
+- name: Assert the invalid Base64 content is refused
+  ansible.builtin.assert:
+    that:
+      - invalid_base64_result is failed
+      - "'Invalid Base64' in invalid_base64_result.msg"
+
+- name: Update the script with an invalid content
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    script: "this is not python"
+  register: invalid_result
+  ignore_errors: true
+
+- name: Assert the validation error is reported
+  ansible.builtin.assert:
+    that:
+      - invalid_result is failed
+      - "'is not valid' in invalid_result.msg"
+
+- name: Restore the valid script
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    src: "{{ role_path }}/files/qa_nae_script.nae"
+  register: restore_result
+
+- name: Assert the script is validated again
+  ansible.builtin.assert:
+    that:
+      - restore_result is changed
+      - restore_result.script.state == 'VALIDATED'
+
+- name: Refuse to delete a system script
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: system_resource_monitor
+    state: delete
+  register: system_result
+  ignore_errors: true
+
+- name: Assert the system script is protected
+  ansible.builtin.assert:
+    that:
+      - system_result is failed
+      - "'system script' in system_result.msg"
+
+- name: Delete the script
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    state: delete
+  register: delete_result
+
+- name: Delete the script again (idempotency)
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_script
+    state: delete
+  register: delete_again_result
+
+- name: Assert the deletion results
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_again_result is not changed

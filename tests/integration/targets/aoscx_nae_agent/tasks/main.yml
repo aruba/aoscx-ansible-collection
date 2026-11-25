@@ -1,0 +1,162 @@
+---
+# Integration tests for the aoscx_nae_agent module.
+#
+# Run with:
+#   ansible-test integration aoscx_nae_agent --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi with a
+# pyaoscx release that ships the NaeScript and NaeAgent classes.
+
+- name: Upload the NAE script run by the test agent
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_agent_script
+    script: |
+      Manifest = {
+          'Name': 'qa_nae_agent_script',
+          'Description': 'Integration test script',
+          'Version': '1.0',
+          'Author': 'QA'
+      }
+
+      ParameterDefinitions = {
+          'threshold': {
+              'Name': 'CPU threshold',
+              'Description': 'CPU utilization threshold in percent',
+              'Type': 'integer',
+              'Default': 90
+          },
+          'label': {
+              'Name': 'Label',
+              'Description': 'Free text label',
+              'Type': 'string',
+              'Default': 'none'
+          },
+          'token': {
+              'Name': 'Token',
+              'Description': 'Encrypted value',
+              'Type': 'string',
+              'Default': '',
+              'Encrypted': True
+          }
+      }
+
+
+      class Agent(NAE):
+
+          def __init__(self):
+              uri = ('/rest/v1/system/subsystems/management_module/*'
+                     '?attributes=resource_utilization.cpu')
+              self.m1 = Monitor(uri, 'CPU utilization')
+              self.r1 = Rule('CPU above threshold')
+              self.r1.condition('{} >= {}', [self.m1, self.params['threshold']])
+              self.r1.action('ALERT_LEVEL', AlertLevel.MINOR)
+              self.r1.clear_condition('{} < {}', [self.m1, self.params['threshold']])
+              self.r1.clear_action('ALERT_LEVEL', AlertLevel.NONE)
+
+- name: Create an agent
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    parameters:
+      threshold: 0
+      label: integration
+    encrypted_parameters:
+      token: s3cr3t
+  register: create_result
+
+- name: Assert the agent was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.agent.script == 'qa_nae_agent_script'
+      - create_result.agent.vrf == 'default'
+      - create_result.agent.disabled == false
+
+- name: Apply the same configuration (idempotency)
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    parameters:
+      threshold: 0
+      label: integration
+    encrypted_parameters:
+      token: s3cr3t
+  register: same_result
+
+- name: Assert nothing changed
+  ansible.builtin.assert:
+    that:
+      - same_result is not changed
+
+- name: Change one parameter and disable the agent
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    parameters:
+      label: changed
+    disabled: true
+    state: update
+  register: update_result
+
+- name: Assert the agent was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.agent.disabled == true
+
+- name: Enable the agent
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    disabled: false
+    state: update
+
+- name: Refuse an unknown parameter
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    parameters:
+      unknown: 1
+  register: unknown_result
+  ignore_errors: true
+
+- name: Refuse a VRF change
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    vrf: mgmt
+  register: vrf_result
+  ignore_errors: true
+
+- name: Assert the invalid requests are refused
+  ansible.builtin.assert:
+    that:
+      - unknown_result is failed
+      - "'Unknown parameter unknown' in unknown_result.msg"
+      - vrf_result is failed
+      - "'vrf cannot be changed' in vrf_result.msg"
+
+- name: Delete the agent
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    state: delete
+  register: delete_result
+
+- name: Delete the agent again (idempotency)
+  arubanetworks.aoscx.aoscx_nae_agent:
+    name: qa_nae_agent
+    script_name: qa_nae_agent_script
+    state: delete
+  register: delete_again_result
+
+- name: Assert the deletion results
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_again_result is not changed
+
+- name: Delete the test script
+  arubanetworks.aoscx.aoscx_nae_script:
+    name: qa_nae_agent_script
+    state: delete

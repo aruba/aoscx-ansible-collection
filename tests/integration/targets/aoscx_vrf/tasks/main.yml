@@ -1,0 +1,96 @@
+# Integration tests for the aoscx_vrf module (RD and route targets).
+#
+# Run with:
+#   ansible-test integration aoscx_vrf --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi. Uses a
+# temporary VRF (ANSIBLE_IT_VRF) and cleans up afterwards.
+
+- name: Make sure the test VRF does not exist yet
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    state: delete
+
+- name: Create the VRF with an RD and EVPN route targets (check mode)
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    rd: "10.140.253.13:20000"
+    address_families:
+      - address_family: evpn
+        export_route_targets: ["1:1", "65001:20000"]
+        import_route_targets: ["1:1", "65001:20000"]
+  check_mode: true
+  register: check_result
+
+- name: Assert check mode reports a change
+  ansible.builtin.assert:
+    that:
+      - check_result is changed
+
+- name: Create the VRF with an RD and EVPN route targets
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    rd: "10.140.253.13:20000"
+    address_families:
+      - address_family: evpn
+        export_route_targets: ["1:1", "65001:20000"]
+        import_route_targets: ["1:1", "65001:20000"]
+  register: create_result
+
+- name: Assert create changed
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+
+- name: Re-apply the same configuration in a different order
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    rd: "10.140.253.13:20000"
+    address_families:
+      - address_family: evpn
+        export_route_targets: ["65001:20000", "1:1"]
+        import_route_targets: ["65001:20000", "1:1"]
+  register: idem_result
+
+- name: Assert re-apply did not change
+  ansible.builtin.assert:
+    that:
+      - idem_result is not changed
+
+- name: Add IPv4 unicast route targets
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    address_families:
+      - address_family: ipv4_unicast
+        import_route_targets: ["65001:100"]
+        export_route_targets: ["65001:100"]
+  register: ipv4_result
+
+- name: Assert IPv4 unicast changed
+  ansible.builtin.assert:
+    that:
+      - ipv4_result is changed
+
+- name: Clear EVPN export route targets
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    address_families:
+      - address_family: evpn
+        export_route_targets: []
+  register: clear_result
+
+- name: Assert clear changed
+  ansible.builtin.assert:
+    that:
+      - clear_result is changed
+
+- name: Delete the VRF
+  arubanetworks.aoscx.aoscx_vrf:
+    name: ANSIBLE_IT_VRF
+    state: delete
+  register: delete_result
+
+- name: Assert delete changed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed

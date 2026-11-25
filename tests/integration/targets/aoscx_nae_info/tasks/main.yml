@@ -1,0 +1,61 @@
+---
+# Integration tests for the aoscx_nae_info module.
+#
+# Run with:
+#   ansible-test integration aoscx_nae_info --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi, an
+# AOS-CX 10.10 or later switch, and a pyaoscx release that ships the NAE
+# classes. The test raises an alert with a NAE-Lite agent whose condition is
+# always met.
+
+- name: Create a NAE-Lite agent that raises a critical alert
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: qa_lite_alert
+    monitors:
+      - name: cpu
+        resource: system cpu
+    condition:
+      source: cpu
+      expression: ge 0
+      alert_level: critical
+
+- name: Wait for the alert
+  arubanetworks.aoscx.aoscx_nae_info:
+    agent_name: qa_lite_alert
+  register: wait_result
+  until: wait_result.nae.alerts | length > 0
+  retries: 20
+  delay: 10
+
+- name: Collect the NAE information
+  arubanetworks.aoscx.aoscx_nae_info:
+  register: info_result
+
+- name: Assert the alert is reported
+  ansible.builtin.assert:
+    that:
+      - info_result is not changed
+      - info_result.nae.aggregated_alert_level == 'CRITICAL'
+      - info_result.nae.alerts[0].alert_level == 'CRITICAL'
+      - info_result.nae.agents.qa_lite_alert.alerts_count >= 1
+      - info_result.nae.scripts.qa_lite_alert.origin == 'generated'
+      - info_result.nae.lite_agents.qa_lite_alert.state == 'AGENT_CREATED'
+      - "'system_resource_monitor' in info_result.nae.scripts"
+
+- name: Collect the conditions of the agent
+  arubanetworks.aoscx.aoscx_nae_info:
+    agent_name: qa_lite_alert
+    include_conditions: true
+  register: conditions_result
+
+- name: Assert the conditions are reported
+  ansible.builtin.assert:
+    that:
+      - conditions_result.nae.agents | length == 1
+      - conditions_result.nae.agents.qa_lite_alert.conditions | length >= 1
+
+- name: Delete the test agent
+  arubanetworks.aoscx.aoscx_nae_lite_agent:
+    name: qa_lite_alert
+    state: delete
