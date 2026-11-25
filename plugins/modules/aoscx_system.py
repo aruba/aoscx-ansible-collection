@@ -63,6 +63,21 @@ options:
     type: bool
     default: false
     required: false
+  virtual_mac:
+    description: >
+      Global virtual MAC address (C(virtual-mac) command), in the
+      xx:xx:xx:xx:xx:xx format. EVPN advertises it as the router MAC of the
+      symmetric IRB routes. This option is mutually exclusive with the
+      use_default_virtual_mac option.
+    type: str
+    required: false
+  use_default_virtual_mac:
+    description: >
+      Remove the global virtual MAC address (C(no virtual-mac)), this option
+      is mutually exclusive with the virtual_mac option.
+    type: bool
+    default: false
+    required: false
 """
 
 EXAMPLES = """
@@ -93,13 +108,24 @@ EXAMPLES = """
 - name: Set the global Schedule Profile to the switch's factory default
   aoscx_system:
     use_default_global_schedule_profile: true
+
+- name: Set the global virtual MAC address used by EVPN symmetric IRB
+  aoscx_system:
+    virtual_mac: "02:00:00:00:00:01"
+
+- name: Remove the global virtual MAC address
+  aoscx_system:
+    use_default_virtual_mac: true
 """
 
 RETURN = r""" # """
 
+import re
+
 from ansible.module_utils.basic import AnsibleModule
 
 try:
+    from pyaoscx.device import Device
     from pyaoscx.qos import Qos
     from pyaoscx.queue_profile import QueueProfile
 
@@ -111,6 +137,9 @@ if HAS_PYAOSCX:
     from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
         get_pyaoscx_session,
     )
+
+
+MAC_REGEX = re.compile(r"^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$")
 
 
 def get_argument_spec():
@@ -140,6 +169,16 @@ def get_argument_spec():
             "required": False,
             "default": False,
         },
+        "virtual_mac": {
+            "type": "str",
+            "required": False,
+            "default": None,
+        },
+        "use_default_virtual_mac": {
+            "type": "bool",
+            "required": False,
+            "default": False,
+        },
     }
     return argument_spec
 
@@ -151,10 +190,17 @@ def main():
         mutually_exclusive=[
             ("global_queue_profile", "use_default_global_queue_profile"),
             ("global_schedule_profile", "use_default_global_schedule_profile"),
+            ("virtual_mac", "use_default_virtual_mac"),
         ],
     )
 
     result = dict(changed=False)
+
+    virtual_mac = ansible_module.params["virtual_mac"]
+    if virtual_mac and not MAC_REGEX.match(virtual_mac):
+        ansible_module.fail_json(
+            msg="virtual_mac must be in the xx:xx:xx:xx:xx:xx format."
+        )
 
     if ansible_module.check_mode:
         ansible_module.exit_json(**result)
@@ -200,6 +246,12 @@ def main():
         result["changed"] |= QueueProfile.set_global_queue_profile(
             session, None
         )
+
+    if virtual_mac:
+        result["changed"] |= Device(session).set_virtual_mac(virtual_mac)
+
+    if ansible_module.params["use_default_virtual_mac"]:
+        result["changed"] |= Device(session).set_virtual_mac(None)
 
     ansible_module.exit_json(**result)
 
