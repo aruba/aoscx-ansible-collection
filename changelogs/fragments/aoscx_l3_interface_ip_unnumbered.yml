@@ -1,0 +1,6 @@
+minor_changes:
+  - aoscx_l3_interface - add the ``ip_unnumbered`` option to make a routed
+    port or L3 LAG borrow the primary IPv4 address of a loopback interface
+    (CLI ``ip unnumbered interface loopback <n>``), and to remove it with
+    the delete state (requires a pyaoscx version providing
+    ``Interface.set_ip_unnumbered``).

@@ -32,6 +32,7 @@ export ANSIBLE_AOSCX_REST_VERSION=10.09
 | `interface`                      | str  |                                           | [x]      | Interface name, should be in the format chassis/slot/port, e.g. 1/2/3                                                                                                                                                                                                                |
 | `ipv4`                           | list |                                           | [ ]      | The IPv4 address and subnet mask in the address/mask format. The first entry in the list is the primary IPv4, the remainings are secondary IPv4; to remove an IP address pass in the list and use the delete state.                                                                  |
 | `ipv6`                           | str  |                                           | [ ]      | The IPv6 address and subnet mask in the address/mask format. To remove an IP address pass in the list and use the delete state.                                                                                                                                                      |
+| `ip_unnumbered`                  | str  |                                           | [ ]      | Name of the loopback interface, e.g. `loopback0`, whose primary IPv4 address is borrowed by the interface (CLI `ip unnumbered interface loopback <n>`). Only supported on routed ports and L3 LAGs; the loopback must exist and belong to the same VRF as the interface. Cannot be used together with `ipv4`; the switch ignores the borrowed address while a static IPv4 address is configured on the interface, a warning is then returned. An empty string removes the IP unnumbered configuration, as does the delete state with the configured loopback name. Requires a pyaoscx version providing `Interface.set_ip_unnumbered`. |
 | `vrf`                            | str  |                                           | [ ]      | VRF to which the port belongs if the port is routing. If none provided, the interface will be in the Default VRF. If the VRF is removed or changed all configuration is erased from the interface.                                                             |
 | `interface_qos_schedule_profile` | dict |                                           | [ ]      | Attaching existing QoS schedule profile to interface. This parameter is deprecated and will be removed in a future version.                                                                                                                                                          |
 | `interface_qos_rate`             | dict |                                           | [ ]      | The rate limit value configured for broadcast/multicast/unknown unicast traffic. Dictionary should have the format `type_of_traffic`: speed e.g. {'unknown-unicast': '100pps', 'broadcast': '200pps', 'multicast': '200pps'}                                                         |
@@ -78,6 +79,18 @@ export ANSIBLE_AOSCX_REST_VERSION=10.09
     interface: 1/1/6
     ipv4:
       - 10.0.1.1/24
+    state: delete
+
+- name: Point-to-point underlay link 1/1/27 borrowing the loopback0 address
+  aoscx_l3_interface:
+    interface: 1/1/27
+    description: p2p to spine1
+    ip_unnumbered: loopback0
+
+- name: Remove IP unnumbered from L3 Interface 1/1/27
+  aoscx_l3_interface:
+    interface: 1/1/27
+    ip_unnumbered: loopback0
     state: delete
 
 - name: Delete VRF attach of the Interface 1/1/3

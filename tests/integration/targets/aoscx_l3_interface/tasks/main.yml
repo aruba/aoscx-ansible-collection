@@ -1,0 +1,84 @@
+# Integration tests for the IP unnumbered handling of the aoscx_l3_interface
+# module.
+#
+# Run with:
+#   ansible-test integration aoscx_l3_interface --venv
+#
+# Requires an inventory entry named "aoscx" reachable over httpapi, a free
+# physical port (l3_it_port, 1/1/25 by default) and an existing loopback0 in
+# the default VRF. The port is set back to its default configuration
+# afterwards.
+
+- name: Set the test port facts
+  ansible.builtin.set_fact:
+    l3_it_port: "{{ l3_it_port | default('1/1/25') }}"
+
+- name: Start from a default interface
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    state: delete
+
+- name: Borrow the loopback0 address
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    ip_unnumbered: loopback0
+  register: create_result
+
+- name: Re-apply the same lender
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    ip_unnumbered: loopback0
+  register: idempotent_result
+
+- name: Assert create changed and re-apply did not
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - idempotent_result is not changed
+
+- name: Use a lender that is not a loopback
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    ip_unnumbered: vlan1
+  register: invalid_result
+  ignore_errors: true
+
+- name: Use ipv4 together with ip_unnumbered
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    ipv4:
+      - 192.0.2.1/31
+    ip_unnumbered: loopback0
+  register: exclusive_result
+  ignore_errors: true
+
+- name: Assert invalid parameters are rejected
+  ansible.builtin.assert:
+    that:
+      - invalid_result is failed
+      - exclusive_result is failed
+
+- name: Remove the IP unnumbered configuration
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    ip_unnumbered: loopback0
+    state: delete
+  register: delete_result
+
+- name: Remove it again
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    ip_unnumbered: loopback0
+    state: delete
+  register: delete_again_result
+
+- name: Assert delete changed once
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_again_result is not changed
+
+- name: Set the port back to its default configuration
+  arubanetworks.aoscx.aoscx_l3_interface:
+    interface: "{{ l3_it_port }}"
+    state: delete
