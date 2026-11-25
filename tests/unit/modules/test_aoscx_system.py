@@ -3,8 +3,8 @@
 # (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 """
-Unit tests for the virtual_mac and gbp_enable options of the aoscx_system
-module.
+Unit tests for the virtual_mac, gbp_enable, internal_vlan_range and
+interface_groups options of the aoscx_system module.
 
 The pyaoscx session and Device are fully mocked, so no switch is required.
 """
@@ -21,6 +21,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ansible.module_utils import basic
+from pyaoscx.exceptions.parameter_error import ParameterError
+from pyaoscx.exceptions.unsupported_capability_error import (
+    UnsupportedCapabilityError,
+)
 from ansible.module_utils.common.text.converters import to_bytes
 
 try:
@@ -76,6 +80,8 @@ def run_module(args, changed=True, device=None):
         device = MagicMock()
         device.set_virtual_mac.return_value = changed
         device.set_gbp_enable.return_value = changed
+        device.set_internal_vlan_range.return_value = changed
+        device.set_interface_group_speed.return_value = changed
     with args_context:
         with patch(MODULE + ".get_pyaoscx_session", return_value=MagicMock()):
             with patch(MODULE + ".Device", return_value=device):
@@ -137,3 +143,74 @@ def test_gbp_enable_unsupported_pyaoscx_reports_error():
     result, _ = run_module({"gbp_enable": True}, device=device)
     assert result["failed"] is True
     assert "Upgrade pyaoscx" in result["msg"]
+
+
+def test_set_internal_vlan_range():
+    result, device = run_module(
+        {"internal_vlan_range": {"start": 3000, "end": 3999}}
+    )
+    assert result["changed"] is True
+    device.set_internal_vlan_range.assert_called_once_with(3000, 3999)
+
+
+def test_internal_vlan_range_unchanged():
+    result, _ = run_module(
+        {"internal_vlan_range": {"start": 3000, "end": 3999}}, changed=False
+    )
+    assert result["changed"] is False
+
+
+def test_internal_vlan_range_unsupported_platform_fails():
+    device = MagicMock()
+    device.set_internal_vlan_range.side_effect = UnsupportedCapabilityError(
+        "The internal VLAN range is not supported on this platform"
+    )
+    result, _ = run_module(
+        {"internal_vlan_range": {"start": 3000, "end": 3999}}, device=device
+    )
+    assert result["failed"] is True
+    assert "internal VLAN range" in result["msg"]
+
+
+def test_internal_vlan_range_unsupported_pyaoscx_reports_error():
+    device = MagicMock(spec=["set_virtual_mac"])
+    result, _ = run_module(
+        {"internal_vlan_range": {"start": 3000, "end": 3999}}, device=device
+    )
+    assert result["failed"] is True
+    assert "Upgrade pyaoscx" in result["msg"]
+
+
+def test_set_interface_groups():
+    result, device = run_module(
+        {
+            "interface_groups": [
+                {"group": 1, "speed": "10g"},
+                {"group": 2, "speed": "default", "line_module": "1/3"},
+            ]
+        }
+    )
+    assert result["changed"] is True
+    assert device.set_interface_group_speed.call_args_list == [
+        ((1, "10g"), {"line_module": None}),
+        ((2, None), {"line_module": "1/3"}),
+    ]
+
+
+def test_interface_groups_unchanged():
+    result, _ = run_module(
+        {"interface_groups": [{"group": 1, "speed": "10g"}]}, changed=False
+    )
+    assert result["changed"] is False
+
+
+def test_interface_groups_invalid_speed_fails():
+    device = MagicMock()
+    device.set_interface_group_speed.side_effect = ParameterError(
+        "Invalid speed 40g for interface group 1"
+    )
+    result, _ = run_module(
+        {"interface_groups": [{"group": 1, "speed": "40g"}]}, device=device
+    )
+    assert result["failed"] is True
+    assert "interface group 1" in result["msg"]
