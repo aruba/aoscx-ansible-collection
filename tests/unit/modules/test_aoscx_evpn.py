@@ -20,12 +20,18 @@ __metaclass__ = type
 
 import json
 
+from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from ansible.module_utils import basic
 from ansible.module_utils.common.text.converters import to_bytes
+
+try:
+    from ansible.module_utils.testing import patch_module_args
+except ImportError:  # ansible-core < 2.19
+    patch_module_args = None
 
 from ansible_collections.arubanetworks.aoscx.plugins.modules import (
     aoscx_evpn,
@@ -54,8 +60,11 @@ def fail_json(*args, **kwargs):
 
 
 def set_module_args(args):
+    if patch_module_args is not None:
+        return patch_module_args(args)
     serialized = json.dumps({"ANSIBLE_MODULE_ARGS": args})
     basic._ANSIBLE_ARGS = to_bytes(serialized)
+    return nullcontext()
 
 
 @pytest.fixture(autouse=True)
@@ -74,8 +83,10 @@ def build_evpn(
     mac_move_count=5,
     mac_move_timer=180,
     redistribute=None,
+    dyn_vxlan_tunnel_bridging_mode="no-bridging",
 ):
     evpn = MagicMock()
+    evpn.dyn_vxlan_tunnel_bridging_mode = dyn_vxlan_tunnel_bridging_mode
     evpn.arp_suppression_enable = arp_suppression_enable
     evpn.nd_suppression_enable = nd_suppression_enable
     evpn.mac_move_count = mac_move_count
@@ -102,10 +113,10 @@ def build_session(evpn):
 
 
 def run_module(args, session):
-    set_module_args(args)
-    with patch(MODULE + ".get_pyaoscx_session", return_value=session):
-        with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
-            aoscx_evpn.main()
+    with set_module_args(args):
+        with patch(MODULE + ".get_pyaoscx_session", return_value=session):
+            with pytest.raises((AnsibleExitJson, AnsibleFailJson)) as exc:
+                aoscx_evpn.main()
     return exc.value.args[0]
 
 
@@ -164,6 +175,56 @@ def test_redistribute_no_change():
     result = run_module({"redistribute": {"local-mac": True}}, session)
     assert result["changed"] is False
     evpn.update.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "current, wanted, changed",
+    [
+        ("no-bridging", "ibgp-ebgp", True),
+        ("ibgp-ebgp", "no-bridging", True),
+        ("ibgp-ebgp", "ibgp-ebgp", False),
+        # Attribute absent: firmware not supporting it, sent to fail
+        (None, "no-bridging", True),
+    ],
+)
+def test_dyn_vxlan_tunnel_bridging_mode(current, wanted, changed):
+    evpn = build_evpn(dyn_vxlan_tunnel_bridging_mode=current)
+    session = build_session(evpn)
+    result = run_module({"dyn_vxlan_tunnel_bridging_mode": wanted}, session)
+    assert result["changed"] is changed
+    if changed:
+        evpn.set_dyn_vxlan_tunnel_bridging_mode.assert_called_once_with(wanted)
+        evpn.update.assert_called_once()
+    else:
+        evpn.set_dyn_vxlan_tunnel_bridging_mode.assert_not_called()
+        evpn.update.assert_not_called()
+
+
+def test_dyn_vxlan_tunnel_bridging_mode_old_pyaoscx():
+    evpn = build_evpn()
+    del evpn.set_dyn_vxlan_tunnel_bridging_mode
+    session = build_session(evpn)
+    result = run_module(
+        {"dyn_vxlan_tunnel_bridging_mode": "ibgp-ebgp"}, session
+    )
+    assert result["failed"] is True
+    assert "Upgrade pyaoscx" in result["msg"]
+    evpn.update.assert_not_called()
+
+
+def test_dyn_vxlan_tunnel_bridging_mode_unsupported_by_switch():
+    evpn = build_evpn(dyn_vxlan_tunnel_bridging_mode=None)
+    evpn.update.side_effect = Exception(
+        "cannot modify the attribute: dyn_vxlan_tunnel_bridging_mode "
+        "(attribute probably not supported by this switch platform or "
+        "firmware version)"
+    )
+    session = build_session(evpn)
+    result = run_module(
+        {"dyn_vxlan_tunnel_bridging_mode": "ibgp-ebgp"}, session
+    )
+    assert result["failed"] is True
+    assert "probably not supported" in result["msg"]
 
 
 # --------------------------------------------------------------------------

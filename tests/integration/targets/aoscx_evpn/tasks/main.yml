@@ -41,3 +41,38 @@
   ansible.builtin.assert:
     that:
       - restore_result is changed
+
+# dyn_vxlan_tunnel_bridging_mode: the original value is found in check mode
+# (no change reported for the configured mode), then restored.
+- name: Detect the current dyn_vxlan_tunnel_bridging_mode
+  arubanetworks.aoscx.aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: ibgp-ebgp
+  check_mode: true
+  register: bridging_probe
+
+- name: Set the bridging mode to change
+  ansible.builtin.set_fact:
+    bridging_original: "{{ 'no-bridging' if bridging_probe is changed else 'ibgp-ebgp' }}"
+    bridging_new: "{{ 'ibgp-ebgp' if bridging_probe is changed else 'no-bridging' }}"
+
+- name: Change the dyn_vxlan_tunnel_bridging_mode
+  arubanetworks.aoscx.aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: "{{ bridging_new }}"
+  register: bridging_change
+
+- name: Re-apply the same dyn_vxlan_tunnel_bridging_mode
+  arubanetworks.aoscx.aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: "{{ bridging_new }}"
+  register: bridging_idem
+
+- name: Restore the dyn_vxlan_tunnel_bridging_mode
+  arubanetworks.aoscx.aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: "{{ bridging_original }}"
+  register: bridging_restore
+
+- name: Assert the dyn_vxlan_tunnel_bridging_mode results
+  ansible.builtin.assert:
+    that:
+      - bridging_change is changed
+      - bridging_idem is not changed
+      - bridging_restore is changed

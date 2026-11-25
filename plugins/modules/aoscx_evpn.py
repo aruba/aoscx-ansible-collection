@@ -60,6 +60,21 @@ options:
       When omitted it is left unchanged.
     required: false
     type: dict
+  dyn_vxlan_tunnel_bridging_mode:
+    description: >
+      Bridging mode between dynamic (EVPN) VXLAN tunnels. C(ibgp-ebgp)
+      (CLI C(dyn-vxlan-tunnel-bridging-mode ibgp-ebgp)) puts the iBGP and
+      eBGP tunnels in different broadcast groups and permits bridging
+      between them, for example between two fabrics interconnected by
+      border leaves. C(no-bridging) (default of the switch, CLI
+      C(no dyn-vxlan-tunnel-bridging-mode ibgp-ebgp)) puts all EVPN tunnels
+      in the same broadcast group. The module fails if the switch platform
+      or firmware does not support it. When omitted it is left unchanged.
+    required: false
+    type: str
+    choices:
+      - no-bridging
+      - ibgp-ebgp
   state:
     description: >
       Use C(create) or C(update) to apply the configuration. Both behave
@@ -88,6 +103,14 @@ EXAMPLES = """
     redistribute:
       local-mac: true
       local-svi: true
+
+- name: Permit bridging between iBGP and eBGP EVPN tunnels on a border leaf
+  aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: ibgp-ebgp
+
+- name: Put back all EVPN tunnels in the same broadcast group (default)
+  aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: no-bridging
 """
 
 RETURN = r"""
@@ -110,6 +133,11 @@ def main():
         mac_move_count=dict(type="int", default=None),
         mac_move_timer=dict(type="int", default=None),
         redistribute=dict(type="dict", default=None),
+        dyn_vxlan_tunnel_bridging_mode=dict(
+            type="str",
+            default=None,
+            choices=["no-bridging", "ibgp-ebgp"],
+        ),
         state=dict(
             type="str",
             default="update",
@@ -126,6 +154,7 @@ def main():
     mac_move_count = ansible_module.params["mac_move_count"]
     mac_move_timer = ansible_module.params["mac_move_timer"]
     redistribute = ansible_module.params["redistribute"]
+    bridging_mode = ansible_module.params["dyn_vxlan_tunnel_bridging_mode"]
 
     result = dict(changed=False)
 
@@ -178,6 +207,19 @@ def main():
         if merged != current:
             changed = True
             evpn.redistribute = merged
+
+    if bridging_mode is not None and (
+        getattr(evpn, "dyn_vxlan_tunnel_bridging_mode", None) != bridging_mode
+    ):
+        if not hasattr(evpn, "set_dyn_vxlan_tunnel_bridging_mode"):
+            ansible_module.fail_json(
+                msg=(
+                    "This pyaoscx version does not support "
+                    "dyn_vxlan_tunnel_bridging_mode. Upgrade pyaoscx."
+                )
+            )
+        changed = True
+        evpn.set_dyn_vxlan_tunnel_bridging_mode(bridging_mode)
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:

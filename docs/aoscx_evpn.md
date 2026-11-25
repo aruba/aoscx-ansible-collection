@@ -41,6 +41,21 @@ parameter left unset is preserved.
       left unchanged.
     required: false
     type: dict
+  dyn_vxlan_tunnel_bridging_mode:
+    description: >
+      Bridging mode between dynamic (EVPN) VXLAN tunnels. ibgp-ebgp (CLI
+      dyn-vxlan-tunnel-bridging-mode ibgp-ebgp) puts the iBGP and eBGP tunnels
+      in different broadcast groups and permits bridging between them, for
+      example between two fabrics interconnected by border leaves.
+      no-bridging (default of the switch, CLI no dyn-vxlan-tunnel-bridging-mode
+      ibgp-ebgp) puts all EVPN tunnels in the same broadcast group. The module
+      fails if the switch platform or firmware does not support it. When
+      omitted it is left unchanged.
+    required: false
+    type: str
+    choices:
+      - no-bridging
+      - ibgp-ebgp
   state:
     description: >
       Use create or update to apply the configuration. Both behave the same
@@ -71,4 +86,12 @@ parameter left unset is preserved.
     redistribute:
       local-mac: true
       local-svi: true
+
+- name: Permit bridging between iBGP and eBGP EVPN tunnels on a border leaf
+  aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: ibgp-ebgp
+
+- name: Put back all EVPN tunnels in the same broadcast group (default)
+  aoscx_evpn:
+    dyn_vxlan_tunnel_bridging_mode: no-bridging
 ```
