@@ -52,6 +52,20 @@ options:
     type: list
     elements: str
     required: false
+  ip_unnumbered:
+    description: >
+      Name of the loopback interface, e.g. loopback0, whose primary IPv4
+      address is borrowed by the interface (CLI
+      C(ip unnumbered interface loopback <n>)). Only supported on routed
+      ports and L3 LAGs; the loopback must exist and belong to the same VRF
+      as the interface. Cannot be used together with I(ipv4); the switch
+      ignores the borrowed address while a static IPv4 address is configured
+      on the interface, a warning is then returned. An empty string removes
+      the IP unnumbered configuration, as does the delete state with the
+      configured loopback name. Requires a pyaoscx version providing
+      C(Interface.set_ip_unnumbered).
+    type: str
+    required: false
   vrf:
     description: >
       VRF to which the port belongs if the port is routing. If none provided,
@@ -135,6 +149,18 @@ EXAMPLES = """
       - 10.0.1.1/24
     state: delete
 
+- name: Point-to-point underlay link 1/1/27 borrowing the loopback0 address
+  aoscx_l3_interface:
+    interface: 1/1/27
+    description: p2p to spine1
+    ip_unnumbered: loopback0
+
+- name: Remove IP unnumbered from L3 Interface 1/1/27
+  aoscx_l3_interface:
+    interface: 1/1/27
+    ip_unnumbered: loopback0
+    state: delete
+
 - name: Delete VRF attach of the Interface 1/1/3
   aoscx_l3_interface:
     interface: 1/1/3
@@ -173,6 +199,7 @@ def main():
         description=dict(type="str", default=None),
         ipv4=dict(type="list", elements="str", default=None),
         ipv6=dict(type="list", elements="str", default=None),
+        ip_unnumbered=dict(type="str", default=None),
         interface_qos_schedule_profile=dict(type="dict", default=None),
         interface_qos_rate=dict(type="dict", default=None),
         vrf=dict(type="str", default=None),
@@ -188,6 +215,7 @@ def main():
     description = ansible_module.params["description"]
     ipv4 = ansible_module.params["ipv4"]
     ipv6 = ansible_module.params["ipv6"]
+    ip_unnumbered = ansible_module.params["ip_unnumbered"]
     vrf = ansible_module.params["vrf"]
     ip_helper_addresses = ansible_module.params["ip_helper_address"]
     state = ansible_module.params["state"]
@@ -197,6 +225,11 @@ def main():
         ipv4 = []
     if ipv6 == [""]:
         ipv6 = []
+
+    if ipv4 and ip_unnumbered:
+        ansible_module.fail_json(
+            msg="parameters are mutually exclusive: ipv4|ip_unnumbered"
+        )
 
     # Set result var
     result = dict(changed=False)
@@ -218,10 +251,23 @@ def main():
         )
     device = Device(session)
     interface = device.interface(interface_name)
+    if ip_unnumbered is not None and not hasattr(
+        interface, "set_ip_unnumbered"
+    ):
+        ansible_module.fail_json(
+            msg="ip_unnumbered requires a pyaoscx version providing "
+            "Interface.set_ip_unnumbered, please upgrade pyaoscx."
+        )
     modified = interface.modified
     exists = not modified
 
-    if state == "delete" and not ipv4 and not ipv6 and not vrf:
+    if (
+        state == "delete"
+        and not ipv4
+        and not ipv6
+        and not vrf
+        and not ip_unnumbered
+    ):
 
         is_special_type = interface.type in [
             "lag",
@@ -263,6 +309,8 @@ def main():
     else:
         new_ipv6_list = None
         new_ipv4_list = None
+        new_ip_unnumbered = None
+        current_ip_unnumbered = getattr(interface, "ip_unnumbered", None)
         # Verify if interface was create
         if interface.was_modified():
             # Changed
@@ -294,14 +342,17 @@ def main():
                 modified |= interface.ip6_addresses is not None and set(
                     new_ipv6_list
                 ) != set(ipv6_str)
+            if vrf is None and ip_unnumbered:
+                if current_ip_unnumbered == ip_unnumbered:
+                    new_ip_unnumbered = ""
+                    modified = True
             if vrf:
                 modified |= interface.vrf is not None
                 vrf_def = "default"
-                interface.configure_l3(
-                    ipv4=[],
-                    ipv6=[],
-                    vrf=vrf_def,
-                )
+                l3_args = dict(ipv4=[], ipv6=[], vrf=vrf_def)
+                if current_ip_unnumbered:
+                    l3_args["ip_unnumbered"] = ""
+                interface.configure_l3(**l3_args)
                 vrf = interface.vrf.name
             vrf = (
                 interface.vrf.name if interface.vrf is not None else "default"
@@ -376,13 +427,36 @@ def main():
                     set(ipv6_str) != set(new_ipv6_list)
                 )
 
-        try:
-            interface.configure_l3(
-                ipv4=new_ipv4_list,
-                ipv6=new_ipv6_list,
-                vrf=vrf,
-                description=description,
+            if ip_unnumbered is not None:
+                new_ip_unnumbered = ip_unnumbered
+                modified |= (current_ip_unnumbered or "") != ip_unnumbered
+            elif modified_vrf and current_ip_unnumbered:
+                # The loopback is in the previous VRF
+                new_ip_unnumbered = ""
+
+            static_ipv4 = (
+                new_ipv4_list
+                if new_ipv4_list is not None
+                else interface.ip4_address
             )
+            if new_ip_unnumbered and static_ipv4:
+                ansible_module.warn(
+                    "Interface {0} has a static IPv4 address, the switch "
+                    "ignores ip_unnumbered until it is removed".format(
+                        interface_name
+                    )
+                )
+
+        l3_args = dict(
+            ipv4=new_ipv4_list,
+            ipv6=new_ipv6_list,
+            vrf=vrf,
+            description=description,
+        )
+        if new_ip_unnumbered is not None:
+            l3_args["ip_unnumbered"] = new_ip_unnumbered
+        try:
+            interface.configure_l3(**l3_args)
         except Exception as e:
             ansible_module.fail_json(msg=str(e))
 
