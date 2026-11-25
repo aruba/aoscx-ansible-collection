@@ -1,0 +1,5 @@
+minor_changes:
+  - aoscx_vxlan_interface - add the ``inter_vxlan_bridging_mode`` option
+    (``deny``, ``static-evpn``, ``static-all``) to manage the CLI
+    ``inter-vxlan-bridging-mode`` setting of the VXLAN interface (requires a
+    pyaoscx version providing ``Interface.set_inter_vxlan_bridging_mode``).

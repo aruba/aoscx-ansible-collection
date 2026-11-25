@@ -86,3 +86,35 @@ def get_pyaoscx_session(ansible_module):
     base_url = ansible_module_session_info["url"]
     auth = ansible_module_session_info["credentials"]
     return PyaoscxSession.from_session(requests_session, base_url, credentials=auth)
+
+
+def pyaoscx_error_message(session, feature, exc):
+    """
+    Build the failure message of a pyaoscx error raised while configuring
+    feature. The switch answers 404, 405 or 415 when it does not know the
+    resource or request format, and 400 "invalid attribute" (already flagged
+    by pyaoscx) when its firmware does not know an attribute; in these cases
+    the platform, firmware and REST API version are added to the message.
+    """
+    code = getattr(exc, "response_code", None)
+    detail = getattr(exc, "message", None) or str(exc)
+    detail = str(detail).strip()
+    msg = "{0}: {1}".format(feature, detail)
+    if code:
+        msg += " (HTTP {0})".format(code)
+    if code in (404, 405, 415) and "not supported" not in detail:
+        msg += ", probably not supported by this switch"
+    if code in (404, 405, 415) or "not supported" in detail:
+        try:
+            firmware_resp = session.request("GET", "firmware")
+            system_resp = session.request(
+                "GET", "system", params={"attributes": "platform_name"}
+            )
+            msg += ". Switch: {0}, firmware {1}, REST API v{2}".format(
+                system_resp.json().get("platform_name"),
+                firmware_resp.json().get("current_version"),
+                session.api,
+            )
+        except Exception:
+            pass
+    return msg
