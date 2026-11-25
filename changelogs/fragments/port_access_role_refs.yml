@@ -1,0 +1,5 @@
+---
+minor_changes:
+  - aoscx_port_access_role - add the C(macsec_policy) and C(ipfix_flow_monitor)
+    options to associate a MACsec policy and per-address-family IPFIX flow
+    monitors with a port access role.
