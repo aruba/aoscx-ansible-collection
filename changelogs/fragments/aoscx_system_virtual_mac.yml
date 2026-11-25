@@ -1,0 +1,5 @@
+minor_changes:
+  - aoscx_system - add the ``virtual_mac`` option to set the global virtual
+    MAC address (``virtual-mac``) advertised by EVPN as the router MAC of the
+    symmetric IRB routes, and the ``use_default_virtual_mac`` option to remove
+    it. Requires a pyaoscx release that ships ``Device.set_virtual_mac()``.
