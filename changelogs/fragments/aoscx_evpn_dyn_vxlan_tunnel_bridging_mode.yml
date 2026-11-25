@@ -1,0 +1,7 @@
+minor_changes:
+  - aoscx_evpn - add the ``dyn_vxlan_tunnel_bridging_mode`` option
+    (``no-bridging`` or ``ibgp-ebgp``) to manage the bridging between the
+    iBGP and eBGP dynamic VXLAN tunnels (CLI
+    ``dyn-vxlan-tunnel-bridging-mode ibgp-ebgp`` in the EVPN context). The
+    module fails when the switch does not support it (requires a pyaoscx
+    version providing ``Evpn.set_dyn_vxlan_tunnel_bridging_mode``).
