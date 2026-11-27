@@ -21,6 +21,23 @@ parameter left unset is preserved.
       omitted it is left unchanged.
     required: false
     type: bool
+  arp_suppression_extended_enable:
+    description: >
+      Whether ARP suppression extended is globally enabled (CLI
+      arp-suppression-extended). It cannot be enabled together with
+      arp_suppression_enable: to migrate, disable the latter in the same
+      task. When omitted it is left unchanged. Requires a pyaoscx version
+      providing Evpn.check_suppression().
+    required: false
+    type: bool
+  nd_suppression_extended_enable:
+    description: >
+      Whether ND suppression extended is globally enabled (CLI
+      nd-suppression-extended). Same behavior as
+      arp_suppression_extended_enable, and cannot be enabled together with
+      nd_suppression_enable. When omitted it is left unchanged.
+    required: false
+    type: bool
   mac_move_count:
     description: >
       Maximum number of MAC moves allowed within the MAC move interval before
@@ -94,4 +111,9 @@ parameter left unset is preserved.
 - name: Put back all EVPN tunnels in the same broadcast group (default)
   aoscx_evpn:
     dyn_vxlan_tunnel_bridging_mode: no-bridging
+
+- name: Migrate the global ARP and ND suppression to the extended versions
+  aoscx_evpn:
+    arp_suppression_enable: false
+    arp_suppression_extended_enable: true
 ```

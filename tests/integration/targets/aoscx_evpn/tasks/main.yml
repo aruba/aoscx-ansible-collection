@@ -76,3 +76,26 @@
       - bridging_change is changed
       - bridging_idem is not changed
       - bridging_restore is changed
+
+# The extended ND suppression is expected to be disabled by default, as is
+# the plain one: enable it, check idempotency, then disable it again.
+- name: Enable the global ND suppression extended
+  arubanetworks.aoscx.aoscx_evpn:
+    nd_suppression_enable: false
+    nd_suppression_extended_enable: true
+  register: nd_extended
+
+- name: Enable the global ND suppression extended again
+  arubanetworks.aoscx.aoscx_evpn:
+    nd_suppression_enable: false
+    nd_suppression_extended_enable: true
+  register: nd_extended_idem
+
+- name: Disable the global ND suppression extended
+  arubanetworks.aoscx.aoscx_evpn:
+    nd_suppression_extended_enable: false
+
+- name: Assert the ND suppression extended was changed once
+  ansible.builtin.assert:
+    that:
+      - nd_extended_idem is not changed

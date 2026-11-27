@@ -64,6 +64,99 @@ options:
       unchanged. Ignored when I(state) is C(delete).
     required: false
     type: dict
+  arp_suppression:
+    description: >
+      ARP suppression for this VLAN (CLI C(arp-suppression enable|disable) in
+      the C(evpn) / C(vlan) context). C(enable) and C(disable) override the
+      global C(arp_suppression_enable) of M(arubanetworks.aoscx.aoscx_evpn),
+      C(global) removes the override so that the VLAN follows the global
+      setting again. Cannot be enabled together with
+      I(arp_suppression_extended). When omitted it is left unchanged. Ignored
+      when I(state) is C(delete). Requires a pyaoscx version providing
+      C(EvpnVlan.set_suppression()).
+    required: false
+    type: str
+    choices:
+      - enable
+      - disable
+      - global
+  arp_suppression_extended:
+    description: >
+      ARP suppression extended for this VLAN (CLI
+      C(arp-suppression-extended enable|disable)). It also suppresses on L2
+      VLANs and not only on active gateway SVIs. Same values and behavior as
+      I(arp_suppression), the global setting is
+      C(arp_suppression_extended_enable) of
+      M(arubanetworks.aoscx.aoscx_evpn). Cannot be enabled together with
+      I(arp_suppression). When omitted it is left unchanged. Ignored when
+      I(state) is C(delete).
+    required: false
+    type: str
+    choices:
+      - enable
+      - disable
+      - global
+  nd_suppression:
+    description: >
+      Neighbor Discovery (ND) suppression for this VLAN (CLI
+      C(nd-suppression enable|disable)). Same values and behavior as
+      I(arp_suppression), the global setting is C(nd_suppression_enable) of
+      M(arubanetworks.aoscx.aoscx_evpn). Cannot be enabled together with
+      I(nd_suppression_extended). When omitted it is left unchanged. Ignored
+      when I(state) is C(delete).
+    required: false
+    type: str
+    choices:
+      - enable
+      - disable
+      - global
+  nd_suppression_extended:
+    description: >
+      ND suppression extended for this VLAN (CLI
+      C(nd-suppression-extended enable|disable)). Same values and behavior
+      as I(arp_suppression_extended), the global setting is
+      C(nd_suppression_extended_enable) of
+      M(arubanetworks.aoscx.aoscx_evpn). Cannot be enabled together with
+      I(nd_suppression). When omitted it is left unchanged. Ignored when
+      I(state) is C(delete).
+    required: false
+    type: str
+    choices:
+      - enable
+      - disable
+      - global
+  arp_suppression_exclude:
+    description: >
+      IPv4 addresses excluded from ARP suppression, whose ARP requests are
+      flooded in the fabric (CLI C(arp-suppression exclude <ip>)). The list
+      replaces the current one and is compared regardless of order, an empty
+      list removes all the exclusions. At most 256 addresses. When omitted it
+      is left unchanged. Ignored when I(state) is C(delete).
+    required: false
+    type: list
+    elements: str
+  arp_suppression_extended_exclude:
+    description: >
+      IPv4 addresses excluded from ARP suppression extended. Same behavior as
+      I(arp_suppression_exclude).
+    required: false
+    type: list
+    elements: str
+  nd_suppression_exclude:
+    description: >
+      IPv6 addresses excluded from ND suppression (CLI
+      C(nd-suppression exclude <ip>)). Same behavior as
+      I(arp_suppression_exclude).
+    required: false
+    type: list
+    elements: str
+  nd_suppression_extended_exclude:
+    description: >
+      IPv6 addresses excluded from ND suppression extended. Same behavior as
+      I(arp_suppression_exclude).
+    required: false
+    type: list
+    elements: str
   state:
     description: Create, update or delete the per-VLAN EVPN entry.
     required: false
@@ -101,6 +194,29 @@ EXAMPLES = """
   aoscx_evpn_vlan:
     vlan: 204
     state: delete
+
+- name: Enable ARP suppression on VLAN 204 whatever the global setting is
+  aoscx_evpn_vlan:
+    vlan: 204
+    arp_suppression: enable
+    arp_suppression_exclude:
+      - 10.204.0.1
+      - 10.204.0.2
+
+- name: Migrate VLAN 204 to ARP and ND suppression extended
+  aoscx_evpn_vlan:
+    vlan: 204
+    arp_suppression: disable
+    arp_suppression_extended: enable
+    nd_suppression_extended: enable
+    nd_suppression_extended_exclude:
+      - "fd00:204::1"
+
+- name: Follow the global ARP suppression again and remove the exclusions
+  aoscx_evpn_vlan:
+    vlan: 204
+    arp_suppression: global
+    arp_suppression_exclude: []
 """
 
 RETURN = r"""
@@ -119,6 +235,42 @@ from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx 
 MIN_VLAN_ID = 1
 MAX_VLAN_ID = 4094
 
+# SDK suppression feature -> (mode option, exclusion list option)
+SUPPRESSION_OPTIONS = {
+    "arp": ("arp_suppression", "arp_suppression_exclude"),
+    "arp_extended": (
+        "arp_suppression_extended",
+        "arp_suppression_extended_exclude",
+    ),
+    "nd": ("nd_suppression", "nd_suppression_exclude"),
+    "nd_extended": (
+        "nd_suppression_extended",
+        "nd_suppression_extended_exclude",
+    ),
+}
+
+
+def apply_suppression(evpn_vlan, params):
+    """
+    Set the suppression modes and exclusion lists supplied by the user on the
+    EvpnVlan object, nothing is sent to the switch.
+
+    :return: True if one of them differs from the current configuration.
+    """
+    changed = False
+    for feature, (mode_option, exclude_option) in SUPPRESSION_OPTIONS.items():
+        mode = params[mode_option]
+        if mode is not None:
+            # "global" removes the override of the global setting
+            value = None if mode == "global" else mode
+            if evpn_vlan.set_suppression(feature, value):
+                changed = True
+        addresses = params[exclude_option]
+        if addresses is not None:
+            if evpn_vlan.set_suppression_ip_exemption(feature, addresses):
+                changed = True
+    return changed
+
 
 def main():
     module_args = dict(
@@ -127,6 +279,28 @@ def main():
         import_route_targets=dict(type="list", elements="str", default=None),
         export_route_targets=dict(type="list", elements="str", default=None),
         redistribute=dict(type="dict", default=None),
+        arp_suppression=dict(
+            type="str", default=None, choices=["enable", "disable", "global"]
+        ),
+        arp_suppression_extended=dict(
+            type="str", default=None, choices=["enable", "disable", "global"]
+        ),
+        nd_suppression=dict(
+            type="str", default=None, choices=["enable", "disable", "global"]
+        ),
+        nd_suppression_extended=dict(
+            type="str", default=None, choices=["enable", "disable", "global"]
+        ),
+        arp_suppression_exclude=dict(
+            type="list", elements="str", default=None
+        ),
+        arp_suppression_extended_exclude=dict(
+            type="list", elements="str", default=None
+        ),
+        nd_suppression_exclude=dict(type="list", elements="str", default=None),
+        nd_suppression_extended_exclude=dict(
+            type="list", elements="str", default=None
+        ),
         state=dict(
             type="str",
             default="create",
@@ -147,6 +321,11 @@ def main():
 
     result = dict(changed=False)
 
+    suppression_requested = any(
+        ansible_module.params[option] is not None
+        for options in SUPPRESSION_OPTIONS.values()
+        for option in options
+    )
     if not MIN_VLAN_ID <= vlan <= MAX_VLAN_ID:
         ansible_module.fail_json(
             msg="vlan must be between {0} and {1}.".format(
@@ -199,6 +378,17 @@ def main():
         )
 
     # ------------------------------------------------------- create / update
+    if suppression_requested and not hasattr(
+        evpn_vlan, "set_suppression_ip_exemption"
+    ):
+        ansible_module.fail_json(
+            msg=(
+                "The suppression options require a pyaoscx version "
+                "providing EvpnVlan.set_suppression() and "
+                "EvpnVlan.set_suppression_ip_exemption(). Upgrade pyaoscx."
+            )
+        )
+
     if not exists:
         kwargs = {}
         if rd is not None:
@@ -210,6 +400,14 @@ def main():
         if redistribute is not None:
             kwargs["redistribute"] = redistribute
         evpn_vlan = session.api.get_module(session, "EvpnVlan", vlan, **kwargs)
+        try:
+            if suppression_requested:
+                apply_suppression(evpn_vlan, ansible_module.params)
+                evpn_vlan.check_suppression()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Invalid suppression configuration: {0}".format(str(e))
+            )
         result["changed"] = True
         if not ansible_module.check_mode:
             try:
@@ -248,6 +446,16 @@ def main():
         if merged != current:
             changed = True
             evpn_vlan.redistribute = merged
+
+    if suppression_requested:
+        try:
+            if apply_suppression(evpn_vlan, ansible_module.params):
+                changed = True
+            evpn_vlan.check_suppression()
+        except Exception as e:
+            ansible_module.fail_json(
+                msg="Invalid suppression configuration: {0}".format(str(e))
+            )
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:

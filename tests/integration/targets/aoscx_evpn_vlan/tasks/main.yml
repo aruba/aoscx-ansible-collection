@@ -61,6 +61,51 @@
     that:
       - update_result is changed
 
+- name: Enable ARP suppression with an exclusion and ND suppression extended
+  arubanetworks.aoscx.aoscx_evpn_vlan:
+    vlan: 3999
+    state: update
+    arp_suppression: enable
+    arp_suppression_exclude:
+      - 10.39.99.1
+    nd_suppression_extended: enable
+    nd_suppression_extended_exclude:
+      - "fd00:3999::1"
+  register: suppression_result
+
+- name: Re-apply the suppression settings
+  arubanetworks.aoscx.aoscx_evpn_vlan:
+    vlan: 3999
+    state: update
+    arp_suppression: enable
+    arp_suppression_exclude:
+      - 10.39.99.1
+    nd_suppression_extended: enable
+    nd_suppression_extended_exclude:
+      - "fd00:3999::1"
+  register: suppression_idem
+
+- name: Assert the suppression settings were applied once
+  ansible.builtin.assert:
+    that:
+      - suppression_result is changed
+      - suppression_idem is not changed
+
+- name: Follow the global setting again and remove the exclusions
+  arubanetworks.aoscx.aoscx_evpn_vlan:
+    vlan: 3999
+    state: update
+    arp_suppression: global
+    arp_suppression_exclude: []
+    nd_suppression_extended: global
+    nd_suppression_extended_exclude: []
+  register: suppression_reset
+
+- name: Assert the reset changed
+  ansible.builtin.assert:
+    that:
+      - suppression_reset is changed
+
 - name: Delete the EVPN VLAN
   arubanetworks.aoscx.aoscx_evpn_vlan:
     vlan: 3999

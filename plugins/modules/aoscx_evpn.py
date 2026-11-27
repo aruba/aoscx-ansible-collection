@@ -40,6 +40,25 @@ options:
       omitted it is left unchanged.
     required: false
     type: bool
+  arp_suppression_extended_enable:
+    description: >
+      Whether ARP suppression extended is globally enabled (CLI
+      C(arp-suppression-extended)). It suppresses ARP requests on L2 VLANs as
+      well as on active gateway SVIs, and cannot be enabled together with
+      I(arp_suppression_enable): to migrate, disable the latter in the same
+      task. A VLAN can override it, see
+      M(arubanetworks.aoscx.aoscx_evpn_vlan). When omitted it is left
+      unchanged. Requires a pyaoscx version providing C(Evpn.check_suppression()).
+    required: false
+    type: bool
+  nd_suppression_extended_enable:
+    description: >
+      Whether ND suppression extended is globally enabled (CLI
+      C(nd-suppression-extended)). Same behavior as
+      I(arp_suppression_extended_enable), and cannot be enabled together with
+      I(nd_suppression_enable). When omitted it is left unchanged.
+    required: false
+    type: bool
   mac_move_count:
     description: >
       Maximum number of MAC moves allowed within the MAC move interval
@@ -111,6 +130,13 @@ EXAMPLES = """
 - name: Put back all EVPN tunnels in the same broadcast group (default)
   aoscx_evpn:
     dyn_vxlan_tunnel_bridging_mode: no-bridging
+
+- name: Migrate the global ARP and ND suppression to the extended versions
+  aoscx_evpn:
+    arp_suppression_enable: false
+    arp_suppression_extended_enable: true
+    nd_suppression_enable: false
+    nd_suppression_extended_enable: true
 """
 
 RETURN = r"""
@@ -130,6 +156,8 @@ def main():
     module_args = dict(
         arp_suppression_enable=dict(type="bool", default=None),
         nd_suppression_enable=dict(type="bool", default=None),
+        arp_suppression_extended_enable=dict(type="bool", default=None),
+        nd_suppression_extended_enable=dict(type="bool", default=None),
         mac_move_count=dict(type="int", default=None),
         mac_move_timer=dict(type="int", default=None),
         redistribute=dict(type="dict", default=None),
@@ -151,6 +179,12 @@ def main():
 
     arp_suppression_enable = ansible_module.params["arp_suppression_enable"]
     nd_suppression_enable = ansible_module.params["nd_suppression_enable"]
+    arp_suppression_extended_enable = ansible_module.params[
+        "arp_suppression_extended_enable"
+    ]
+    nd_suppression_extended_enable = ansible_module.params[
+        "nd_suppression_extended_enable"
+    ]
     mac_move_count = ansible_module.params["mac_move_count"]
     mac_move_timer = ansible_module.params["mac_move_timer"]
     redistribute = ansible_module.params["redistribute"]
@@ -188,12 +222,19 @@ def main():
     scalars = {
         "arp_suppression_enable": arp_suppression_enable,
         "nd_suppression_enable": nd_suppression_enable,
+        "arp_suppression_extended_enable": arp_suppression_extended_enable,
+        "nd_suppression_extended_enable": nd_suppression_extended_enable,
         "mac_move_count": mac_move_count,
         "mac_move_timer": mac_move_timer,
     }
     for attr, value in scalars.items():
         if value is None:
             continue
+        if attr.endswith("_extended_enable") and attr not in evpn.config_attrs:
+            ansible_module.fail_json(
+                msg="{0} is not supported by the firmware of the "
+                "switch.".format(attr)
+            )
         if getattr(evpn, attr, None) != value:
             changed = True
             setattr(evpn, attr, value)
@@ -220,6 +261,28 @@ def main():
             )
         changed = True
         evpn.set_dyn_vxlan_tunnel_bridging_mode(bridging_mode)
+
+    if changed:
+        extended_requested = (
+            arp_suppression_extended_enable is not None
+            or nd_suppression_extended_enable is not None
+        )
+        if hasattr(evpn, "check_suppression"):
+            # A dry run must refuse what the real run would refuse
+            try:
+                evpn.check_suppression()
+            except Exception as e:
+                ansible_module.fail_json(
+                    msg="Invalid suppression configuration: {0}".format(str(e))
+                )
+        elif extended_requested:
+            ansible_module.fail_json(
+                msg=(
+                    "The extended suppression options require a pyaoscx "
+                    "version providing Evpn.check_suppression(). Upgrade "
+                    "pyaoscx."
+                )
+            )
 
     result["changed"] = changed
     if changed and not ansible_module.check_mode:
