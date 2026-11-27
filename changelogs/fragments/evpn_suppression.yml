@@ -1,0 +1,3 @@
+minor_changes:
+  - aoscx_evpn_vlan - Add the ``arp_suppression``, ``arp_suppression_extended``, ``nd_suppression`` and ``nd_suppression_extended`` options, and their ``*_exclude`` lists, to configure the ARP/ND suppression of an EVPN VLAN (requires a pyaoscx version providing ``EvpnVlan.set_suppression()``).
+  - aoscx_evpn - Add the ``arp_suppression_extended_enable`` and ``nd_suppression_extended_enable`` options to enable the extended ARP/ND suppression globally.
