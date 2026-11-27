@@ -1,0 +1,9 @@
+---
+minor_changes:
+  - aoscx_interfaces - new module to configure a list of interfaces in a
+    single task (description, admin state, MTU, loop protection, application
+    recognition, access or trunk VLANs, spanning tree, port access, 802.1X and
+    MAC authentication). One REST session is reused for every interface, which
+    avoids one task per interface and per feature on switches with many
+    ports. The dot1x and mac_auth settings require a pyaoscx release that
+    ships the PortAccessAuthConfiguration class.
