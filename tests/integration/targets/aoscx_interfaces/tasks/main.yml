@@ -1,0 +1,78 @@
+# Integration tests for the aoscx_interfaces module.
+#
+# Run with:
+#   ansible-test integration aoscx_interfaces --venv
+#
+# Requires an inventory entry named "aoscx" with REST API version 10.16 and a
+# pyaoscx release that ships the PortAccessAuthConfiguration class. Uses the
+# free ports 1/1/20 and 1/1/21 and resets the settings it changed.
+
+- name: Access port settings
+  ansible.builtin.set_fact:
+    test_ports:
+      - name: 1/1/20
+        description: ansible-test
+        vlan_mode: access
+        vlan_access: 1
+        stp: {admin_edge: true, bpdu_guard: true}
+        port_access: {client_limit: 2, allow_bpdu: [cdp, lldp]}
+        dot1x: {auth_enable: true, reauth_period: 86400}
+      - name: 1/1/21
+        description: ansible-test
+        vlan_mode: access
+        vlan_access: 1
+        mac_auth: {auth_enable: true, quiet_period: 30}
+
+- name: Configure the ports (check mode)
+  arubanetworks.aoscx.aoscx_interfaces:
+    interfaces: "{{ test_ports }}"
+  check_mode: true
+  register: result
+
+- name: Assert check mode reports the change
+  ansible.builtin.assert:
+    that:
+      - result.changed
+      - result.changed_interfaces == ['1/1/20', '1/1/21']
+
+- name: Configure the ports
+  arubanetworks.aoscx.aoscx_interfaces:
+    interfaces: "{{ test_ports }}"
+  register: result
+
+- name: Assert the ports were configured
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Configure the ports again (idempotent)
+  arubanetworks.aoscx.aoscx_interfaces:
+    interfaces: "{{ test_ports }}"
+  register: result
+
+- name: Assert no change on re-run
+  ansible.builtin.assert:
+    that:
+      - not result.changed
+
+- name: Reset the settings
+  arubanetworks.aoscx.aoscx_interfaces:
+    interfaces: "{{ test_ports }}"
+    state: delete
+  register: result
+
+- name: Assert the settings were reset
+  ansible.builtin.assert:
+    that:
+      - result.changed
+
+- name: Reset the settings again (idempotent)
+  arubanetworks.aoscx.aoscx_interfaces:
+    interfaces: "{{ test_ports }}"
+    state: delete
+  register: result
+
+- name: Assert no change on second reset
+  ansible.builtin.assert:
+    that:
+      - not result.changed
