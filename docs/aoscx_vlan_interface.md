@@ -87,6 +87,17 @@ on AOS-CX devices.
       Must be used in together with active_gateway_ip.
     type: str
     required: false
+  local_proxy_arp_exclude:
+    description: >
+      IPv4 addresses excluded from local proxy ARP on the VLAN interface (CLI
+      ip local-proxy-arp exclude <ip_address> in the interface vlan context).
+      The list replaces the current one and is compared regardless of order,
+      an empty list removes all the exclusions. At most 256 addresses. When
+      omitted it is left unchanged. Ignored when state is delete. Requires a
+      pyaoscx version providing Interface.set_local_proxy_arp_ip_exemption().
+    type: list
+    elements: str
+    required: false
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -141,4 +152,16 @@ on AOS-CX devices.
       acl_type: ipv4
       acl_direction: routed-in
       state: delete
+
+  - name: Exclude two hosts from local proxy ARP on VLAN Interface 100
+    aoscx_vlan_interface:
+      vlan_id: 100
+      local_proxy_arp_exclude:
+        - 10.10.20.10
+        - 10.10.20.11
+
+  - name: Remove all the local proxy ARP exclusions of VLAN Interface 100
+    aoscx_vlan_interface:
+      vlan_id: 100
+      local_proxy_arp_exclude: []
 ```

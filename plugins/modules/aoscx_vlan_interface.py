@@ -105,6 +105,18 @@ options:
       Must be used in together with active_gateway_ip.
     type: str
     required: false
+  local_proxy_arp_exclude:
+    description: >
+      IPv4 addresses excluded from local proxy ARP on the VLAN interface (CLI
+      C(ip local-proxy-arp exclude <ip_address>) in the C(interface vlan)
+      context). The list replaces the current one and is compared regardless
+      of order, an empty list removes all the exclusions. At most 256
+      addresses. When omitted it is left unchanged. Ignored when I(state) is
+      C(delete). Requires a pyaoscx version providing
+      C(Interface.set_local_proxy_arp_ip_exemption()).
+    type: list
+    elements: str
+    required: false
   state:
     description: Create or update or delete the VLAN.
     required: false
@@ -156,6 +168,18 @@ EXAMPLES = """
       acl_name: ipv4_acl
       acl_type: ipv4
       acl_direction: routed-in
+
+  - name: Exclude two hosts from local proxy ARP on VLAN Interface 100
+    aoscx_vlan_interface:
+      vlan_id: 100
+      local_proxy_arp_exclude:
+        - 10.10.20.10
+        - 10.10.20.11
+
+  - name: Remove all the local proxy ARP exclusions of VLAN Interface 100
+    aoscx_vlan_interface:
+      vlan_id: 100
+      local_proxy_arp_exclude: []
       state: delete
 """
 
@@ -185,6 +209,7 @@ def main():
         ),
         active_gateway_ip=dict(type="str", default=None),
         active_gateway_mac_v4=dict(type="str", default=None),
+        local_proxy_arp_exclude=dict(type="list", elements="str"),
     )
     ansible_module = AnsibleModule(
         argument_spec=module_args,
@@ -204,6 +229,7 @@ def main():
     acl_direction = ansible_module.params["acl_direction"]
     active_gateway_ip = ansible_module.params["active_gateway_ip"]
     active_gateway_mac_v4 = ansible_module.params["active_gateway_mac_v4"]
+    local_proxy_arp_exclude = ansible_module.params["local_proxy_arp_exclude"]
     state = ansible_module.params["state"]
 
     # Set IP variable as empty arrays
@@ -235,6 +261,16 @@ def main():
 
     device = Device(session)
     vlan_interface = device.interface(vlan_interface_id)
+    if (
+        local_proxy_arp_exclude is not None
+        and state != "delete"
+        and not hasattr(vlan_interface, "set_local_proxy_arp_ip_exemption")
+    ):
+        ansible_module.fail_json(
+            msg="local_proxy_arp_exclude requires a pyaoscx version "
+            "providing Interface.set_local_proxy_arp_ip_exemption(), "
+            "please upgrade pyaoscx."
+        )
     modified = vlan_interface.modified
     exists = not modified
     modified_op = False
@@ -308,6 +344,15 @@ def main():
                 active_gateway_ip, active_gateway_mac_v4
             )
             modified_op = modified_op2 or modified_op
+
+        if local_proxy_arp_exclude is not None:
+            try:
+                if vlan_interface.set_local_proxy_arp_ip_exemption(
+                    local_proxy_arp_exclude
+                ):
+                    modified_op |= vlan_interface.apply()
+            except Exception as e:
+                ansible_module.fail_json(msg=str(e))
 
         if ip_helper_address:
             # Create DHCP_Relay object

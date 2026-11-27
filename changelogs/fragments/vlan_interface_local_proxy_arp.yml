@@ -1,0 +1,2 @@
+minor_changes:
+  - aoscx_vlan_interface - Add the ``local_proxy_arp_exclude`` option to list the IPv4 addresses excluded from local proxy ARP (CLI ``ip local-proxy-arp exclude <ip_address>``). It requires a pyaoscx version providing ``Interface.set_local_proxy_arp_ip_exemption()``.
