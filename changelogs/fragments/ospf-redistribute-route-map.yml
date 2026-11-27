@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - aoscx_ospf_router - New option ``redistribute_route_maps`` to attach a
+    route map to a redistribution (``redistribute bgp route-map NAME``).

@@ -213,6 +213,17 @@ options:
       - static
       - bgp
       - rip
+  redistribute_route_maps:
+    description: >
+      Route map filtering the routes redistributed from each source into this
+      OSPF instance (C(redistribute bgp route-map NAME) in the CLI). The keys
+      are the sources, the values the route map names. The sources are merged
+      with the existing ones, except with I(state=override) where the ones not
+      given are detached. An empty name detaches the route map of that source.
+      The route map must already exist, and the source should also be in
+      I(redistribute).
+    required: false
+    type: dict
   redistribute_ospf:
     description: >
       Redistribute routes from other OSPF instances into this OSPF instance. If
@@ -331,6 +342,17 @@ EXAMPLES = """
       - 1/1/6
 
 - name: >
+    Update OSPF Router, redistribute BGP routes filtered by a route map.
+  aoscx_ospf_router:
+    state: update
+    vrf: default
+    instance_tag: 1
+    redistribute:
+      - bgp
+    redistribute_route_maps:
+      bgp: BGP-TO-OSPF
+
+- name: >
     Update OSPF Router, add connected to the redistribute methods list.
   aoscx_ospf_router:
     state: update
@@ -393,6 +415,10 @@ except ImportError:
 if HAS_PYAOSCX:
     from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_pyaoscx import (  # NOQA
         get_pyaoscx_session,
+    )
+    from ansible_collections.arubanetworks.aoscx.plugins.module_utils.aoscx_routing_policy import (  # NOQA
+        check_reference,
+        reference_uri,
     )
 
 
@@ -542,6 +568,11 @@ def get_argument_spec():
                 "rip",
             ],
         },
+        "redistribute_route_maps": {
+            "type": "dict",
+            "required": False,
+            "default": None,
+        },
         "redistribute_ospf": {
             "type": "list",
             "required": False,
@@ -630,6 +661,7 @@ def main():
     instance_tag = params.pop("instance_tag")
     vrf = params.pop("vrf")
     state = params.pop("state")
+    route_maps = params.pop("redistribute_route_maps", None)
 
     session = get_pyaoscx_session(ansible_module)
 
@@ -644,7 +676,29 @@ def main():
         if params[key] is None:
             del params[key]
 
-    ospf_router = OspfRouter(session, instance_tag, vrf, **params)
+    route_map_uris = {}
+    if route_maps:
+        valid = ["connected", "local_loopback", "static", "bgp", "rip"]
+        for source, name in route_maps.items():
+            if source not in valid:
+                ansible_module.fail_json(
+                    msg="Unknown redistribute source {0}, use one of: "
+                    "{1}".format(source, ", ".join(valid))
+                )
+            if name:
+                check_reference(ansible_module, session, "route map", name)
+                route_map_uris[source] = reference_uri(
+                    session, "route map", name
+                )
+            else:
+                route_map_uris[source] = None
+
+    new_params = dict(params)
+    if route_maps and state != "delete":
+        new_params["redistribute_route_map"] = {
+            k: v for k, v in route_map_uris.items() if v
+        }
+    ospf_router = OspfRouter(session, instance_tag, vrf, **new_params)
     try:
         ospf_router.get()
         exists = True
@@ -706,6 +760,18 @@ def main():
             _olist = list(set(_olist) | set(present))
             result["changed"] |= bool(set(_olist) - set(present))
         setattr(ospf_router, olist, _olist)
+
+    if route_maps:
+        present = dict(ospf_router.redistribute_route_map or {})
+        desired = {} if state == "override" else dict(present)
+        for source, uri in route_map_uris.items():
+            if uri:
+                desired[source] = uri
+            else:
+                desired.pop(source, None)
+        if desired != present:
+            result["changed"] = True
+            ospf_router.redistribute_route_map = desired
 
     for key, value in params.items():
         present = getattr(ospf_router, key)
